@@ -5,6 +5,7 @@
 *.user
 *.sdf
 *.opensdf
+*.spv
 Debug/
 Release/
 Floorplan/
