@@ -10,6 +10,7 @@
 #include <optional>
 #include <set>
 #include <fstream>
+#include <chrono>
 
 const int WIDTH = 800;
 const int HEIGHT = 600;
@@ -941,9 +942,21 @@ private:
 	}
 
 	void mainLoop() {
+		long long timec = 0;
+		int framec = 0;
 		while (!glfwWindowShouldClose(window)) {
+			auto start = std::chrono::steady_clock::now();
 			glfwPollEvents();
 			drawFrame();
+			auto end = std::chrono::steady_clock::now();
+			auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start);
+			timec += duration.count();
+			if (timec > 1000000000) {
+				timec -= 1000000000;
+				std::cout << framec << std::endl;
+				framec = 0;
+			}
+			framec++;
 		}
 
 		vkDeviceWaitIdle(device);
