@@ -523,13 +523,17 @@ private:
 
 		for (const auto& availablePresentMode : availablePresentModes) {
 			if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
+				std::cout << "Mailbox_khr" << std::endl;
 				return availablePresentMode;
 			}
 			else if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
+				std::cout << "Immediate_khr" << std::endl;
 				bestMode = availablePresentMode;
 			}
 		}
-
+		if (bestMode == VK_PRESENT_MODE_FIFO_KHR) {
+			std::cout << "Fifo_khr" << std::endl;
+		}
 		return bestMode;
 	}
 
