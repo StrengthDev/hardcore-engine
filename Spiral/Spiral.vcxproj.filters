@@ -13,21 +13,17 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Resource Files\shaders">
-      <UniqueIdentifier>{917ba637-34db-4ce1-885d-1bda1b8858d3}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Spiral\Main.cpp">
+    <ClCompile Include="src\Test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Resources\shaders\shader.frag">
-      <Filter>Resource Files\shaders</Filter>
+    <None Include="assets\shaders\compile.bat">
+      <Filter>Source Files</Filter>
     </None>
-    <None Include="Resources\shaders\shader.vert">
-      <Filter>Resource Files\shaders</Filter>
-    </None>
+    <None Include="assets\shaders\shader.frag" />
+    <None Include="assets\shaders\shader.vert" />
   </ItemGroup>
 </Project>

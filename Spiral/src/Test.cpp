@@ -30,9 +30,9 @@ const std::vector<const char*> deviceExtensions = {
 };
 
 #ifdef NDEBUG
-	const bool enableValidationLayers = false;
+const bool enableValidationLayers = false;
 #else
-	const bool enableValidationLayers = true;
+const bool enableValidationLayers = true;
 #endif
 
 
@@ -473,7 +473,7 @@ private:
 
 		return requiredExtensions.empty();
 	}
-	
+
 	void createSurface() {
 		if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create window surface!");
@@ -552,7 +552,7 @@ private:
 
 			actualExtent.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, actualExtent.width));
 			actualExtent.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, actualExtent.height));
-			
+
 			return actualExtent;
 		}
 	}
@@ -670,8 +670,8 @@ private:
 	}
 
 	void createGraphicsPipeline() {
-		std::vector<char> vertShaderCode = readFile("Resources/shaders/vert.spv");
-		std::vector<char> fragShaderCode = readFile("Resources/shaders/frag.spv");
+		std::vector<char> vertShaderCode = readFile("assets/shaders/vert.spv");
+		std::vector<char> fragShaderCode = readFile("assets/shaders/frag.spv");
 
 		VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
 		VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
@@ -1224,7 +1224,7 @@ private:
 			throw std::runtime_error("failed to acquire swap chain image!");
 		}
 		updateUniformBuffer(imageIndex);
-		
+
 		VkSubmitInfo submitInfo = {};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
@@ -1240,7 +1240,7 @@ private:
 		VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
 		submitInfo.signalSemaphoreCount = 1;
 		submitInfo.pSignalSemaphores = signalSemaphores;
-		
+
 		vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
 		if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
