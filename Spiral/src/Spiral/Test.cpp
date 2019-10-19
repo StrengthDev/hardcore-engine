@@ -15,6 +15,7 @@
 #include <set>
 #include <fstream>
 #include <chrono>
+#include "Test.hpp"
 
 const int WIDTH = 800;
 const int HEIGHT = 600;
@@ -1371,6 +1372,12 @@ private:
 	}
 };
 
+void Test::run() {
+	HelloTriangleApplication app;
+	app.run();
+}
+
+/*
 int main() {
 	HelloTriangleApplication app;
 
@@ -1383,4 +1390,4 @@ int main() {
 	}
 
 	return EXIT_SUCCESS;
-}
+}*/
