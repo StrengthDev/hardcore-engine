@@ -1,7 +1,6 @@
-#include "Client.hpp"
+#include "pch.hpp"
 
-#include <iostream>
-#include <stdexcept>
+#include "Client.hpp"
 
 namespace Spiral
 {

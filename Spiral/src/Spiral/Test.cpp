@@ -1,20 +1,10 @@
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include "pch.hpp"
+
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <array>
-#include <iostream>
-#include <stdexcept>
-#include <algorithm>
-#include <vector>
-#include <cstring>
-#include <cstdlib>
-#include <optional>
-#include <set>
-#include <fstream>
-#include <chrono>
+
 #include "Test.hpp"
 
 const int WIDTH = 800;
@@ -62,7 +52,7 @@ static std::vector<char> readFile(const std::string& filename) {
 	}
 
 	size_t fileSize = (size_t)file.tellg();
-	std::vector<char> buffer(fileSize);
+	std::vector<char> buffer(fileSize); //allocates in the heap(malloc), might want a custom solution
 	file.seekg(0);
 	file.read(buffer.data(), fileSize);
 	file.close();
