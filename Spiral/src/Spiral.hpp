@@ -1,4 +1,6 @@
 #pragma once
 
-#include "Spiral/Client.hpp"
-#include "Spiral/EntryPoint.hpp"
+#include "Spiral/Core/Client.hpp"
+#include "Spiral/Debug/Log.hpp"
+
+#include "Spiral/Core/EntryPoint.hpp"

@@ -3,7 +3,7 @@
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-
+#include <thread>
 
 #include "Test.hpp"
 
@@ -255,8 +255,10 @@ private:
 		std::vector<VkExtensionProperties> extensions(extensionCount);
 		vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
 		std::cout << "available extensions:" << std::endl;
+		SPRL_CORE_INFO("Available extensions:");
 		for (const auto& extension : extensions) {
-			std::cout << "\t" << extension.extensionName << std::endl;
+			//std::cout << "\t" << extension.extensionName << std::endl;
+			SPRL_CORE_INFO(extension.extensionName);
 		}
 	}
 
@@ -266,7 +268,8 @@ private:
 		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 		void* pUserData) {
 
-		std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+		//std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+		SPRL_CORE_ERROR("Validation layer: {0}", pCallbackData->pMessage);
 
 		return VK_FALSE;
 	}
@@ -519,16 +522,19 @@ private:
 
 		for (const auto& availablePresentMode : availablePresentModes) {
 			if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-				std::cout << "Mailbox_khr" << std::endl;
+				//std::cout << "Mailbox_khr" << std::endl;
+				SPRL_CORE_INFO("Present mode: {0}", "MAILBOX_KHR");
 				return availablePresentMode;
 			}
 			else if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
-				std::cout << "Immediate_khr" << std::endl;
+				//std::cout << "Immediate_khr" << std::endl;
+				SPRL_CORE_INFO("Present mode: {0}", "IMMEDIATE_KHR");
 				bestMode = availablePresentMode;
 			}
 		}
 		if (bestMode == VK_PRESENT_MODE_FIFO_KHR) {
-			std::cout << "Fifo_khr" << std::endl;
+			//std::cout << "Fifo_khr" << std::endl;
+			SPRL_CORE_INFO("Present mode: {0}", "FIFO_KHR");
 		}
 		return bestMode;
 	}
@@ -1318,7 +1324,8 @@ private:
 			timec += duration.count();
 			if (timec > 1000000000) {
 				timec -= 1000000000;
-				std::cout << framec << std::endl;
+				//std::cout << framec << std::endl;
+				SPRL_CORE_DEBUG(framec);
 				framec = 0;
 			}
 			framec++;
@@ -1364,7 +1371,14 @@ private:
 
 void Test::run() {
 	HelloTriangleApplication app;
-	app.run();
+	try {
+		app.run();
+	}
+	catch (const std::exception& e) {
+		std::cerr << e.what() << std::endl;
+		std::chrono::seconds timespan(10);
+		std::this_thread::sleep_for(timespan);
+	}
 }
 
 /*

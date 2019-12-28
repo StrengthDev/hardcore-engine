@@ -1,7 +1,7 @@
 #pragma once
 
-#include <array>
 #include <iostream>
+#include <array>
 #include <stdexcept>
 #include <algorithm>
 #include <vector>
@@ -11,6 +11,9 @@
 #include <set>
 #include <fstream>
 #include <chrono>
+
+
+#include "Spiral/Debug/Log.hpp"
 
 
 #define GLFW_INCLUDE_VULKAN

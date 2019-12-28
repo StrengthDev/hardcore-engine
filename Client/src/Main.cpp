@@ -1,14 +1,14 @@
 #include <Spiral.hpp>
 
-class Client : public Spiral::Client
+class ExampleClient : public Spiral::Client
 {
 public:
-	Client()
+	ExampleClient()
 	{
-
+		SPRL_INFO("Initializing Client");
 	}
 
-	~Client()
+	~ExampleClient()
 	{
 
 	}
@@ -16,5 +16,5 @@ public:
 
 Spiral::Client* Spiral::Start()
 {
-	return new Client();
+	return new ExampleClient();
 }

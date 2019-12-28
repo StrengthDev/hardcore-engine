@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Core.hpp"
-#include "Test.hpp"
+#include "Spiral/Test.hpp"
 
 namespace Spiral
 {
