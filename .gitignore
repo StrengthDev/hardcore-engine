@@ -6,8 +6,6 @@
 *.sdf
 *.opensdf
 *.spv
-Debug/
-Release/
 Floorplan/
 bin/
 binINT/

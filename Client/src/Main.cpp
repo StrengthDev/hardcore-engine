@@ -5,7 +5,7 @@ class ExampleClient : public Spiral::Client
 public:
 	ExampleClient()
 	{
-		SPRL_INFO("Initializing Client");
+		
 	}
 
 	~ExampleClient()
