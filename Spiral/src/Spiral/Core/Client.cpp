@@ -4,9 +4,13 @@
 
 namespace Spiral
 {
+	Client* Client::instance = nullptr;
+
 	Client::Client()
 	{
+		instance = this;
 
+		//layerstack = LayerStack(LAYER_TIERS);
 	}
 
 	Client::~Client()
@@ -14,7 +18,17 @@ namespace Spiral
 
 	}
 
-	void Client::Run()
+	void Client::pushLayer(Layer* layer, uint32_t tier)
+	{
+
+	}
+
+	void Client::popLayer(uint32_t tier)
+	{
+
+	}
+
+	void Client::run()
 	{
 		Test app;
 

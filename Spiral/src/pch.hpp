@@ -11,10 +11,8 @@
 #include <set>
 #include <fstream>
 #include <chrono>
+#include <thread>
 
 
 #include "Spiral/Debug/Log.hpp"
 
-
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>

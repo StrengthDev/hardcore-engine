@@ -9,13 +9,13 @@
 #endif
 
 
-extern Spiral::Client* Spiral::Start();
+extern Spiral::Client* Spiral::start();
 
 int main(int argc, char** argv)
 {
 	LOGINIT;
-	auto client = Spiral::Start();
-	client->Run();
+	auto client = Spiral::start();
+	client->run();
 	delete client;
 	LOGSHUTDOWN;
 }

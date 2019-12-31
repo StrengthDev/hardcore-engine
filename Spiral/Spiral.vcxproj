@@ -185,6 +185,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\Spiral\Core\Client.cpp" />
+    <ClCompile Include="src\Spiral\Core\Layer.cpp" />
+    <ClCompile Include="src\Spiral\Core\LayerStack.cpp" />
     <ClCompile Include="src\Spiral\Debug\Log.cpp" />
     <ClCompile Include="src\Spiral\Render\Shader.cpp" />
     <ClCompile Include="src\Spiral\Test.cpp" />
@@ -195,6 +197,9 @@
     <ClInclude Include="src\Spiral\Core\Client.hpp" />
     <ClInclude Include="src\Spiral\Core\Core.hpp" />
     <ClInclude Include="src\Spiral\Core\EntryPoint.hpp" />
+    <ClInclude Include="src\Spiral\Event\Event.hpp" />
+    <ClInclude Include="src\Spiral\Core\Layer.hpp" />
+    <ClInclude Include="src\Spiral\Core\LayerStack.hpp" />
     <ClInclude Include="src\Spiral\Debug\Log.hpp" />
     <ClInclude Include="src\Spiral\Render\Shader.hpp" />
     <ClInclude Include="src\Spiral\Test.hpp" />
