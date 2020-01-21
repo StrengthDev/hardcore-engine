@@ -13,20 +13,20 @@ namespace Spiral
 	SPIRAL_API inline std::shared_ptr<spdlog::logger>& clientLog();
 }
 
-#ifdef NDEBUG
+#ifndef NDEBUG
 #define SPRL_CORE_TRACE(...)
-#define SPRL_CORE_INFO(...)
-#define SPRL_CORE_CRIT(...)
-#define SPRL_CORE_WARN(...)
+#define SPRL_CORE_DEBUG(...)
+#define SPRL_CORE_INFO(...)	
+#define SPRL_CORE_WARN(...)	
 #define SPRL_CORE_ERROR(...)
-#define SPRL_CORE_FATAL(...)
+#define SPRL_CORE_CRIT(...)	
 
-#define SPRL_TRACE(...)
-#define SPRL_INFO(...)
-#define SPRL_CRIT(...)
-#define SPRL_WARN(...)
-#define SPRL_ERROR(...)
-#define SPRL_FATAL(...)
+#define SPRL_TRACE(...)		
+#define SPRL_DEBUG(...)		
+#define SPRL_INFO(...)		
+#define SPRL_WARN(...)		
+#define SPRL_ERROR(...)		
+#define SPRL_CRIT(...)		
 #else
 #define SPRL_CORE_TRACE(...)	Spiral::coreLog()->trace(__VA_ARGS__)
 #define SPRL_CORE_DEBUG(...)	Spiral::coreLog()->debug(__VA_ARGS__)

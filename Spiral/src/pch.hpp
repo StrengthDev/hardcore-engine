@@ -12,6 +12,7 @@
 #include <fstream>
 #include <chrono>
 #include <thread>
+#include <functional>
 
 
 #include "Spiral/Debug/Log.hpp"

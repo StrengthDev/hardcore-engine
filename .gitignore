@@ -6,6 +6,7 @@
 *.sdf
 *.opensdf
 *.spv
+*.png
 Floorplan/
 bin/
 binINT/

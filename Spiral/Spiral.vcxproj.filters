@@ -36,6 +36,12 @@
     <ClCompile Include="src\Spiral\Core\Layer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\Spiral\Core\Window.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Spiral\Core\Event.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Spiral.hpp">
@@ -68,7 +74,13 @@
     <ClInclude Include="src\Spiral\Core\LayerStack.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Spiral\Event\Event.hpp">
+    <ClInclude Include="src\Spiral\Core\Window.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Spiral\Core\WindowObject.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Spiral\Core\Event.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

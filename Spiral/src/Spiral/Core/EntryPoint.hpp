@@ -1,11 +1,11 @@
 #pragma once
 
 #ifndef NDEBUG
-#define LOGINIT Spiral::logInit()
-#define LOGSHUTDOWN Spiral::logShutdown()
-#else
 #define LOGINIT
 #define LOGSHUTDOWN
+#else
+#define LOGINIT Spiral::logInit()
+#define LOGSHUTDOWN Spiral::logShutdown()
 #endif
 
 

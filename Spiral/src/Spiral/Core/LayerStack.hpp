@@ -1,24 +1,30 @@
 #pragma once
 
-#include "pch.hpp"
-
 #include "Core.hpp"
 #include "Layer.hpp"
 
+#include <vector>
+
 namespace Spiral
 {
-	class SPIRAL_API LayerStack
+	struct LayerStack
 	{
-	public:
-		LayerStack();
+		// because the vectors contain pointers instead of actual data, the pointers must be cleared manually
+		std::vector<Layer*> basestack;
+		std::vector<Layer*> overlaystack;
+		
+		LayerStack() = default;
 
 		~LayerStack();
 
-		void push(Layer* layer, uint32_t tier);
+		void pushLayer(Spiral::Layer* layer);
 
-		void pop(uint32_t tier);
+		void pushOverlay(Spiral::Layer* layer);
 
-	private:
+		void popLayer();
 
+		void popOverlay();
+
+		void clear();
 	};
 }

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Core.hpp"
-#include "Spiral/Event/Event.hpp"
+#include "Event.hpp"
 
 namespace Spiral
 {
