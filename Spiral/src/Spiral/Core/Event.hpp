@@ -15,7 +15,7 @@ namespace Spiral
 		MouseButtonPressed, MouseButtonReleased, MouseMoved, MouseScrolled
 	};
 
-	enum class EventCategory : uint16_t
+	enum EventCategory : uint16_t
 	{
 		None = 0,
 		Application		= BIT(0),
@@ -28,13 +28,29 @@ namespace Spiral
 	struct Event
 	{
 		EventType type;
-		EventCategory categories;
+		uint16_t categories;
 
-		uint16_t x;
-		uint16_t y;
+		union val64
+		{
+			int64_t i;
+			uint64_t u;
+			double f;
+			char c;
+			wchar_t w; //Cannot log this
+		};
+
+		val64 x;
+		val64 y;
 
 		//constructor type functions
-		static Event windowResize(uint16_t width, uint16_t height);
+		static Event windowResize(int64_t width, int64_t height);
 		static Event windowClose();
+		static Event keyPressed(int64_t key, int64_t scancode);
+		static Event keyReleased(int64_t key, int64_t scancode);
+		static Event keyTyped(uint64_t codepoint);
+		static Event mouseButtonPressed(int64_t button);
+		static Event mouseButtonReleased(int64_t button);
+		static Event mouseMoved(double xpos, double ypos);
+		static Event mouseScrolled(double xoffset, double yoffset);
 	};
 }

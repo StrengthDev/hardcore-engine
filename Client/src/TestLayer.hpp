@@ -2,14 +2,21 @@
 
 #include <Spiral.hpp>
 
+#include <chrono>
+
 class TestLayer : public Spiral::Layer
 {
 public:
 	TestLayer();
 
-	~TestLayer() override;
+	~TestLayer();
 
 	void tick() override;
 
-	bool handleEvent(Spiral::Event e) override;
+	bool handleEvent(Spiral::Event &e) override;
+
+private:
+	std::chrono::time_point<std::chrono::steady_clock> start;
+	long long timec;
+	int framec;
 };

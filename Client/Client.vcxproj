@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\ELLayer.cpp" />
     <ClCompile Include="src\Main.cpp" />
     <ClCompile Include="src\TestLayer.cpp" />
   </ItemGroup>
@@ -33,6 +34,7 @@
     <None Include="assets\shaders\shader.vert" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\ELLayer.hpp" />
     <ClInclude Include="src\TestLayer.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

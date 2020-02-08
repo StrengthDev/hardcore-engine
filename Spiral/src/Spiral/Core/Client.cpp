@@ -31,6 +31,10 @@ namespace Spiral
 
 		window = Window::init();
 		window->setEventCallback(std::bind(&Client::pushEvent, this, std::placeholders::_1)); //because pushEvent is a member function, a forwarder function must be used 
+		window->setSizeCallback(std::bind(&Client::pushWindowSize, this, std::placeholders::_1, std::placeholders::_2));
+
+		window->getDimensions(&windowWidth, &windowHeight);
+		windowSizeChanged = false;
 
 		eventBuffer = (Event*)malloc(sizeof(Event) * EVENT_BUFFER_CAPACITY);
 		eventBufferSize = 0;
@@ -40,6 +44,7 @@ namespace Spiral
 
 	Client::~Client()
 	{
+		delete window;
 		uint16_t total = nLayers + nOverlays;
 		uint16_t i;
 		for (i = 0; i < total; i++)
@@ -70,7 +75,14 @@ namespace Spiral
 		}
 	}
 
-	void Client::pushLayer(Layer* layer)
+	void Client::pushWindowSize(int width, int height)
+	{
+		windowWidth = width;
+		windowHeight = height;
+		windowSizeChanged = true;
+	}
+
+	void Client::pushLayer(Layer *layer)
 	{
 		uint16_t i;
 		if (pushLayerSize + 1 > pushLayerCapacity)
@@ -98,7 +110,7 @@ namespace Spiral
 		popLayerBuffer++;
 	}
 
-	void Client::pushOverlay(Layer* layer)
+	void Client::pushOverlay(Layer *layer)
 	{
 		uint16_t i;
 		if (pushOverlaySize + 1 > pushOverlayCapacity)
@@ -133,72 +145,109 @@ namespace Spiral
 
 	void Client::run()
 	{
-//#define TEST
-#ifdef TEST
-		Test app;
-
-		try {
-			app.run();
-		}
-		catch (const std::exception& e) {
-			std::cerr << e.what() << std::endl;
-		}
-#else
-
+		uint16_t i, n;
+		Layer** t;
 		while (running)
 		{
-			uint16_t i;
-			//TODO: main loop
+			for (i = 0; i < nLayers + nOverlays; i++)
+			{
+				layerStack[i]->tick();
+			}
 
 			window->tick();
 
-			//TODO: insert resize window event
+			if (windowSizeChanged)
+			{
+				pushEvent(Event::windowResize(windowWidth, windowHeight));
+				windowSizeChanged = false;
+			}
 
 			while (eventBufferSize > 0)
 			{
-				SPRL_CORE_INFO("Window resize event: ({0}, {1}) - Index = {2}", eventBuffer[eventStart].x, eventBuffer[eventStart].y, eventStart);
-				//TODO: handle events by looping through layers
-
-				//TODO: handle missed events such as window close
+				for (i = nLayers + nOverlays - 1; i != 65535U; i--) //Kinda assuming the layer will never get as big as 65535, but it shouldnt
+				{
+					if (layerStack[i]->handleEvent(eventBuffer[eventStart]))
+					{
+						goto endevent;
+					}
+				}
+				
 				if (eventBuffer[eventStart].type == EventType::WindowClose)
 				{
 					running = false;
 				}
 
+				endevent:
 				eventStart = eventStart + 1 == EVENT_BUFFER_CAPACITY ? 0 : eventStart + 1;
 				eventBufferSize--;
 			}
 
-			if (popLayerBuffer > 0)
+			if (popOverlayBuffer)
 			{
-				//TODO: pop layers
-
-				popLayerBuffer = 0;
-			}
-
-			if (popOverlayBuffer > 0)
-			{
-				//TODO: pop overlays
-
+				n = nLayers + nOverlays;
+				for (i = n - popOverlayBuffer; i < n; i++) 
+				{
+					delete layerStack[i];
+				}
+				nOverlays -= popOverlayBuffer;
 				popOverlayBuffer = 0;
 			}
 
-			if (pushLayerSize > 0)
+			if (popLayerBuffer)
 			{
-				//TODO: push layers
-				
-				pushLayerSize = 0;
+				for (i = nLayers - popOverlayBuffer; i < nLayers; i++)
+				{
+					delete layerStack[i];
+				}
+				nLayers -= popLayerBuffer;
+				for (i = nLayers; i < nLayers + nOverlays; i++)
+				{
+					layerStack[i] = layerStack[i + popLayerBuffer];
+				}
+				popLayerBuffer = 0;
 			}
 
-			if (pushOverlaySize > 0)
+			if (pushLayerSize || pushOverlaySize)
 			{
-				//TODO: push overlays
+				n = pushLayerSize + pushOverlaySize + nLayers + nOverlays;
+				if (n > layerStackCapacity)
+				{
+					i = (n / INITIAL_STACK_CAPACITY + 1) * INITIAL_STACK_CAPACITY;
+					t = (Layer**)malloc(sizeof(Layer*) * i);
+					layerStackCapacity = i;
+					for (i = 0; i < nLayers + nOverlays; i++)
+					{
+						t[i] = layerStack[i];
+					}
+					free(layerStack);
+					layerStack = t;
+				}
 
-				pushOverlaySize = 0;
+				if (pushLayerSize)
+				{
+					for (i = nLayers + nOverlays + pushLayerSize - 1; i > nLayers + pushLayerSize - 1; i--)
+					{
+						layerStack[i] = layerStack[i - pushLayerSize];
+					}
+					for (i = nLayers; i < nLayers + pushLayerSize; i++)
+					{
+						layerStack[i] = pushLayerBuffer[i - nLayers];
+					}
+					nLayers += pushLayerSize;
+					pushLayerSize = 0;
+				}
+
+				if (pushOverlaySize)
+				{
+					n = nLayers + nOverlays;
+					for (i = n; i < n + pushOverlaySize; i++)
+					{
+						layerStack[i] = pushOverlayBuffer[i - n];
+					}
+					nOverlays += pushOverlaySize;
+					pushOverlaySize = 0;
+				}
 			}
 		}
-
-		delete window; //TODO: move to destructor
-#endif 
 	}
 }

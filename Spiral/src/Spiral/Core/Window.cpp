@@ -20,13 +20,14 @@ namespace Spiral
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
 		window = glfwCreateWindow(1080, 720, "Spiral Engine", nullptr, nullptr);
-		glfwSetWindowUserPointer(window, &data);
+		glfwSetWindowUserPointer(window, &callbackContainer);
 
 		glfwSetWindowSizeCallback(window, [](GLFWwindow* window, int width, int height)
 		{
 			EventCallbackContainer& container = *(EventCallbackContainer*)glfwGetWindowUserPointer(window);
 			//TODO: complete the callback
-			container.eventCallback(Event::windowResize(width, height));
+			//container.eventCallback(Event::windowResize(width, height));
+			container.sizeCallback(width, height);
 		});
 
 		glfwSetWindowCloseCallback(window, [](GLFWwindow* window)
@@ -37,27 +38,53 @@ namespace Spiral
 
 		glfwSetKeyCallback(window, [](GLFWwindow* window, int key, int scancode, int action, int mods)
 		{
-			//TODO: complete the callback
+			//TODO: might want to consider addings the mods to the Event object(shift, ctrl, alt and super)
+			EventCallbackContainer& container = *(EventCallbackContainer*)glfwGetWindowUserPointer(window);
+			switch (action)
+			{
+			case GLFW_PRESS:
+				container.eventCallback(Event::keyPressed(key, scancode));
+				return;
+			case GLFW_RELEASE:
+				container.eventCallback(Event::keyReleased(key, scancode));
+				return;
+			case GLFW_REPEAT:
+				container.eventCallback(Event::keyPressed(key, scancode));
+				return;
+			}
 		});
 
-		glfwSetCharCallback(window, [](GLFWwindow* window, unsigned int keycode)
+		glfwSetCharCallback(window, [](GLFWwindow* window, unsigned int codepoint)
 		{
-			//TODO: complete the callback
+			EventCallbackContainer& container = *(EventCallbackContainer*)glfwGetWindowUserPointer(window);
+			container.eventCallback(Event::keyTyped(codepoint));
 		});
 
 		glfwSetMouseButtonCallback(window, [](GLFWwindow* window, int button, int action, int mods)
 		{
-			//TODO: complete the callback
-		});
-
-		glfwSetScrollCallback(window, [](GLFWwindow* window, double xoffset, double yoffset)
-		{
-			//TODO: complete the callback
+			EventCallbackContainer& container = *(EventCallbackContainer*)glfwGetWindowUserPointer(window);
+			switch (action)
+			{
+			case GLFW_PRESS:
+				container.eventCallback(Event::mouseButtonPressed(button));
+				return;
+			case GLFW_RELEASE:
+				container.eventCallback(Event::mouseButtonReleased(button));
+				return;
+			}
 		});
 
 		glfwSetCursorPosCallback(window, [](GLFWwindow* window, double xpos, double ypos)
 		{
-			//TODO: complete the callback
+			//TODO: might want to optimize this callback in the same way as size callback, bloating eventbuffer without rendering
+			EventCallbackContainer& container = *(EventCallbackContainer*)glfwGetWindowUserPointer(window);
+			container.eventCallback(Event::mouseMoved(xpos, ypos));
+		});
+
+		glfwSetScrollCallback(window, [](GLFWwindow* window, double xoffset, double yoffset)
+		{
+			EventCallbackContainer& container = *(EventCallbackContainer*)glfwGetWindowUserPointer(window);
+			container.eventCallback(Event::mouseScrolled(xoffset, yoffset));
 		});
 	}
 
@@ -67,22 +94,27 @@ namespace Spiral
 		glfwTerminate();
 	}
 
-	void WindowObject::getDimensions(int* width, int* height) const
+	void WindowObject::getDimensions(int *width, int *height) const
 	{
 		glfwGetFramebufferSize(window, width, height);
 	}
 
-	void WindowObject::setEventCallback(const fnEventCallback& callback)
+	void WindowObject::setEventCallback(const fnEventCallback &callback)
 	{
-		data.eventCallback = callback;
+		callbackContainer.eventCallback = callback;
 	}
 
-	void WindowObject::setTitle(const char* title)
+	void WindowObject::setSizeCallback(const fnSizeCallback &callback)
+	{
+		callbackContainer.sizeCallback = callback;
+	}
+
+	void WindowObject::setTitle(const char *title)
 	{
 		glfwSetWindowTitle(window, title);
 	}
 
-	void WindowObject::setIcon(const char** files, unsigned int num)
+	void WindowObject::setIcon(const char **files, unsigned int num)
 	{
 		std::vector<GLFWimage> images(num);
 		unsigned int i;

@@ -16,11 +16,13 @@ namespace Spiral
 
 		void pushEvent(Event e);
 
-		void pushLayer(Layer* layer);
+		void pushWindowSize(int width, int height);
+
+		void pushLayer(Layer *layer);
 
 		inline void popLayer();
 
-		void pushOverlay(Layer* layer);
+		void pushOverlay(Layer *layer);
 
 		inline void popOverlay();
 
@@ -56,6 +58,10 @@ namespace Spiral
 		uint16_t eventBufferSize;
 		uint16_t eventStart; //Inclusive
 		uint16_t eventEnd; //Non-inclusive
+
+		int windowWidth;
+		int windowHeight;
+		bool windowSizeChanged;
 
 
 		static Client* instance; //There will be only one Client class instance during runtime

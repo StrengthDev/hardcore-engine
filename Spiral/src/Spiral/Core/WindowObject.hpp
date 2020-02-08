@@ -13,13 +13,14 @@ namespace Spiral
 
 		virtual ~WindowObject();
 
-		inline void getDimensions(int* width, int* height) const override;
+		inline void getDimensions(int *width, int *height) const override;
 
 		inline void setEventCallback(const fnEventCallback& callback) override;
+		inline void setSizeCallback(const fnSizeCallback &callback) override;
 
-		inline void setTitle(const char* title) override;
+		inline void setTitle(const char *title) override;
 
-		inline void setIcon(const char** files, unsigned int num) override;
+		inline void setIcon(const char **files, unsigned int num) override;
 
 		void tick() override;
 
@@ -29,8 +30,9 @@ namespace Spiral
 		struct EventCallbackContainer
 		{
 			fnEventCallback eventCallback;
+			fnSizeCallback sizeCallback;
 		};
 
-		EventCallbackContainer data;
+		EventCallbackContainer callbackContainer;
 	};
 }

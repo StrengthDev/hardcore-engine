@@ -14,7 +14,7 @@ namespace Spiral
 
 	}
 
-	bool Layer::handleEvent(Event e)
+	bool Layer::handleEvent(Event &e)
 	{
 		return false;
 	}

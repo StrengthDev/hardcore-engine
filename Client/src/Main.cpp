@@ -2,6 +2,7 @@
 #include <Spiral/Core/EntryPoint.hpp>
 
 #include "TestLayer.hpp"
+#include "ELLayer.hpp"
 
 class ExampleClient : public Spiral::Client
 {
@@ -9,6 +10,7 @@ public:
 	ExampleClient()
 	{
 		pushLayer(new TestLayer());
+		pushLayer(new ELLayer());
 
 		int width = 0, height = 0;
 		getWindow().getDimensions(&width, &height);
