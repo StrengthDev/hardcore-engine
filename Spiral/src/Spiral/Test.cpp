@@ -271,7 +271,7 @@ private:
 		void* pUserData) {
 
 		//std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
-		SPRL_CORE_ERROR("Validation layer: {0}", pCallbackData->pMessage);
+		SPRL_CORE_DEBUG("Validation layer: {0}", pCallbackData->pMessage);
 
 		return VK_FALSE;
 	}

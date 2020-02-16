@@ -8,8 +8,6 @@ namespace Spiral
 	static std::shared_ptr<spdlog::logger> coreLogger;
 	static std::shared_ptr<spdlog::logger> clientLogger;
 
-	static std::shared_ptr<int> t;
-
 	void logInit()
 	{
 		spdlog::set_pattern("%^[%T] %n: %v%$");

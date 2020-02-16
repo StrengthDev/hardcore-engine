@@ -11,7 +11,7 @@ public:
 
 	void tick() override;
 
-	bool handleEvent(Spiral::Event &e) override;
+	bool handleEvent(const Spiral::Event &e) override;
 
 private:
 

@@ -19,14 +19,14 @@ void TestLayer::tick()
 	if (timec > 1000000000)
 	{
 		timec -= 1000000000;
-		SPRL_DEBUG("Frame count: ({0})", framec);
+		SPRL_TRACE("Frame count: ({0})", framec);
 		framec = 0;
 	}
 	framec++;
 	start = std::chrono::steady_clock::now();
 }
 
-bool TestLayer::handleEvent(Spiral::Event &e)
+bool TestLayer::handleEvent(const Spiral::Event &e)
 {
 	return false;
 }

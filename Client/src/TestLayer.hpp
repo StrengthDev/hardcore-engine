@@ -13,7 +13,7 @@ public:
 
 	void tick() override;
 
-	bool handleEvent(Spiral::Event &e) override;
+	bool handleEvent(const Spiral::Event &e) override;
 
 private:
 	std::chrono::time_point<std::chrono::steady_clock> start;

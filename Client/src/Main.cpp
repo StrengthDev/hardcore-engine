@@ -12,10 +12,6 @@ public:
 		pushLayer(new TestLayer());
 		pushLayer(new ELLayer());
 
-		int width = 0, height = 0;
-		getWindow().getDimensions(&width, &height);
-		SPRL_DEBUG("Window size: ({0}, {1})", width, height);
-
 		getWindow().setTitle("Chad Engine");
 
 		const char* files[2] =
@@ -25,6 +21,7 @@ public:
 		};
 
 		getWindow().setIcon(files, 2);
+		//setProperties("Debug Program", 1, 0, 0);
 	}
 
 	~ExampleClient()

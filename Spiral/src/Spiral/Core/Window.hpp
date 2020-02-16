@@ -15,16 +15,18 @@ namespace Spiral
 
 		virtual ~Window() = default;
 
-		virtual void getDimensions(int *width, int *height) const = 0;
+		const virtual void getDimensions(int *width, int *height) const = 0;
 
 		virtual void setEventCallback(const fnEventCallback &callback) = 0;
 		virtual void setSizeCallback(const fnSizeCallback &callback) = 0;
 
 		virtual void setTitle(const char *title) = 0;
-
 		virtual void setIcon(const char **files, unsigned int num) = 0;
 
 		virtual void tick() = 0;
+
+		virtual void* getInstance() const = 0;
+
 
 		static Window* init();
 	};

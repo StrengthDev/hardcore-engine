@@ -15,18 +15,16 @@ namespace Spiral
 	WindowObject::WindowObject()
 	{
 		int init = glfwInit();
-		SPRL_CORE_DEBUG("Attempted to initialize GLFW, code ({0})", init); //code 1 = good
+		//SPRL_CORE_DEBUG("Attempted to initialize GLFW, code ({0})", init); //code 1 = good
 		glfwSetErrorCallback(errorCallback);
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 
 		window = glfwCreateWindow(1080, 720, "Spiral Engine", nullptr, nullptr);
 		glfwSetWindowUserPointer(window, &callbackContainer);
 
-		glfwSetWindowSizeCallback(window, [](GLFWwindow* window, int width, int height)
+		glfwSetWindowSizeCallback(window, [](GLFWwindow* window, int width, int height) //TODO: May need to add framebuffer callback, as it can differ on some machines
 		{
 			EventCallbackContainer& container = *(EventCallbackContainer*)glfwGetWindowUserPointer(window);
-			//TODO: complete the callback
-			//container.eventCallback(Event::windowResize(width, height));
 			container.sizeCallback(width, height);
 		});
 
@@ -38,7 +36,7 @@ namespace Spiral
 
 		glfwSetKeyCallback(window, [](GLFWwindow* window, int key, int scancode, int action, int mods)
 		{
-			//TODO: might want to consider addings the mods to the Event object(shift, ctrl, alt and super)
+			//TODO: might want to consider adding the mods to the Event object(shift, ctrl, alt and super)
 			EventCallbackContainer& container = *(EventCallbackContainer*)glfwGetWindowUserPointer(window);
 			switch (action)
 			{
@@ -94,7 +92,7 @@ namespace Spiral
 		glfwTerminate();
 	}
 
-	void WindowObject::getDimensions(int *width, int *height) const
+	const void WindowObject::getDimensions(int *width, int *height) const
 	{
 		glfwGetFramebufferSize(window, width, height);
 	}

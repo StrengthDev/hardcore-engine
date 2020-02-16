@@ -8,3 +8,14 @@
 
 
 #define BIT(x) (1 << x)
+
+namespace Spiral
+{
+	struct ECProperties //Engine/Client properties
+	{
+		const char* name;
+		unsigned int major;
+		unsigned int minor;
+		unsigned int patch;
+	};
+}

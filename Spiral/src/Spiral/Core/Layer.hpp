@@ -14,6 +14,6 @@ namespace Spiral
 
 		virtual void tick();
 
-		virtual bool handleEvent(Event &e);
+		virtual bool handleEvent(const Event &e);
 	};
 }

@@ -15,7 +15,7 @@ void ELLayer::tick()
 
 }
 
-bool ELLayer::handleEvent(Spiral::Event &e)
+bool ELLayer::handleEvent(const Spiral::Event &e)
 {
 	switch (e.type)
 	{

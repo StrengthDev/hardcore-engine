@@ -2,14 +2,20 @@
 
 #include "Client.hpp"
 
-#define EVENT_BUFFER_CAPACITY 100
 #define INITIAL_STACK_CAPACITY 5
 
 namespace Spiral
 {
+	ECProperties Client::engineProperties = {
+		SPIRAL_NAME,
+		SPIRAL_MAJOR_VERSION,
+		SPIRAL_MINOR_VERSION,
+		SPIRAL_PATCH_VERSION
+	};
+
 	Client* Client::instance = nullptr;
 
-	Client::Client()
+	Client::Client() //TODO: might want to consider giving an absolute size to the layerstack and move it to the stack memory space instead of heap
 	{
 		instance = this;
 		layerStack = (Layer**)malloc(sizeof(Layer*) * INITIAL_STACK_CAPACITY);
@@ -36,7 +42,8 @@ namespace Spiral
 		window->getDimensions(&windowWidth, &windowHeight);
 		windowSizeChanged = false;
 
-		eventBuffer = (Event*)malloc(sizeof(Event) * EVENT_BUFFER_CAPACITY);
+		setProperties("Spiral Application", 1, 0, 0);
+
 		eventBufferSize = 0;
 		eventStart = 0;
 		eventEnd = 0;
@@ -44,6 +51,7 @@ namespace Spiral
 
 	Client::~Client()
 	{
+		delete renderer;
 		delete window;
 		uint16_t total = nLayers + nOverlays;
 		uint16_t i;
@@ -55,7 +63,20 @@ namespace Spiral
 		free(layerStack);
 		free(pushLayerBuffer);
 		free(pushOverlayBuffer);
-		free(eventBuffer);
+	}
+
+	void Client::init()
+	{
+		//SPRL_CORE_TRACE(properties.name);
+		renderer = Renderer::init(engineProperties, properties);
+	}
+
+	void Client::setProperties(const char *name, unsigned int majorVersion, unsigned int minorVersion, unsigned int patchVersion)
+	{
+		properties.name = name;
+		properties.major = majorVersion;
+		properties.minor = minorVersion;
+		properties.patch = patchVersion;
 	}
 
 	static std::mutex eventMutex;
@@ -249,5 +270,10 @@ namespace Spiral
 				}
 			}
 		}
+	}
+
+	void Client::shutdown()
+	{
+		running = false;
 	}
 }
