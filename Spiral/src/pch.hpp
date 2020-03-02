@@ -2,7 +2,6 @@
 
 #include <iostream>
 #include <array>
-#include <stdexcept>
 #include <algorithm>
 #include <vector>
 #include <cstring>

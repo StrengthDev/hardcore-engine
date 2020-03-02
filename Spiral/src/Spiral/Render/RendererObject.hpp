@@ -2,8 +2,11 @@
 
 #include "Renderer.hpp"
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include "RenderCore.hpp"
+
+#include "Device.hpp"
+
+#define MAX_DEVICES 32
 
 namespace Spiral
 {
@@ -17,8 +20,9 @@ namespace Spiral
 	private:
 		VkInstance instance;
 		VkSurfaceKHR surface;
-		VkPhysicalDevice* availableDevices;
+		Device availableDevices[MAX_DEVICES];
 		uint32_t nAvailableDevices;
+		uint16_t presentDevice;
 
 		VkDebugUtilsMessengerEXT debugMessenger;
 	};

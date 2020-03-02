@@ -4,17 +4,6 @@
 
 #include "Spiral/Core/Client.hpp"
 
-
-const std::vector<const char*> validationLayers = {
-	"VK_LAYER_KHRONOS_validation"
-};
-
-#ifndef NDEBUG
-	const bool enableValidationLayers = false;
-#else
-	const bool enableValidationLayers = true;
-#endif
-
 namespace Spiral
 {
 	bool checkValidationLayerSupport()
@@ -53,7 +42,7 @@ namespace Spiral
 		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 		void* pUserData)
 	{
-		SPRL_CORE_DEBUG("[RENDERER] Validation layer: {0}", pCallbackData->pMessage);
+		SPRL_CORE_DEBUG("[VULKAN] {0}", pCallbackData->pMessage);
 
 		return VK_FALSE;
 	}
@@ -96,11 +85,12 @@ namespace Spiral
 			SPRL_CORE_INFO("[RENDERER] Available extensions:");
 			for (const auto& extension : extensions)
 			{
-				SPRL_CORE_INFO("[RENDERER] {0}", extension.extensionName);
+				SPRL_CORE_INFO("[RENDERER]  - {0}", extension.extensionName);
 			}
 		}
 
 		VkResult result;
+		uint32_t i;
 
 		VkApplicationInfo appInfo = {};	//has pNext for extension information
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -163,22 +153,31 @@ namespace Spiral
 			return;
 		}
 
-		uint32_t deviceCount = 0;
-		vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
-		if (deviceCount == 0)
+		nAvailableDevices = 0;
+		vkEnumeratePhysicalDevices(instance, &nAvailableDevices, nullptr);
+		if (nAvailableDevices == 0)
 		{
 			Client::get().shutdown();
 			return;
 		}
-		std::vector<VkPhysicalDevice> devices(deviceCount);
-		vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+		VkPhysicalDevice* devices = (VkPhysicalDevice*)malloc(sizeof(VkPhysicalDevice) * nAvailableDevices);
+		vkEnumeratePhysicalDevices(instance, &nAvailableDevices, devices);
+		for (i = 0; i < nAvailableDevices; i++)
+		{
+			availableDevices[i].init(devices[i], surface);
+		}
+		free(devices);
 
-		availableDevices = (VkPhysicalDevice*)malloc(sizeof(VkPhysicalDevice) * 2); //TODO: change obviously
+		presentDevice = 0; //TODO: select present device
 	}
 
 	RendererObject::~RendererObject()
 	{
-		delete availableDevices;
+		uint32_t i;
+		for (i = 0; i < nAvailableDevices; i++)
+		{
+			availableDevices[i].terminate();
+		}
 
 		if (enableValidationLayers)
 		{

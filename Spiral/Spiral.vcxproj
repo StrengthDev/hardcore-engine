@@ -189,8 +189,10 @@
     <ClCompile Include="src\Spiral\Core\Layer.cpp" />
     <ClCompile Include="src\Spiral\Core\Window.cpp" />
     <ClCompile Include="src\Spiral\Debug\Log.cpp" />
+    <ClCompile Include="src\Spiral\Render\Device.cpp" />
     <ClCompile Include="src\Spiral\Render\Renderer.cpp" />
     <ClCompile Include="src\Spiral\Render\Shader.cpp" />
+    <ClCompile Include="src\Spiral\Render\SwapChain.cpp" />
     <ClCompile Include="src\Spiral\Test.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -204,9 +206,12 @@
     <ClInclude Include="src\Spiral\Core\Event.hpp" />
     <ClInclude Include="src\Spiral\Core\Layer.hpp" />
     <ClInclude Include="src\Spiral\Debug\Log.hpp" />
+    <ClInclude Include="src\Spiral\Render\Device.hpp" />
     <ClInclude Include="src\Spiral\Render\Renderer.hpp" />
     <ClInclude Include="src\Spiral\Render\RendererObject.hpp" />
+    <ClInclude Include="src\Spiral\Render\RenderCore.hpp" />
     <ClInclude Include="src\Spiral\Render\Shader.hpp" />
+    <ClInclude Include="src\Spiral\Render\SwapChain.hpp" />
     <ClInclude Include="src\Spiral\Test.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
