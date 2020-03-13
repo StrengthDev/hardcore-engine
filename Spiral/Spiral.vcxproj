@@ -192,7 +192,7 @@
     <ClCompile Include="src\Spiral\Render\Device.cpp" />
     <ClCompile Include="src\Spiral\Render\Renderer.cpp" />
     <ClCompile Include="src\Spiral\Render\Shader.cpp" />
-    <ClCompile Include="src\Spiral\Render\SwapChain.cpp" />
+    <ClCompile Include="src\Spiral\Render\Swapchain.cpp" />
     <ClCompile Include="src\Spiral\Test.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -211,7 +211,7 @@
     <ClInclude Include="src\Spiral\Render\RendererObject.hpp" />
     <ClInclude Include="src\Spiral\Render\RenderCore.hpp" />
     <ClInclude Include="src\Spiral\Render\Shader.hpp" />
-    <ClInclude Include="src\Spiral\Render\SwapChain.hpp" />
+    <ClInclude Include="src\Spiral\Render\Swapchain.hpp" />
     <ClInclude Include="src\Spiral\Test.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

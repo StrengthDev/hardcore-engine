@@ -18,3 +18,5 @@ const bool enableValidationLayers = false;
 #else
 const bool enableValidationLayers = true;
 #endif
+
+#define MAX_FRAMES_IN_FLIGHT 2

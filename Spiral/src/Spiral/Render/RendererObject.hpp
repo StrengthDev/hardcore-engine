@@ -6,7 +6,7 @@
 
 #include "Device.hpp"
 
-#define MAX_DEVICES 32
+#define MAX_DEVICES 8
 
 namespace Spiral
 {
@@ -16,13 +16,15 @@ namespace Spiral
 		RendererObject(ECProperties engineProps, ECProperties clientProps);
 		~RendererObject();
 
+		void presentFrame() override;
+
 
 	private:
 		VkInstance instance;
 		VkSurfaceKHR surface;
 		Device availableDevices[MAX_DEVICES];
 		uint32_t nAvailableDevices;
-		uint16_t presentDevice;
+		uint16_t presentDeviceIndex;
 
 		VkDebugUtilsMessengerEXT debugMessenger;
 	};

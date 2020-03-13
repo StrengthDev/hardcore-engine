@@ -73,6 +73,7 @@ namespace Spiral
 	{
 		if (enableValidationLayers && !checkValidationLayerSupport())
 		{
+			DEBUG_BREAK;
 			Client::get().shutdown();
 			return;
 		}
@@ -124,6 +125,7 @@ namespace Spiral
 		result = vkCreateInstance(&createInfo, nullptr, &instance);
 		if (result != VK_SUCCESS)
 		{
+			DEBUG_BREAK;
 			Client::get().shutdown();
 			return;
 		}
@@ -140,6 +142,7 @@ namespace Spiral
 			result = CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger);
 			if (result != VK_SUCCESS)
 			{
+				DEBUG_BREAK;
 				Client::get().shutdown();
 				return;
 			}
@@ -149,6 +152,7 @@ namespace Spiral
 		result = glfwCreateWindowSurface(instance, window, nullptr, &surface);
 		if (result != VK_SUCCESS)
 		{
+			DEBUG_BREAK;
 			Client::get().shutdown();
 			return;
 		}
@@ -157,6 +161,7 @@ namespace Spiral
 		vkEnumeratePhysicalDevices(instance, &nAvailableDevices, nullptr);
 		if (nAvailableDevices == 0)
 		{
+			DEBUG_BREAK;
 			Client::get().shutdown();
 			return;
 		}
@@ -167,8 +172,15 @@ namespace Spiral
 			availableDevices[i].init(devices[i], surface);
 		}
 		free(devices);
+		
+		presentDeviceIndex = 0; //TODO: select present device
 
-		presentDevice = 0; //TODO: select present device
+		if (!availableDevices[presentDeviceIndex].createSwapchain())
+		{
+			DEBUG_BREAK;
+			Client::get().shutdown();
+			return;
+		}
 	}
 
 	RendererObject::~RendererObject()
@@ -186,6 +198,14 @@ namespace Spiral
 
 		vkDestroySurfaceKHR(instance, surface, nullptr);
 		vkDestroyInstance(instance, nullptr);
+	}
+
+	void RendererObject::presentFrame()
+	{
+		if (availableDevices[presentDeviceIndex].drawFrame())
+		{
+			Client::get().shutdown();
+		}
 	}
 
 	Renderer* Renderer::init(ECProperties engineProps, ECProperties clientProps)

@@ -1,27 +1,19 @@
 #pragma once
 
 #include "RenderCore.hpp"
-#include "SwapChain.hpp"
+#include "Swapchain.hpp"
 
 namespace Spiral
 {
-	class Device //TODO: SLI/crossfire support, change to struct
+	struct Device //TODO: SLI/crossfire support
 	{
-	public:
-		Device();
-		void init(VkPhysicalDevice physical, VkSurfaceKHR surface);
-		void terminate();
-
-
+		VkSurfaceKHR surfaceHandle;
 		VkPhysicalDevice physicalHandle;
-		VkDevice handle;
-		bool hasHandle;
-
-		SwapChain swapChain;
-
-	private:
 		VkPhysicalDeviceProperties properties;
 		VkPhysicalDeviceFeatures features;
+		VkDevice handle;
+		bool hasHandle;
+		uint32_t score; //TODO: calculate score
 
 		//Queue families
 		int64_t graphicsIndex;
@@ -33,5 +25,24 @@ namespace Spiral
 		int64_t computeIndex;
 		VkQueue computeQueue;
 
+		//Rendering pipeline
+		Swapchain swapchain;
+		bool hasSwapchain;
+
+		VkCommandBuffer* commandBuffers;
+
+		size_t currentFrame;
+		VkSemaphore imageAvailableSemaphores[MAX_FRAMES_IN_FLIGHT];
+		VkSemaphore renderFinishedSemaphores[MAX_FRAMES_IN_FLIGHT];
+		VkFence inFlightFences[MAX_FRAMES_IN_FLIGHT];
+
+
+
+		void init(VkPhysicalDevice physical, VkSurfaceKHR surface);
+		void terminate();
+
+		bool createSwapchain();
+		bool recreateSwapchain();
+		bool drawFrame();
 	};
 }

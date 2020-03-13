@@ -87,7 +87,8 @@ namespace Spiral
 		if (eventBufferSize < EVENT_BUFFER_CAPACITY)
 		{
 			eventBuffer[eventEnd] = e;
-			eventEnd = eventEnd + 1 == EVENT_BUFFER_CAPACITY ? 0 : eventEnd + 1;
+			//eventEnd = eventEnd + 1 == EVENT_BUFFER_CAPACITY ? 0 : eventEnd + 1; //because the capacity is fairly big, comparing is better than using the % operator (if the capacity was not a power of 2)
+			eventEnd = (eventEnd + 1) % EVENT_BUFFER_CAPACITY; //modulus on a power of 2 is really fast
 			eventBufferSize++;
 		}
 		else
@@ -176,6 +177,7 @@ namespace Spiral
 			}
 
 			window->tick();
+			//renderer->presentFrame();
 
 			if (windowSizeChanged)
 			{

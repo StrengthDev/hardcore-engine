@@ -45,7 +45,7 @@
     <ClCompile Include="src\Spiral\Render\Device.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Spiral\Render\SwapChain.cpp">
+    <ClCompile Include="src\Spiral\Render\Swapchain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -98,7 +98,7 @@
     <ClInclude Include="src\Spiral\Render\RenderCore.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Spiral\Render\SwapChain.hpp">
+    <ClInclude Include="src\Spiral\Render\Swapchain.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

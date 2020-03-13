@@ -29,5 +29,6 @@ namespace Spiral
 
 
 		static Window* init();
+		//TODO: static functions
 	};
 }

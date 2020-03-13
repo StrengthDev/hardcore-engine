@@ -4,7 +4,7 @@
 
 #include <spdlog/spdlog.h>
 
-namespace Spiral
+namespace Spiral //TODO: make core logger invisible to the client
 {
 	SPIRAL_API void logInit();
 	SPIRAL_API void logShutdown();
