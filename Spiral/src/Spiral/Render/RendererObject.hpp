@@ -5,6 +5,7 @@
 #include "RenderCore.hpp"
 
 #include "Device.hpp"
+#include "ShaderLibrary.hpp"
 
 #define MAX_DEVICES 8
 
@@ -16,7 +17,8 @@ namespace Spiral
 		RendererObject(ECProperties engineProps, ECProperties clientProps);
 		~RendererObject();
 
-		void presentFrame() override;
+		void m_presentFrame() override;
+		void m_loadMesh(Mesh mesh, uint32_t vertexShaderId, uint32_t fragShaderId) override;
 
 
 	private:
@@ -24,7 +26,7 @@ namespace Spiral
 		VkSurfaceKHR surface;
 		Device availableDevices[MAX_DEVICES];
 		uint32_t nAvailableDevices;
-		uint16_t presentDeviceIndex;
+		uint32_t presentDeviceIndex;
 
 		VkDebugUtilsMessengerEXT debugMessenger;
 	};

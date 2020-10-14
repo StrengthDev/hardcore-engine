@@ -16,7 +16,7 @@ namespace Spiral
 		VkPresentModeKHR* availablePresentModes;
 		uint32_t nPresentModes;
 		VkSurfaceCapabilitiesKHR capabilities;
-		VkExtent2D extent;
+		valid = true;
 
 		vkGetPhysicalDeviceSurfaceFormatsKHR(physicalHandle, surface, &nFormats, nullptr);
 		surfaceFormat = { VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
@@ -133,23 +133,59 @@ namespace Spiral
 		createInfo.clipped = VK_TRUE;
 		createInfo.oldSwapchain = VK_NULL_HANDLE; //used when it's needed to create a new swapchain
 
-		if ((creation = vkCreateSwapchainKHR(logicalHandle, &createInfo, nullptr, &handle)) != VK_SUCCESS)
+		if (vkCreateSwapchainKHR(logicalHandle, &createInfo, nullptr, &handle) != VK_SUCCESS)
 		{
 			DEBUG_BREAK;
+			valid = false;
 			return;
 		}
 
 		vkGetSwapchainImagesKHR(logicalHandle, handle, &nImages, nullptr);
-		swapchainImages = (VkImage*)malloc(sizeof(VkImage) * nImages);
-		vkGetSwapchainImagesKHR(logicalHandle, handle, &nImages, swapchainImages);
+		images = (VkImage*)malloc(sizeof(VkImage) * nImages);
+		vkGetSwapchainImagesKHR(logicalHandle, handle, &nImages, images);
 
-		swapchainImageFormat = surfaceFormat.format;
-		swapchainExtent = extent;
+		imageFormat = surfaceFormat.format;
+
+		imageViews = (VkImageView*)malloc(sizeof(VkImageView) * nImages);
+		for (i = 0; i < nImages; i++)
+		{
+			VkImageViewCreateInfo createInfo = {};
+			createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			createInfo.image = images[i];
+			createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			createInfo.format = imageFormat;
+			createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+			createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+			createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+			createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+			createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			createInfo.subresourceRange.baseMipLevel = 0;
+			createInfo.subresourceRange.levelCount = 1;
+			createInfo.subresourceRange.baseArrayLayer = 0;
+			createInfo.subresourceRange.layerCount = 1;
+
+			if (vkCreateImageView(logicalHandle, &createInfo, nullptr, &imageViews[i]) != VK_SUCCESS)
+			{
+				DEBUG_BREAK;
+				valid = false;
+				free(imageViews); //TODO: destroy image views that might have already been created
+				free(images);
+				vkDestroySwapchainKHR(logicalHandle, handle, nullptr);
+				return;
+			}
+		}
 	}
 
 	void Swapchain::terminate(VkDevice logicalHandle)
 	{
-		free(swapchainImages);
+		uint32_t i;
+		for (i = 0; i < nImages; i++)
+		{
+			vkDestroyImageView(logicalHandle, imageViews[i], nullptr);
+		}
+
+		free(imageViews);
+		free(images);
 		vkDestroySwapchainKHR(logicalHandle, handle, nullptr);
 	}
 }

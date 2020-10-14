@@ -1,12 +1,13 @@
 #pragma once
 
+#include "RenderCore.hpp"
+
 namespace Spiral 
 {
 	struct Shader
 	{
-	public:
-		Shader();
-
-		~Shader();
+		uint32_t* source;
+		size_t size;
+		VkShaderStageFlagBits type;
 	};
 }

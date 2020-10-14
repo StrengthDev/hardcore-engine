@@ -1,6 +1,7 @@
 #include "pch.hpp"
 
 #include "Device.hpp"
+#include "ShaderLibrary.hpp"
 
 namespace Spiral
 {
@@ -58,7 +59,7 @@ namespace Spiral
 		{
 			if (index != -1)
 			{
-				VkDeviceQueueCreateInfo info = {}; //TODO: might wanna change this to make more queues, etc
+				VkDeviceQueueCreateInfo info = {}; //TODO: make Queue struct, look at queue selection in DEV bookmarks
 				info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 				info.queueFamilyIndex = (uint32_t)index;
 				info.queueCount = 1;
@@ -110,9 +111,18 @@ namespace Spiral
 
 	void Device::terminate() //Note: when an object is destroyed, the member variables are only destroyed AFTER its destructor is called
 	{
+		size_t i;
 		if (hasSwapchain)
 		{
+			//gPipeline.terminate();
 			swapchain.terminate(handle);
+			for (i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+			{
+				vkDestroySemaphore(handle, renderFinishedSemaphores[i], nullptr);
+				vkDestroySemaphore(handle, imageAvailableSemaphores[i], nullptr);
+				vkDestroyFence(handle, inFlightFences[i], nullptr);
+			}
+			vkDestroyCommandPool(handle, gCommandPool, nullptr);
 		}
 		if (hasHandle)
 		{
@@ -123,17 +133,52 @@ namespace Spiral
 	bool Device::createSwapchain()
 	{
 		swapchain.init(physicalHandle, handle, surfaceHandle, (uint32_t)graphicsIndex, (uint32_t)presentIndex);
-		if (swapchain.creation != VK_SUCCESS)
+		if (!swapchain.valid)
 		{
 			return false;
 		}
 		hasSwapchain = true;
+
+		VkCommandPoolCreateInfo poolInfo = {}; //TODO: place in graphics pipeline, buffers in the same pool cannot be recorded concurrently
+		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		poolInfo.queueFamilyIndex = (uint32_t)graphicsIndex;
+		poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // Necessary to allow resetting command buffers
+		if (vkCreateCommandPool(handle, &poolInfo, nullptr, &gCommandPool) != VK_SUCCESS)
+		{
+			return false;
+		}
+
+		size_t i;
+		VkSemaphoreCreateInfo semaphoreInfo = {};
+		semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+		VkFenceCreateInfo fenceInfo = {};
+		fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+		fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+		for (i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
+		{
+			if (vkCreateSemaphore(handle, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
+				vkCreateSemaphore(handle, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
+				vkCreateFence(handle, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS)
+			{
+				return false; //TODO: destroy objects that might have already been created
+			}
+		}
+
 		return true;
 	}
 
 	bool Device::recreateSwapchain()
 	{
 		return true;
+	}
+
+	void Device::loadMesh(Mesh mesh, uint32_t vertexShaderId, uint32_t fragShaderId)
+	{
+		Shader shaders[2];
+		shaders[0] = ShaderLibrary::get(vertexShaderId);
+		shaders[1] = ShaderLibrary::get(fragShaderId);
+		gPipeline.init(handle, swapchain, gCommandPool, shaders, 2);
 	}
 
 	bool Device::drawFrame()
@@ -162,7 +207,7 @@ namespace Spiral
 		submitInfo.pWaitSemaphores = waitSemaphores;
 		submitInfo.pWaitDstStageMask = waitStages;
 		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &commandBuffers[imageIndex];
+		submitInfo.pCommandBuffers = &gPipeline.commandBuffers[imageIndex];
 		VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
 		submitInfo.signalSemaphoreCount = 1;
 		submitInfo.pSignalSemaphores = signalSemaphores;

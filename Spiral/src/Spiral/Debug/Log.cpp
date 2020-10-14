@@ -14,9 +14,11 @@ namespace Spiral
 	
 		coreLogger = spdlog::stdout_color_mt("SPIRAL");
 		coreLogger->set_level(spdlog::level::trace);
+		coreLogger->debug("Logger initiated.");
 	
 		clientLogger = spdlog::stdout_color_mt("CLIENT");
 		clientLogger->set_level(spdlog::level::trace);
+		clientLogger->debug("Logger initiated.");
 	}
 
 	void logShutdown()

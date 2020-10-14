@@ -7,13 +7,13 @@ namespace Spiral
 	struct Swapchain
 	{
 		VkSwapchainKHR handle;
-		VkImage* swapchainImages;
+		VkImage* images;
 		uint32_t nImages;
-		VkImageView* swapchainImageViews;
-		VkFormat swapchainImageFormat;
-		VkExtent2D swapchainExtent;
+		VkImageView* imageViews;
+		VkFormat imageFormat;
+		VkExtent2D extent;
 
-		VkResult creation;
+		bool valid;
 
 		void init(VkPhysicalDevice physicalHandle, VkDevice logicalHandle, VkSurfaceKHR surface, uint32_t graphicsIndex, uint32_t presentIndex);
 		void terminate(VkDevice logicalHandle);

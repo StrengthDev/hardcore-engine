@@ -6,6 +6,8 @@
 
 namespace Spiral
 {
+	Renderer* renderer;
+
 	bool checkValidationLayerSupport()
 	{
 		uint32_t layerCount;
@@ -43,7 +45,7 @@ namespace Spiral
 		void* pUserData)
 	{
 		SPRL_CORE_DEBUG("[VULKAN] {0}", pCallbackData->pMessage);
-
+		
 		return VK_FALSE;
 	}
 
@@ -181,6 +183,7 @@ namespace Spiral
 			Client::get().shutdown();
 			return;
 		}
+		ShaderLibrary::init();
 	}
 
 	RendererObject::~RendererObject()
@@ -198,18 +201,34 @@ namespace Spiral
 
 		vkDestroySurfaceKHR(instance, surface, nullptr);
 		vkDestroyInstance(instance, nullptr);
+		ShaderLibrary::terminate();
 	}
 
-	void RendererObject::presentFrame()
+	void RendererObject::m_presentFrame()
 	{
-		if (availableDevices[presentDeviceIndex].drawFrame())
+		//TODO: draw commands and pipeline management
+		if (!availableDevices[presentDeviceIndex].drawFrame())
 		{
-			Client::get().shutdown();
+			//Client::get().shutdown();
 		}
 	}
 
+	void RendererObject::m_loadMesh(Mesh mesh, uint32_t vertexShaderId, uint32_t fragShaderId)
+	{
+		availableDevices[presentDeviceIndex].loadMesh(mesh, vertexShaderId, fragShaderId);
+	}
+
+	//TODO: submit function should have arguments like VertexData or something containing data/layout and an array of indexes
+	//NOTE: leaves and water wave effects should be done in geometry shaders, or maybe not, theyre not efficient
+
 	Renderer* Renderer::init(ECProperties engineProps, ECProperties clientProps)
 	{
-		return new RendererObject(engineProps, clientProps);
+		renderer = new RendererObject(engineProps, clientProps);
+		return renderer;
+	}
+
+	void Renderer::loadMesh(Mesh mesh, uint32_t vertexShaderId, uint32_t fragShaderId)
+	{
+		renderer->m_loadMesh(mesh, vertexShaderId, fragShaderId);
 	}
 }

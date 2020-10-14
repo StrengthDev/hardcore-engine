@@ -9,9 +9,7 @@ class ExampleClient : public Spiral::Client
 public:
 	ExampleClient()
 	{
-		pushLayer(new TestLayer());
-		pushLayer(new ELLayer());
-
+		//TODO: this is stupid, change to loose functions instead of class static methods
 		getWindow().setTitle("Chad Engine");
 
 		const char* files[2] =
@@ -27,6 +25,12 @@ public:
 	~ExampleClient()
 	{
 		
+	}
+
+	void pushInitialLayers()
+	{
+		pushLayer(new TestLayer());
+		pushLayer(new ELLayer());
 	}
 };
 

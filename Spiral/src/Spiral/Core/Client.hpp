@@ -21,6 +21,7 @@ namespace Spiral
 		Client();
 		virtual ~Client();
 		void init();
+		virtual void pushInitialLayers() = 0;
 
 		inline void setProperties(const char *name, unsigned int majorVersion, unsigned int minorVersion, unsigned int patchVersion);
 

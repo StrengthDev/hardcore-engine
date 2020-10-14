@@ -187,9 +187,9 @@ namespace Spiral
 
 			while (eventBufferSize > 0)
 			{
-				for (i = nLayers + nOverlays - 1; i != 65535U; i--) //Kinda assuming the layer will never get as big as 65535, but it shouldnt
+				for (i = nLayers + nOverlays - 1; i != 65535U; i--) //Kinda assuming the layer stack will never get as big as 65535, but it shouldnt
 				{
-					if (layerStack[i]->handleEvent(eventBuffer[eventStart]))
+					if (layerStack[i]->handleEvent(eventBuffer[eventStart])) //TODO: place the switch for event types here, and implement an event function for each type in the layer class, to avoid multiple switches per tick
 					{
 						goto endevent;
 					}
@@ -201,7 +201,7 @@ namespace Spiral
 				}
 
 				endevent:
-				eventStart = eventStart + 1 == EVENT_BUFFER_CAPACITY ? 0 : eventStart + 1;
+				eventStart = (eventStart + 1) % EVENT_BUFFER_CAPACITY;
 				eventBufferSize--;
 			}
 

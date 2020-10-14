@@ -29,7 +29,6 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="assets\shaders\compile.bat" />
     <None Include="assets\shaders\shader.frag" />
     <None Include="assets\shaders\shader.vert" />
   </ItemGroup>

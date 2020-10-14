@@ -91,7 +91,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\1.1.106.0\Include;C:\dev\vendor\GLFW\glfw-3.3.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.3.1\include;C:\dev\vendor\stb_image\stb-master;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.148.1\Include;C:\dev\vendor\GLFW\glfw-3.3.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.3.1\include;C:\dev\vendor\stb_image\stb-master;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions); SPIRAL_BUILD; NDEBUG</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
@@ -99,7 +99,7 @@
       <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.1.106.0\Lib;C:\dev\vendor\GLFW\glfw-3.3.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.2.148.1\Lib;C:\dev\vendor\GLFW\glfw-3.3.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
@@ -112,7 +112,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\1.1.106.0\Include;C:\dev\vendor\GLFW\glfw-3.3.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.3.1\include;C:\dev\vendor\stb_image\stb-master;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.148.1\Include;C:\dev\vendor\GLFW\glfw-3.3.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.3.1\include;C:\dev\vendor\stb_image\stb-master;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions); SPIRAL_BUILD; NDEBUG</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
@@ -120,7 +120,7 @@
       <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.1.106.0\Lib;C:\dev\vendor\GLFW\glfw-3.3.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.2.148.1\Lib;C:\dev\vendor\GLFW\glfw-3.3.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
@@ -135,7 +135,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\1.1.106.0\Include;C:\dev\vendor\GLFW\glfw-3.3.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.3.1\include;C:\dev\vendor\stb_image\stb-master;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.148.1\Include;C:\dev\vendor\GLFW\glfw-3.3.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.3.1\include;C:\dev\vendor\stb_image\stb-master;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions); SPIRAL_BUILD</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
@@ -145,7 +145,7 @@
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.1.106.0\Lib;C:\dev\vendor\GLFW\glfw-3.3.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.2.148.1\Lib;C:\dev\vendor\GLFW\glfw-3.3.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
@@ -160,7 +160,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\1.1.106.0\Include;C:\dev\vendor\GLFW\glfw-3.3.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.3.1\include;C:\dev\vendor\stb_image\stb-master;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.148.1\Include;C:\dev\vendor\GLFW\glfw-3.3.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.3.1\include;C:\dev\vendor\stb_image\stb-master;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions); SPIRAL_BUILD</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
@@ -170,7 +170,7 @@
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.1.106.0\Lib;C:\dev\vendor\GLFW\glfw-3.3.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.2.148.1\Lib;C:\dev\vendor\GLFW\glfw-3.3.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
@@ -190,8 +190,9 @@
     <ClCompile Include="src\Spiral\Core\Window.cpp" />
     <ClCompile Include="src\Spiral\Debug\Log.cpp" />
     <ClCompile Include="src\Spiral\Render\Device.cpp" />
+    <ClCompile Include="src\Spiral\Render\GraphicsPipeline.cpp" />
     <ClCompile Include="src\Spiral\Render\Renderer.cpp" />
-    <ClCompile Include="src\Spiral\Render\Shader.cpp" />
+    <ClCompile Include="src\Spiral\Render\ShaderLibrary.cpp" />
     <ClCompile Include="src\Spiral\Render\Swapchain.cpp" />
     <ClCompile Include="src\Spiral\Test.cpp" />
   </ItemGroup>
@@ -207,11 +208,17 @@
     <ClInclude Include="src\Spiral\Core\Layer.hpp" />
     <ClInclude Include="src\Spiral\Debug\Log.hpp" />
     <ClInclude Include="src\Spiral\Render\Device.hpp" />
+    <ClInclude Include="src\Spiral\Render\GraphicsPipeline.hpp" />
+    <ClInclude Include="src\Spiral\Render\MemoryAllocator.hpp" />
+    <ClInclude Include="src\Spiral\Render\Mesh.hpp" />
     <ClInclude Include="src\Spiral\Render\Renderer.hpp" />
     <ClInclude Include="src\Spiral\Render\RendererObject.hpp" />
     <ClInclude Include="src\Spiral\Render\RenderCore.hpp" />
     <ClInclude Include="src\Spiral\Render\Shader.hpp" />
+    <ClInclude Include="src\Spiral\Render\ShaderLibrary.hpp" />
+    <ClInclude Include="src\Spiral\Render\ShaderAPI.hpp" />
     <ClInclude Include="src\Spiral\Render\Swapchain.hpp" />
+    <ClInclude Include="src\Spiral\Render\BufferLayout.hpp" />
     <ClInclude Include="src\Spiral\Test.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
