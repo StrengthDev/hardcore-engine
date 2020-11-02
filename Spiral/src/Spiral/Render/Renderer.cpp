@@ -85,10 +85,10 @@ namespace Spiral
 			vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
 			std::vector<VkExtensionProperties> extensions(extensionCount);
 			vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
-			SPRL_CORE_INFO("[RENDERER] Available extensions:");
+			SPRL_CORE_INFO("[VULKAN] Available extensions:");
 			for (const auto& extension : extensions)
 			{
-				SPRL_CORE_INFO("[RENDERER]  - {0}", extension.extensionName);
+				SPRL_CORE_INFO("[VULKAN]  - {0}", extension.extensionName);
 			}
 		}
 

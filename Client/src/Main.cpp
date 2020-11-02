@@ -20,6 +20,7 @@ public:
 
 		getWindow().setIcon(files, 2);
 		//setProperties("Debug Program", 1, 0, 0);
+		SPRL_INIT_CLIENT_LOGGER;
 	}
 
 	~ExampleClient()

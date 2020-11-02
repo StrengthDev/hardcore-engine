@@ -1,11 +1,14 @@
 #pragma once
 
 #ifndef NDEBUG
+
+#pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup") //TODO: adapt to be platform independent
+
 #define LOGINIT
 #define LOGSHUTDOWN
 #else
-#define LOGINIT Spiral::logInit()
-#define LOGSHUTDOWN Spiral::logShutdown()
+#define LOGINIT Spiral::Log::init()
+#define LOGSHUTDOWN Spiral::Log::shutdown()
 #endif
 
 
