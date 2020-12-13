@@ -1,6 +1,6 @@
 #include "TestLayer.hpp"
 
-float verts[] = { -0.5f, -0.5f, 0.5f, -0.5f, 0.5f, 0.5f };
+float verts[] = { 0.0f, -0.5f, 0.0f, -0.5f, 0.5f, 0.0f, 0.5f, 0.5f, 0.0f };
 uint16_t idx[] = { 0, 1, 2 };
 
 TestLayer::TestLayer()
@@ -9,12 +9,12 @@ TestLayer::TestLayer()
 	timec = 0;
 	framec = 0;
 
-	uint32_t vi = Spiral::ShaderLibrary::load("assets/shaders/vert.spv", Spiral::ShaderType::Vertex);
-	uint32_t fi = Spiral::ShaderLibrary::load("assets/shaders/frag.spv", Spiral::ShaderType::Fragment);
+	uint32_t vi = Spiral::ShaderLibrary::load("resources/shaders/vert.spv", Spiral::ShaderType::Vertex);
+	uint32_t fi = Spiral::ShaderLibrary::load("resources/shaders/frag.spv", Spiral::ShaderType::Fragment);
 
-	Spiral::Mesh mesh;
+	Spiral::Mesh mesh = {};
 	mesh.vertices = verts;
-	mesh.vSize = sizeof(float) * 6;
+	mesh.vSize = sizeof(float) * 9;
 	mesh.indices = idx;
 	mesh.iSize = 6;
 

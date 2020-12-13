@@ -58,7 +58,7 @@ namespace Spiral
 			DEBUG_BREAK;
 			return 0xFFFFFFFF;
 		}
-		Shader shader;
+		Shader shader = {};
 		size_t filesize = (size_t)file.tellg();
 		char* t = (char*)malloc(filesize);
 		file.seekg(0);

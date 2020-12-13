@@ -14,8 +14,8 @@ public:
 
 		const char* files[2] =
 		{
-			"assets/icons/icon1.png",
-			"assets/icons/icon2.png"
+			"resources/icons/icon1.png",
+			"resources/icons/icon2.png"
 		};
 
 		getWindow().setIcon(files, 2);

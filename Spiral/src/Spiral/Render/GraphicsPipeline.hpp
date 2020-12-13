@@ -3,6 +3,7 @@
 #include "RenderCore.hpp"
 #include "Swapchain.hpp"
 #include "Shader.hpp"
+#include "Memory.hpp"
 #include "Mesh.hpp"
 
 namespace Spiral
@@ -17,9 +18,12 @@ namespace Spiral
 		VkCommandBuffer* commandBuffers;
 		uint32_t nCommandBuffers;
 
+		VkExtent2D extent;
 		VkFramebuffer* frameBuffers;
 		VkDescriptorPool descriptorPool;
 		VkDescriptorSet* descriptorSets;
+
+		MemoryNexus memory;
 
 		bool valid;
 
@@ -27,5 +31,7 @@ namespace Spiral
 		void terminate(VkDevice logicalHandle, uint32_t nImages);
 
 		void loadMesh(Mesh mesh);
+
+		void draw(size_t frame);
 	};
 }

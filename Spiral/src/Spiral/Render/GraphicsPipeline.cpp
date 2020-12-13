@@ -8,7 +8,7 @@
 struct Vertex
 {
 	glm::vec3 pos;
-	glm::vec3 color;
+	//glm::vec3 color;
 
 	static VkVertexInputBindingDescription getBindingDescription()
 	{
@@ -20,20 +20,20 @@ struct Vertex
 		return bindingDescription;
 	}
 
-	static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions()
+	static std::array<VkVertexInputAttributeDescription, 1> getAttributeDescriptions()
 	{
-		std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions = {};
+		std::array<VkVertexInputAttributeDescription, 1> attributeDescriptions = {};
 
 		attributeDescriptions[0].binding = 0;
 		attributeDescriptions[0].location = 0;
 		attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attributeDescriptions[0].offset = offsetof(Vertex, pos);
-
+		/*
 		attributeDescriptions[1].binding = 0;
 		attributeDescriptions[1].location = 1;
 		attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attributeDescriptions[1].offset = offsetof(Vertex, color);
-
+		*/
 		return attributeDescriptions;
 	}
 };
@@ -128,7 +128,7 @@ namespace Spiral
 		}
 
 		VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
-		std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions = Vertex::getAttributeDescriptions(); //TODO: take array out
+		std::array<VkVertexInputAttributeDescription, 1> attributeDescriptions = Vertex::getAttributeDescriptions(); //TODO: take array out
 
 		VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
 		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -299,15 +299,11 @@ namespace Spiral
 		frameBuffers = (VkFramebuffer*)malloc(sizeof(VkFramebuffer) * swapchain.nImages);
 		for (i = 0; i < swapchain.nImages; i++)
 		{
-			VkImageView attachments[] = {
-				swapchain.imageViews[i]
-			};
-
 			VkFramebufferCreateInfo framebufferInfo = {};
 			framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 			framebufferInfo.renderPass = renderPass;
 			framebufferInfo.attachmentCount = 1;
-			framebufferInfo.pAttachments = attachments;
+			framebufferInfo.pAttachments = &swapchain.imageViews[i];
 			framebufferInfo.width = swapchain.extent.width;
 			framebufferInfo.height = swapchain.extent.height;
 			framebufferInfo.layers = 1;
@@ -393,6 +389,11 @@ namespace Spiral
 			vkUpdateDescriptorSets(logicalHandle, 1, &descriptorWrite, 0, nullptr);
 		}
 		*/
+
+		extent = swapchain.extent;
+
+		Memory::init(memory, &commandPool);
+		SPRL_CORE_INFO("New pipeline initialised");
 	}
 
 	void GraphicsPipeline::terminate(VkDevice logicalHandle, uint32_t nImages)
@@ -409,10 +410,74 @@ namespace Spiral
 		vkDestroyRenderPass(logicalHandle, renderPass, nullptr);
 		vkDestroyDescriptorPool(logicalHandle, descriptorPool, nullptr);
 		vkDestroyDescriptorSetLayout(logicalHandle, descriptorSetLayout, nullptr);
+
+		Memory::terminate(memory);
 	}
 
 	void GraphicsPipeline::loadMesh(Mesh mesh)
 	{
+		Memory::createBuffer(mesh.vertices, mesh.vSize, 0, memory);
+		Memory::createBuffer(mesh.indices, mesh.iSize, 0, memory);
+	}
 
+	void GraphicsPipeline::draw(size_t frame)
+	{
+		uint32_t i;
+		Memory::flush(memory);
+
+		//vkResetCommandBuffer(commandBuffers[frame], 0);
+		if (vkResetCommandBuffer(commandBuffers[frame], 0) != VK_SUCCESS)
+		{
+			//do stuff
+			DEBUG_BREAK;
+		}
+
+		VkCommandBufferBeginInfo beginInfo = {};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // | VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+		beginInfo.pInheritanceInfo = nullptr; // Optional
+
+		if (vkBeginCommandBuffer(commandBuffers[frame], &beginInfo) != VK_SUCCESS)
+		{
+			//do stuff
+			DEBUG_BREAK;
+		}
+
+		VkRenderPassBeginInfo renderPassInfo = {};
+		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		renderPassInfo.renderPass = renderPass;
+		renderPassInfo.framebuffer = frameBuffers[frame];
+		renderPassInfo.renderArea.offset = { 0, 0 };
+		renderPassInfo.renderArea.extent = extent;
+
+		VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
+		renderPassInfo.clearValueCount = 1;
+		renderPassInfo.pClearValues = &clearColor;
+
+		vkCmdBeginRenderPass(commandBuffers[frame], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdBindPipeline(commandBuffers[frame], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+		for (i = 0; i < memory.pools[0].nRanges; i += 2)
+		{
+			VkBuffer vertexBuffers[] = { memory.pools[0].buffer };
+			VkDeviceSize offsets[] = { memory.pools[0].ranges[i].offset };
+			vkCmdBindVertexBuffers(commandBuffers[frame], 0, 1, vertexBuffers, offsets);
+
+			vkCmdBindIndexBuffer(commandBuffers[frame], memory.pools[0].buffer, memory.pools[0].ranges[i + 1].offset, VK_INDEX_TYPE_UINT16);
+
+			//vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
+
+			vkCmdDrawIndexed(commandBuffers[frame], memory.pools[0].ranges[i + 1].size / sizeof(uint16_t), 1, 0, 0, 0);
+		}
+
+		vkCmdEndRenderPass(commandBuffers[frame]);
+
+		if (vkEndCommandBuffer(commandBuffers[frame]) != VK_SUCCESS)
+		{
+			//do stuff
+			DEBUG_BREAK;
+		}
+
+		Memory::waitFlush(memory);
 	}
 }

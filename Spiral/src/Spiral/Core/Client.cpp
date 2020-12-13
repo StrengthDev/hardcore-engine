@@ -177,7 +177,7 @@ namespace Spiral
 			}
 
 			window->tick();
-			//renderer->presentFrame();
+			renderer->m_presentFrame();
 
 			if (windowSizeChanged)
 			{

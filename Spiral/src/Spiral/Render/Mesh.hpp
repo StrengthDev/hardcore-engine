@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+//TODO: make this a class dummy
 namespace Spiral
 {
 	struct Mesh

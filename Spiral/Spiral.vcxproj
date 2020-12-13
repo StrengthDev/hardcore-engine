@@ -191,6 +191,7 @@
     <ClCompile Include="src\Spiral\Debug\Log.cpp" />
     <ClCompile Include="src\Spiral\Render\Device.cpp" />
     <ClCompile Include="src\Spiral\Render\GraphicsPipeline.cpp" />
+    <ClCompile Include="src\Spiral\Render\Memory.cpp" />
     <ClCompile Include="src\Spiral\Render\Renderer.cpp" />
     <ClCompile Include="src\Spiral\Render\ShaderLibrary.cpp" />
     <ClCompile Include="src\Spiral\Render\Swapchain.cpp" />
@@ -209,7 +210,7 @@
     <ClInclude Include="src\Spiral\Debug\Log.hpp" />
     <ClInclude Include="src\Spiral\Render\Device.hpp" />
     <ClInclude Include="src\Spiral\Render\GraphicsPipeline.hpp" />
-    <ClInclude Include="src\Spiral\Render\MemoryAllocator.hpp" />
+    <ClInclude Include="src\Spiral\Render\Memory.hpp" />
     <ClInclude Include="src\Spiral\Render\Mesh.hpp" />
     <ClInclude Include="src\Spiral\Render\Renderer.hpp" />
     <ClInclude Include="src\Spiral\Render\RendererObject.hpp" />

@@ -51,6 +51,9 @@
     <ClCompile Include="src\Spiral\Render\ShaderLibrary.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\Spiral\Render\Memory.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Spiral.hpp">
@@ -113,13 +116,13 @@
     <ClInclude Include="src\Spiral\Render\BufferLayout.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Spiral\Render\MemoryAllocator.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\Spiral\Render\Mesh.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Spiral\Render\ShaderAPI.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Spiral\Render\Memory.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

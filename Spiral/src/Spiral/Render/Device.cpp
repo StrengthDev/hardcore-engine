@@ -107,6 +107,21 @@ namespace Spiral
 		//SPRL_CORE_TRACE("Compute family index: {0}", computeIndex);
 		free(queueFamilies);
 		free(queueCreateInfos);
+
+		//DeviceData data = { &physicalHandle, &handle, &graphicsQueue };
+		//TODO: make a command pool construct to facilitate having one pool per thread per frame
+		VkCommandPoolCreateInfo poolInfo = {};
+		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		poolInfo.queueFamilyIndex = graphicsIndex;
+		poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // Optional
+
+		if (vkCreateCommandPool(handle, &poolInfo, nullptr, &gCommandPool) != VK_SUCCESS)
+		{
+			//do stuff
+			DEBUG_BREAK;
+		}
+
+		Memory::init(&physicalHandle, &handle, &graphicsQueue, &gCommandPool);
 	}
 
 	void Device::terminate() //Note: when an object is destroyed, the member variables are only destroyed AFTER its destructor is called
@@ -114,7 +129,10 @@ namespace Spiral
 		size_t i;
 		if (hasSwapchain)
 		{
-			//gPipeline.terminate();
+			if (gPipeline.valid)
+			{
+				gPipeline.terminate(handle, swapchain.nImages);
+			}
 			swapchain.terminate(handle);
 			for (i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
 			{
@@ -124,6 +142,7 @@ namespace Spiral
 			}
 			vkDestroyCommandPool(handle, gCommandPool, nullptr);
 		}
+		Memory::terminate();
 		if (hasHandle)
 		{
 			vkDestroyDevice(handle, nullptr);
@@ -179,6 +198,7 @@ namespace Spiral
 		shaders[0] = ShaderLibrary::get(vertexShaderId);
 		shaders[1] = ShaderLibrary::get(fragShaderId);
 		gPipeline.init(handle, swapchain, gCommandPool, shaders, 2);
+		gPipeline.loadMesh(mesh);
 	}
 
 	bool Device::drawFrame()
@@ -197,20 +217,20 @@ namespace Spiral
 			DEBUG_BREAK;
 			return false;
 		}
+		gPipeline.draw(imageIndex);
 		//TODO: update uniform buffer with imageIndex
 
+		//TODO: move the queue submit to the pipeline
 		VkSubmitInfo submitInfo = {};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		VkSemaphore waitSemaphores[] = { imageAvailableSemaphores[currentFrame] };
 		VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 		submitInfo.waitSemaphoreCount = 1;
-		submitInfo.pWaitSemaphores = waitSemaphores;
+		submitInfo.pWaitSemaphores = &imageAvailableSemaphores[currentFrame];
 		submitInfo.pWaitDstStageMask = waitStages;
 		submitInfo.commandBufferCount = 1;
 		submitInfo.pCommandBuffers = &gPipeline.commandBuffers[imageIndex];
-		VkSemaphore signalSemaphores[] = { renderFinishedSemaphores[currentFrame] };
 		submitInfo.signalSemaphoreCount = 1;
-		submitInfo.pSignalSemaphores = signalSemaphores;
+		submitInfo.pSignalSemaphores = &renderFinishedSemaphores[currentFrame];
 
 		vkResetFences(handle, 1, &inFlightFences[currentFrame]);
 		if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) //TODO: porbably have to change this
@@ -222,7 +242,7 @@ namespace Spiral
 		VkPresentInfoKHR presentInfo = {};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 		presentInfo.waitSemaphoreCount = 1;
-		presentInfo.pWaitSemaphores = signalSemaphores;
+		presentInfo.pWaitSemaphores = &renderFinishedSemaphores[currentFrame];
 		VkSwapchainKHR swapchains[] = { swapchain.handle };
 		presentInfo.swapchainCount = 1;
 		presentInfo.pSwapchains = swapchains;
