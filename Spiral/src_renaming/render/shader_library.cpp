@@ -1,4 +1,4 @@
-#include "pch.hpp"
+#include <pch.hpp>
 
 #include <Spiral/Render/ShaderLibrary.hpp>
 #include <Spiral/Render/ShaderAPI.hpp>

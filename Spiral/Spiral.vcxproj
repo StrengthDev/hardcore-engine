@@ -178,24 +178,24 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\pch.cpp">
+    <ClCompile Include="src_renaming\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="src\Core\Client.cpp" />
-    <ClCompile Include="src\Core\Event.cpp" />
-    <ClCompile Include="src\Core\Layer.cpp" />
-    <ClCompile Include="src\Core\Window.cpp" />
-    <ClCompile Include="src\Debug\Log.cpp" />
-    <ClCompile Include="src\Render\Device.cpp" />
-    <ClCompile Include="src\Render\GraphicsPipeline.cpp" />
-    <ClCompile Include="src\Render\Memory.cpp" />
-    <ClCompile Include="src\Render\Renderer.cpp" />
-    <ClCompile Include="src\Render\ShaderLibrary.cpp" />
-    <ClCompile Include="src\Render\Swapchain.cpp" />
-    <ClCompile Include="src\Tmp\Test.cpp" />
+    <ClCompile Include="src_renaming\core\client.cpp" />
+    <ClCompile Include="src_renaming\core\event.cpp" />
+    <ClCompile Include="src_renaming\core\layer.cpp" />
+    <ClCompile Include="src_renaming\core\window.cpp" />
+    <ClCompile Include="src_renaming\debug\log.cpp" />
+    <ClCompile Include="src_renaming\render\device.cpp" />
+    <ClCompile Include="src_renaming\render\graphics_pipeline.cpp" />
+    <ClCompile Include="src_renaming\render\memory.cpp" />
+    <ClCompile Include="src_renaming\render\renderer.cpp" />
+    <ClCompile Include="src_renaming\render\shader_library.cpp" />
+    <ClCompile Include="src_renaming\render\swapchain.cpp" />
+    <ClCompile Include="src_renaming\Tmp\Test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\pch.hpp" />
@@ -220,7 +220,7 @@
     <ClInclude Include="include\Spiral\Render\ShaderAPI.hpp" />
     <ClInclude Include="include\Spiral\Render\Swapchain.hpp" />
     <ClInclude Include="include\Spiral\Render\BufferLayout.hpp" />
-    <ClInclude Include="src\Tmp\Test.hpp" />
+    <ClInclude Include="src_renaming\Tmp\Test.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
