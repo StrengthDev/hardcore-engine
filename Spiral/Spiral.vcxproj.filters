@@ -15,43 +15,43 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src_renaming\Tmp\Test.cpp">
+    <ClCompile Include="src\Tmp\Test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src_renaming\pch.cpp">
+    <ClCompile Include="src\pch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src_renaming\debug\log.cpp">
+    <ClCompile Include="src\debug\log.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src_renaming\core\client.cpp">
+    <ClCompile Include="src\core\client.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src_renaming\core\layer.cpp">
+    <ClCompile Include="src\core\layer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src_renaming\core\window.cpp">
+    <ClCompile Include="src\core\window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src_renaming\core\event.cpp">
+    <ClCompile Include="src\core\event.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src_renaming\render\renderer.cpp">
+    <ClCompile Include="src\render\renderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src_renaming\render\device.cpp">
+    <ClCompile Include="src\render\device.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src_renaming\render\swapchain.cpp">
+    <ClCompile Include="src\render\swapchain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src_renaming\render\graphics_pipeline.cpp">
+    <ClCompile Include="src\render\graphics_pipeline.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src_renaming\render\shader_library.cpp">
+    <ClCompile Include="src\render\shader_library.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src_renaming\render\memory.cpp">
+    <ClCompile Include="src\render\memory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -59,7 +59,7 @@
     <ClInclude Include="include\Spiral.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src_renaming\Tmp\Test.hpp">
+    <ClInclude Include="src\Tmp\Test.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\pch.hpp">
