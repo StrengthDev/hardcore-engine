@@ -1,7 +1,6 @@
 #include "pch.hpp"
 
-#include "GraphicsPipeline.hpp"
-
+#include <Spiral/Render/GraphicsPipeline.hpp>
 
 //TODO: delet this
 #include "glm/glm.hpp"

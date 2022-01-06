@@ -1,6 +1,7 @@
 #include "pch.hpp"
 
-#include "Log.hpp"
+#include <Spiral/Debug/Log.hpp>
+
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 

@@ -1,7 +1,7 @@
 #include "pch.hpp"
 
-#include "ShaderLibrary.hpp"
-#include "ShaderAPI.hpp"
+#include <Spiral/Render/ShaderLibrary.hpp>
+#include <Spiral/Render/ShaderAPI.hpp>
 
 Spiral::Shader* shaders;
 uint32_t nShaders;

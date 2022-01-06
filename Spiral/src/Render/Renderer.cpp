@@ -1,8 +1,8 @@
 #include "pch.hpp"
 
-#include "RendererObject.hpp"
+#include <Spiral/Render/RendererObject.hpp>
 
-#include "Spiral/Core/Client.hpp"
+#include <Spiral/Core/Client.hpp>
 
 namespace Spiral
 {

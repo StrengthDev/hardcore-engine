@@ -1,7 +1,7 @@
 #include "pch.hpp"
 
-#include "Device.hpp"
-#include "ShaderLibrary.hpp"
+#include <Spiral/Render/Device.hpp>
+#include <Spiral/Render/ShaderLibrary.hpp>
 
 namespace Spiral
 {

@@ -1,6 +1,6 @@
 #include "pch.hpp"
 
-#include "Memory.hpp"
+#include <Spiral/Render/Memory.hpp>
 
 //8 Megabytes
 #define BUFFER_POOL_SIZE BIT(23)

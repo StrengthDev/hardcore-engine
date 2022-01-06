@@ -1,6 +1,6 @@
 #include "pch.hpp"
 
-#include "WindowObject.hpp"
+#include <Spiral/Core/WindowObject.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"

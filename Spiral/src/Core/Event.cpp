@@ -1,6 +1,6 @@
 #include "pch.hpp"
 
-#include "Event.hpp"
+#include <Spiral/Core/Event.hpp>
 
 namespace Spiral
 {
