@@ -91,7 +91,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.154.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.8.1\include;C:\dev\vendor\stb\stb-master;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.176.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.8.1\include;C:\dev\vendor\stb\stb-master;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions); SPIRAL_BUILD; NDEBUG</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
@@ -99,8 +99,8 @@
       <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.2.154.1\Lib;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.2.176.1\Lib;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>spirv-cross-core.lib;vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y "$(OutDir)spiral.dll" "$(SolutionDir)bin\$(Configuration)-$(Platform)\Client\"</Command>
@@ -117,11 +117,11 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.154.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.8.1\include;C:\dev\vendor\stb\stb-master;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.176.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.8.1\include;C:\dev\vendor\stb\stb-master;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.2.154.1\Lib;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.2.176.1\Lib;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>spirv-cross-core.lib;vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y "$(OutDir)spiral.dll" "$(SolutionDir)bin\$(Configuration)-$(Platform)\Client\"</Command>
@@ -135,7 +135,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.154.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.8.1\include;C:\dev\vendor\stb\stb-master;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.176.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.8.1\include;C:\dev\vendor\stb\stb-master;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions); SPIRAL_BUILD</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
@@ -145,8 +145,8 @@
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.2.154.1\Lib;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.2.176.1\Lib;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>spirv-cross-core.lib;vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y "$(OutDir)spiral.dll" "$(SolutionDir)bin\$(Configuration)-$(Platform)\Client\"</Command>
@@ -160,7 +160,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.154.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.8.1\include;C:\dev\vendor\stb\stb-master;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.176.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.8.1\include;C:\dev\vendor\stb\stb-master;src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions); SPIRAL_BUILD</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
@@ -170,8 +170,8 @@
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>C:\VulkanSDK\1.2.154.1\Lib;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\VulkanSDK\1.2.176.1\Lib;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>spirv-cross-core.lib;vulkan-1.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y "$(OutDir)spiral.dll" "$(SolutionDir)bin\$(Configuration)-$(Platform)\Client\"</Command>

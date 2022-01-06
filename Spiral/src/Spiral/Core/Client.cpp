@@ -2,8 +2,6 @@
 
 #include "Client.hpp"
 
-#define INITIAL_STACK_CAPACITY 5
-
 namespace Spiral
 {
 	ECProperties Client::engineProperties = {
@@ -53,11 +51,11 @@ namespace Spiral
 	{
 		delete renderer;
 		delete window;
-		uint16_t total = nLayers + nOverlays;
-		uint16_t i;
-		for (i = 0; i < total; i++)
+		const index_t total = nLayers + nOverlays;
+		index_t i;
+		for (i = 1; i < total + 1; i++)
 		{
-			delete layerStack[i];
+			delete layerStack[total - i];
 		}
 
 		free(layerStack);
@@ -106,7 +104,7 @@ namespace Spiral
 
 	void Client::pushLayer(Layer *layer)
 	{
-		uint16_t i;
+		index_t i;
 		if (pushLayerSize + 1 > pushLayerCapacity)
 		{
 			pushLayerCapacity += INITIAL_STACK_CAPACITY;
@@ -134,7 +132,7 @@ namespace Spiral
 
 	void Client::pushOverlay(Layer *layer)
 	{
-		uint16_t i;
+		index_t i;
 		if (pushOverlaySize + 1 > pushOverlayCapacity)
 		{
 			pushOverlayCapacity += INITIAL_STACK_CAPACITY;
@@ -167,7 +165,7 @@ namespace Spiral
 
 	void Client::run()
 	{
-		uint16_t i, n;
+		index_t i, n;
 		Layer** t;
 		while (running)
 		{
@@ -184,8 +182,8 @@ namespace Spiral
 				pushEvent(Event::windowResize(windowWidth, windowHeight));
 				windowSizeChanged = false;
 			}
-
-			while (eventBufferSize > 0)
+			//TODO: use function_name, var_name, struct_name, name_space, ClassName, TemplateParam -- add include directory, rename files with no capital letters
+			while (eventBufferSize > 0) //TODO: replace goto with function
 			{
 				for (i = nLayers + nOverlays - 1; i != 65535U; i--) //Kinda assuming the layer stack will never get as big as 65535, but it shouldnt
 				{

@@ -19,6 +19,9 @@ TestLayer::TestLayer()
 	mesh.iSize = 6;
 
 	Spiral::Renderer::loadMesh(mesh, vi, fi);
+	//Spiral::Renderer::Pipeline pl();
+	//Spiral::Renderer::Resource res(mesh);
+	//Spiral::Renderer::Instance obj(res, pl);
 }
 
 TestLayer::~TestLayer()

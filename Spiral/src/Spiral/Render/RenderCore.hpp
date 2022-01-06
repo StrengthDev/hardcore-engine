@@ -5,6 +5,8 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include <spirv_cross/spirv_cross.hpp>
+
 #include "../Core/Core.hpp"
 
 const std::vector<const char*> validationLayers = {

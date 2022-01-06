@@ -77,6 +77,8 @@ namespace Spiral
 			SPRL_CORE_DEBUG("Fragment shader loaded (ID-{0} SIZE: {1})", nShaders, filesize);
 			break;
 		}
+		spirv_cross::Compiler comp(shader.source, shader.size / sizeof(uint32_t));
+		shader.resources = comp.get_shader_resources();
 		return add(shader);
 	}
 }

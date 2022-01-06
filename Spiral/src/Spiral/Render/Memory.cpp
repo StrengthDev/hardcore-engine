@@ -232,8 +232,8 @@ namespace Spiral
 				range = nexus.ranges[i];
 
 				VkBufferCopy copyRegion = {};
-				copyRegion.srcOffset = range.srcOffset; // Optional
-				copyRegion.dstOffset = range.dstOffset; // Optional
+				copyRegion.srcOffset = range.srcOffset;
+				copyRegion.dstOffset = range.dstOffset;
 				copyRegion.size = range.size;
 				SPRL_CORE_DEBUG("src:{0} dst:{1} size:{2}", range.srcOffset, range.dstOffset, range.size);
 				vkCmdCopyBuffer(nexus.cmdBuffer, nexus.transientBuffer, nexus.pools[range.pool].buffer, 1, &copyRegion);

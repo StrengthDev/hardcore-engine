@@ -6,12 +6,15 @@
 #include "Spiral/Render/Renderer.hpp"
 
 
-#define SPIRAL_NAME				"Spiral Engine"
-#define SPIRAL_MAJOR_VERSION	1
-#define SPIRAL_MINOR_VERSION	0
-#define SPIRAL_PATCH_VERSION	0
+static const char* SPIRAL_NAME = "Spiral Engine";
+static const unsigned int SPIRAL_MAJOR_VERSION = 1;
+static const unsigned int SPIRAL_MINOR_VERSION = 0;
+static const unsigned int SPIRAL_PATCH_VERSION = 0;
 
-#define EVENT_BUFFER_CAPACITY 128
+using index_t = uint16_t;
+
+static const index_t EVENT_BUFFER_CAPACITY = 128;
+static const index_t INITIAL_STACK_CAPACITY = 5;
 
 namespace Spiral
 {
@@ -47,26 +50,26 @@ namespace Spiral
 		ECProperties properties;
 
 		Layer** layerStack;
-		uint16_t layerStackCapacity;
-		uint16_t nLayers;
-		uint16_t nOverlays;
-		uint16_t overlayOffset;
+		index_t layerStackCapacity;
+		index_t nLayers;
+		index_t nOverlays;
+		index_t overlayOffset;
 
-		uint16_t popLayerBuffer;
-		uint16_t popOverlayBuffer;
+		index_t popLayerBuffer;
+		index_t popOverlayBuffer;
 		Layer** pushLayerBuffer;
-		uint16_t pushLayerCapacity;
-		uint16_t pushLayerSize;
+		index_t pushLayerCapacity;
+		index_t pushLayerSize;
 		Layer** pushOverlayBuffer;
-		uint16_t pushOverlayCapacity;
-		uint16_t pushOverlaySize;
+		index_t pushOverlayCapacity;
+		index_t pushOverlaySize;
 
 		bool running;
 
 		Event eventBuffer[EVENT_BUFFER_CAPACITY];
-		uint16_t eventBufferSize;
-		uint16_t eventStart; //Inclusive
-		uint16_t eventEnd; //Non-inclusive
+		index_t eventBufferSize;
+		index_t eventStart; //Inclusive
+		index_t eventEnd; //Non-inclusive
 
 		int windowWidth;
 		int windowHeight;
