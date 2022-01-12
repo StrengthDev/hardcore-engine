@@ -199,7 +199,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\pch.hpp" />
-    <ClInclude Include="include\Spiral.hpp" />
+    <ClInclude Include="include\spiral.hpp" />
     <ClInclude Include="include\Spiral\Core\Client.hpp" />
     <ClInclude Include="include\Spiral\Core\Core.hpp" />
     <ClInclude Include="include\Spiral\Core\EntryPoint.hpp" />

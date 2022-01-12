@@ -1,10 +1,10 @@
 #pragma once
 
-#include "Renderer.hpp"
+#include "renderer.hpp"
 
 #include "RenderCore.hpp"
 
-#include "Device.hpp"
+#include "device.hpp"
 #include "ShaderLibrary.hpp"
 
 #define MAX_DEVICES 8

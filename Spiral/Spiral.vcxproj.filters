@@ -56,7 +56,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\Spiral.hpp">
+    <ClInclude Include="include\spiral.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Tmp\Test.hpp">

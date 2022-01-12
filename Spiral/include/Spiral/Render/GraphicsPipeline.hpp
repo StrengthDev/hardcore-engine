@@ -1,10 +1,10 @@
 #pragma once
 
 #include "RenderCore.hpp"
-#include "Swapchain.hpp"
-#include "Shader.hpp"
-#include "Memory.hpp"
-#include "Mesh.hpp"
+#include "swapchain.hpp"
+#include "shader.hpp"
+#include "memory.hpp"
+#include "mesh.hpp"
 
 namespace Spiral
 {

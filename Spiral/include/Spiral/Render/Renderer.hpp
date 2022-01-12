@@ -1,7 +1,7 @@
 #pragma once
 
-#include "Spiral/Core/Core.hpp"
-#include "Mesh.hpp"
+#include <spiral/core/core.hpp>
+#include "mesh.hpp"
 #include "ShaderAPI.hpp"
 
 namespace Spiral

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "RenderCore.hpp"
-#include "Swapchain.hpp"
+#include "swapchain.hpp"
 #include "GraphicsPipeline.hpp"
 
 namespace Spiral

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Spiral.hpp>
+#include <spiral.hpp>
 
 #include <chrono>
 

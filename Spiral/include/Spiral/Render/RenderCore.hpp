@@ -7,7 +7,7 @@
 
 #include <spirv_cross/spirv_cross.hpp>
 
-#include "../Core/Core.hpp"
+#include <spiral/core/core.hpp>
 
 const std::vector<const char*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"

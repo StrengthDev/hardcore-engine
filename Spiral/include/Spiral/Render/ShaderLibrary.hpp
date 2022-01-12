@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Shader.hpp"
+#include "shader.hpp"
 #include "RenderCore.hpp"
 
 #define INITIAL_NUM_SHADERS 10

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Spiral/Core/Core.hpp"
+#include <spiral/core/core.hpp>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Spiral.hpp>
+#include <spiral.hpp>
 
 class ELLayer : public Spiral::Layer
 {

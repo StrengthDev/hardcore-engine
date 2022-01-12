@@ -1,9 +1,9 @@
 #pragma once
 
-#include "Core.hpp"
-#include "Layer.hpp"
-#include "Window.hpp"
-#include "Spiral/Render/Renderer.hpp"
+#include "core.hpp"
+#include "layer.hpp"
+#include "window.hpp"
+#include <spiral/render/renderer.hpp>
 
 
 static const char* SPIRAL_NAME = "Spiral Engine";

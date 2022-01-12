@@ -38,6 +38,8 @@ void TestLayer::tick()
 		timec -= 1000000000;
 		SPRL_TRACE("Frame count: ({0})", framec);
 		framec = 0;
+
+		printf("\033[3;100;30mTexting\033[0m\n");
 	}
 	framec++;
 	start = std::chrono::steady_clock::now();

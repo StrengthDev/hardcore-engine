@@ -1,4 +1,4 @@
-#include <Spiral.hpp>
+#include <spiral.hpp>
 #include <Spiral/Core/EntryPoint.hpp>
 
 #include "TestLayer.hpp"
