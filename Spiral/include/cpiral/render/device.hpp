@@ -1,8 +1,8 @@
 #pragma once
 
-#include "RenderCore.hpp"
+#include "render_core.hpp"
 #include "swapchain.hpp"
-#include "GraphicsPipeline.hpp"
+#include "graphics_pipeline.hpp"
 
 namespace Spiral
 {

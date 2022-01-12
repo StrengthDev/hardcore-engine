@@ -1,6 +1,6 @@
 #pragma once
 
-#include "RenderCore.hpp"
+#include "render_core.hpp"
 
 namespace Spiral 
 {

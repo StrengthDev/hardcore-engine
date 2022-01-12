@@ -2,7 +2,7 @@
 
 #include <spiral/core/core.hpp>
 #include "mesh.hpp"
-#include "ShaderAPI.hpp"
+#include "shader.hpp"
 
 namespace Spiral
 {

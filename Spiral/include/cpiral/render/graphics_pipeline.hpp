@@ -1,8 +1,8 @@
 #pragma once
 
-#include "RenderCore.hpp"
+#include "render_core.hpp"
 #include "swapchain.hpp"
-#include "shader.hpp"
+#include "shader_internal.hpp"
 #include "memory.hpp"
 #include "mesh.hpp"
 

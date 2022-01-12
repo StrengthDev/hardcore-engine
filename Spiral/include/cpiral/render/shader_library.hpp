@@ -1,7 +1,7 @@
 #pragma once
 
-#include "shader.hpp"
-#include "RenderCore.hpp"
+#include "render_core.hpp"
+#include "shader_internal.hpp"
 
 #define INITIAL_NUM_SHADERS 10
 #define INCREASE_STEP 10

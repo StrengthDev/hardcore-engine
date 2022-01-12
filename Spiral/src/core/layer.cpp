@@ -1,6 +1,6 @@
 #include <pch.hpp>
 
-#include <Spiral/Core/Layer.hpp>
+#include <spiral/core/layer.hpp>
 
 namespace Spiral
 {

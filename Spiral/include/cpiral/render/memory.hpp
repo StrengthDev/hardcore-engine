@@ -1,6 +1,6 @@
 #pragma once
 
-#include "RenderCore.hpp"
+#include "render_core.hpp"
 
 //NOTE: with the way the system is implemented, having 8MB pools assumes vertexes will have no more than 128 bytes of data
 //TODO: use push constants for model matrix and other object related variables, uniform buffer for view, world matrices and such, regular buffers for the rest

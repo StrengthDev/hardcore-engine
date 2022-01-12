@@ -65,64 +65,64 @@
     <ClInclude Include="include\pch.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Debug\Log.hpp">
+    <ClInclude Include="include\Spiral\debug\log.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Render\Shader.hpp">
+    <ClInclude Include="include\Spiral\Render\shader_internal.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Core\Core.hpp">
+    <ClInclude Include="include\Spiral\core\core.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Core\Client.hpp">
+    <ClInclude Include="include\Spiral\core\client.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Core\EntryPoint.hpp">
+    <ClInclude Include="include\Spiral\core\entry_point.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Core\Layer.hpp">
+    <ClInclude Include="include\Spiral\core\layer.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Core\Window.hpp">
+    <ClInclude Include="include\Spiral\core\window.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Core\WindowObject.hpp">
+    <ClInclude Include="include\Spiral\Core\window_internal.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Core\Event.hpp">
+    <ClInclude Include="include\Spiral\core\event.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Render\Renderer.hpp">
+    <ClInclude Include="include\Spiral\Render\renderer.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Render\RendererObject.hpp">
+    <ClInclude Include="include\Spiral\Render\renderer_internal.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Render\Device.hpp">
+    <ClInclude Include="include\Spiral\Render\device.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Render\RenderCore.hpp">
+    <ClInclude Include="include\Spiral\Render\render_core.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Render\Swapchain.hpp">
+    <ClInclude Include="include\Spiral\Render\swapchain.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Render\GraphicsPipeline.hpp">
+    <ClInclude Include="include\Spiral\Render\graphics_pipeline.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Render\ShaderLibrary.hpp">
+    <ClInclude Include="include\Spiral\Render\shader_library.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Render\BufferLayout.hpp">
+    <ClInclude Include="include\Spiral\Render\buffer_layout.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Render\Mesh.hpp">
+    <ClInclude Include="include\Spiral\Render\mesh.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Render\ShaderAPI.hpp">
+    <ClInclude Include="include\Spiral\Render\shader.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Spiral\Render\Memory.hpp">
+    <ClInclude Include="include\Spiral\Render\memory.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

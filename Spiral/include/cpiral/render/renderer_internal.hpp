@@ -2,10 +2,10 @@
 
 #include "renderer.hpp"
 
-#include "RenderCore.hpp"
+#include "render_core.hpp"
 
 #include "device.hpp"
-#include "ShaderLibrary.hpp"
+#include "shader_library.hpp"
 
 #define MAX_DEVICES 8
 

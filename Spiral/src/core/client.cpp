@@ -1,6 +1,6 @@
 #include <pch.hpp>
 
-#include <Spiral/Core/Client.hpp>
+#include <spiral/core/client.hpp>
 
 namespace Spiral
 {

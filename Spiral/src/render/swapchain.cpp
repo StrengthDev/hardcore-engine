@@ -1,7 +1,7 @@
 #include <pch.hpp>
 
-#include <Spiral/Render/Swapchain.hpp>
-#include <Spiral/Core/Client.hpp>
+#include <spiral/render/swapchain.hpp>
+#include <spiral/core/client.hpp>
 
 namespace Spiral
 {

@@ -1,5 +1,5 @@
 #include <spiral.hpp>
-#include <Spiral/Core/EntryPoint.hpp>
+#include <spiral/core/entry_point.hpp>
 
 #include "TestLayer.hpp"
 #include "ELLayer.hpp"

@@ -13,69 +13,6 @@ namespace Spiral //TODO: make core logger invisible to the client
 	
 		SPIRAL_API std::shared_ptr<spdlog::logger>& core();
 		SPIRAL_API std::shared_ptr<spdlog::logger>& client();
-		/*
-		template<typename T>
-		SPIRAL_API void coreTrace(const T& msg);
-		template<typename FormatString, typename... Args>
-		SPIRAL_API void coreTrace(const FormatString& fmt, const Args &...args);
-
-		template<typename T>
-		SPIRAL_API void coreDebug(const T& msg);
-		template<typename FormatString, typename... Args>
-		SPIRAL_API void coreDebug(const FormatString& fmt, const Args &...args);
-
-		template<typename T>
-		SPIRAL_API void coreInfo(const T& msg);
-		template<typename FormatString, typename... Args>
-		SPIRAL_API void coreInfo(const FormatString& fmt, const Args &...args);
-
-		template<typename T>
-		SPIRAL_API void coreWarn(const T& msg);
-		template<typename FormatString, typename... Args>
-		SPIRAL_API void coreWarn(const FormatString& fmt, const Args &...args);
-
-		template<typename T>
-		SPIRAL_API void coreError(const T& msg);
-		template<typename FormatString, typename... Args>
-		SPIRAL_API void coreError(const FormatString& fmt, const Args &...args);
-
-		template<typename T>
-		SPIRAL_API void coreCritical(const T& msg);
-		template<typename FormatString, typename... Args>
-		SPIRAL_API void coreCritical(const FormatString& fmt, const Args &...args);
-
-
-
-		template<typename T>
-		SPIRAL_API void clientTrace(const T& msg);
-		template<typename FormatString, typename... Args>
-		SPIRAL_API void clientTrace(const FormatString& fmt, const Args &...args);
-
-		template<typename T>
-		SPIRAL_API void clientDebug(const T& msg);
-		template<typename FormatString, typename... Args>
-		SPIRAL_API void clientDebug(const FormatString& fmt, const Args &...args);
-
-		template<typename T>
-		SPIRAL_API void clientInfo(const T& msg);
-		template<typename FormatString, typename... Args>
-		SPIRAL_API void clientInfo(const FormatString& fmt, const Args &...args);
-
-		template<typename T>
-		SPIRAL_API void clientWarn(const T& msg);
-		template<typename FormatString, typename... Args>
-		SPIRAL_API void clientWarn(const FormatString& fmt, const Args &...args);
-
-		template<typename T>
-		SPIRAL_API void clientError(const T& msg);
-		template<typename FormatString, typename... Args>
-		SPIRAL_API void clientError(const FormatString& fmt, const Args &...args);
-
-		template<typename T>
-		SPIRAL_API void clientCritical(const T& msg);
-		template<typename FormatString, typename... Args>
-		SPIRAL_API void clientCritical(const FormatString& fmt, const Args &...args);
-		*/
 	}
 }
 
