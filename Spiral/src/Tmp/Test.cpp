@@ -258,10 +258,10 @@ private:
 		std::vector<VkExtensionProperties> extensions(extensionCount);
 		vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
 		std::cout << "available extensions:" << std::endl;
-		SPRL_CORE_INFO("Available extensions:");
+		//SPRL_CORE_INFO("Available extensions:");
 		for (const auto& extension : extensions) {
 			//std::cout << "\t" << extension.extensionName << std::endl;
-			SPRL_CORE_INFO(extension.extensionName);
+			//SPRL_CORE_INFO(extension.extensionName);
 		}
 	}
 
@@ -272,7 +272,7 @@ private:
 		void* pUserData) {
 
 		//std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
-		SPRL_CORE_DEBUG("Validation layer: {0}", pCallbackData->pMessage);
+		//SPRL_CORE_DEBUG("Validation layer: {0}", pCallbackData->pMessage);
 
 		return VK_FALSE;
 	}
@@ -526,18 +526,18 @@ private:
 		for (const auto& availablePresentMode : availablePresentModes) {
 			if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
 				//std::cout << "Mailbox_khr" << std::endl;
-				SPRL_CORE_INFO("Present mode: {0}", "MAILBOX_KHR");
+				//SPRL_CORE_INFO("Present mode: {0}", "MAILBOX_KHR");
 				return availablePresentMode;
 			}
 			else if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
 				//std::cout << "Immediate_khr" << std::endl;
-				SPRL_CORE_INFO("Present mode: {0}", "IMMEDIATE_KHR");
+				//SPRL_CORE_INFO("Present mode: {0}", "IMMEDIATE_KHR");
 				bestMode = availablePresentMode;
 			}
 		}
 		if (bestMode == VK_PRESENT_MODE_FIFO_KHR) {
 			//std::cout << "Fifo_khr" << std::endl;
-			SPRL_CORE_INFO("Present mode: {0}", "FIFO_KHR");
+			//SPRL_CORE_INFO("Present mode: {0}", "FIFO_KHR");
 		}
 		return bestMode;
 	}
@@ -1328,7 +1328,7 @@ private:
 			if (timec > 1000000000) {
 				timec -= 1000000000;
 				//std::cout << framec << std::endl;
-				SPRL_CORE_DEBUG(framec);
+				//SPRL_CORE_DEBUG(framec);
 				framec = 0;
 			}
 			framec++;

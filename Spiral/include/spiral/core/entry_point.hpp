@@ -1,15 +1,20 @@
 #pragma once
 
+#include <spiral.hpp>
+#include <spiral/debug/log_internal.hpp>
+
 #ifndef NDEBUG
 
+#ifdef _MSC_VER
 #pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup") //TODO: adapt to be platform independent
+#endif // _MSC_VER
 
 #define LOGINIT
 #define LOGSHUTDOWN
 #else
-#define LOGINIT Spiral::Log::init()
-#define LOGSHUTDOWN Spiral::Log::shutdown()
-#endif
+#define LOGINIT Spiral::log::init()
+#define LOGSHUTDOWN Spiral::log::shutdown()
+#endif // NDEBUG
 
 
 extern Spiral::Client* Spiral::start();

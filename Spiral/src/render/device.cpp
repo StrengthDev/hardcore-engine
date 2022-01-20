@@ -16,7 +16,7 @@ namespace Spiral
 		vkGetPhysicalDeviceProperties(physicalHandle, &properties);
 		vkGetPhysicalDeviceFeatures(physicalHandle, &features);
 
-		SPRL_CORE_INFO("[RENDERER] Physical device found: {0}", properties.deviceName);
+		LOGF_INTERNAL_INFO("[RENDERER] Physical device found: {0}", properties.deviceName);
 
 		graphicsIndex = -1;
 		presentIndex = -1;

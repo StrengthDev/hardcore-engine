@@ -1,67 +1,158 @@
 #pragma once
 
-#include <spiral/core/core.hpp>
-#include <spdlog/spdlog.h>
-#include <spdlog/sinks/stdout_color_sinks.h>
+#include <iostream>
+#include <sstream>
+#include <array>
 
-namespace Spiral //TODO: make core logger invisible to the client
+#include <spiral/core/core.hpp>
+
+namespace Spiral
 {
-	namespace Log
+	namespace log
 	{
-		SPIRAL_API void init();
-		SPIRAL_API void shutdown();
-	
-		SPIRAL_API std::shared_ptr<spdlog::logger>& core();
-		SPIRAL_API std::shared_ptr<spdlog::logger>& client();
+		using flag_t = uint8_t;
+		
+		enum log_mask_flag_bits
+		{
+			TRACE_BIT =	BIT(0),
+			DEBUG_BIT =	BIT(1),
+			INFO_BIT =	BIT(2),
+			WARN_BIT =	BIT(3),
+			ERROR_BIT =	BIT(4),
+			CRIT_BIT =	BIT(5)
+		};
+
+		enum log_format_flag_bits
+		{
+			TIMESTAMP_BIT =		BIT(0),
+			CALLER_BIT =		BIT(1),
+			EXPLICIT_TYPE_BIT =	BIT(2)
+		};
+
+		SPIRAL_API void set_log_mask_flags(flag_t flags);
+		SPIRAL_API void set_log_format_flags(flag_t flags);
+
+		template<std::size_t N, typename Type, typename... Types>
+		inline void args_to_strings(std::array<std::string, N>& arr, Type arg, Types... args)
+		{
+			std::stringstream str_stream;
+			str_stream << arg;
+			arr[N - sizeof...(args) - 1] = str_stream.str();
+			if constexpr (0 < sizeof...(args))
+			{
+				args_to_strings(arr, args...);
+			}
+		}
+
+		//TODO: Optimize this, it is garbage
+		template<typename... Types>
+		inline std::string str_format(const std::string& format, Types... args)
+		{
+			if constexpr (sizeof...(Types) == 0)
+			{
+				return format;
+			}
+			else
+			{
+				std::array<std::string, sizeof...(args)> arg_strings;
+				args_to_strings(arg_strings, args...);
+				
+				std::stringstream str_stream;
+				std::size_t arg_n, t, pos = 0;
+				std::size_t save_index = 0;
+				std::string tmp;
+				while ((pos = format.find('{', pos)) != std::string::npos)
+				{
+					t = format.find('}', pos);
+					if (t == std::string::npos)
+					{
+						break;
+					}
+
+					tmp = format.substr(pos + 1, t - pos - 1);
+
+					try
+					{
+						arg_n = std::stoull(tmp);
+						str_stream << format.substr(save_index, pos - save_index);
+						if (arg_n < sizeof...(args))
+						{
+							str_stream << arg_strings[arg_n];
+						}
+						else
+						{
+							str_stream << "NO_ARG";
+						}
+						
+						t++;
+						save_index = t;
+						pos = t;
+					}
+					catch (std::exception e)
+					{
+						pos++;
+					}
+				}
+				if (save_index < format.length())
+				{
+					str_stream << format.substr(save_index, format.length() - save_index);
+				}
+				return str_stream.str();
+			}
+		}
+
+		SPIRAL_API void trace(const char* message);
+		template<typename... Types>
+		inline void tracef(const std::string& format, Types... args) { trace(str_format(format, args...).c_str()); }
+
+		SPIRAL_API void debug(const char* message);
+		template<typename... Types>
+		inline void debugf(const std::string& format, Types... args) { debug(str_format(format, args...).c_str()); }
+
+		SPIRAL_API void info(const char* message);
+		template<typename... Types>
+		inline void infof(const std::string& format, Types... args) { info(str_format(format, args...).c_str()); }
+
+		SPIRAL_API void warn(const char* message);
+		template<typename... Types>
+		inline void warnf(const std::string& format, Types... args) { warn(str_format(format, args...).c_str()); }
+
+		SPIRAL_API void error(const char* message);
+		template<typename... Types>
+		inline void errorf(const std::string& format, Types... args) { error(str_format(format, args...).c_str()); }
+
+		SPIRAL_API void crit(const char* message);
+		template<typename... Types>
+		inline void critf(const std::string& format, Types... args) { crit(str_format(format, args...).c_str()); }
 	}
 }
 
 #ifndef NDEBUG
-#define SPRL_CORE_TRACE(...)
-#define SPRL_CORE_DEBUG(...)
-#define SPRL_CORE_INFO(...)	
-#define SPRL_CORE_WARN(...)	
-#define SPRL_CORE_ERROR(...)
-#define SPRL_CORE_CRIT(...)	
+#define LOG_TRACE(message)
+#define LOG_DEBUG(message)
+#define LOG_INFO(message)
+#define LOG_WARN(message)
+#define LOG_ERROR(message)
+#define LOG_CRIT(message)
 
-#define SPRL_TRACE(...)		
-#define SPRL_DEBUG(...)		
-#define SPRL_INFO(...)		
-#define SPRL_WARN(...)		
-#define SPRL_ERROR(...)		
-#define SPRL_CRIT(...)		
+#define LOGF_TRACE(...)
+#define LOGF_DEBUG(...)
+#define LOGF_INFO(...)
+#define LOGF_WARN(...)
+#define LOGF_ERROR(...)
+#define LOGF_CRIT(...)
+#else				
+#define LOG_TRACE(message)	{ std::stringstream str_stream; str_stream << message; Spiral::log::trace(str_stream.str().c_str()); }
+#define LOG_DEBUG(message)	{ std::stringstream str_stream; str_stream << message; Spiral::log::debug(str_stream.str().c_str()); }
+#define LOG_INFO(message)	{ std::stringstream str_stream; str_stream << message; Spiral::log::info(str_stream.str().c_str()); }
+#define LOG_WARN(message)	{ std::stringstream str_stream; str_stream << message; Spiral::log::warn(str_stream.str().c_str()); }
+#define LOG_ERROR(message)	{ std::stringstream str_stream; str_stream << message; Spiral::log::error(str_stream.str().c_str()); }
+#define LOG_CRIT(message)	{ std::stringstream str_stream; str_stream << message; Spiral::log::crit(str_stream.str().c_str()); }
 
-#define SPRL_INIT_CLIENT_LOGGER
-#else
-/*
-#define SPRL_CORE_TRACE(...)	Spiral::Log::coreTrace(__VA_ARGS__)
-#define SPRL_CORE_DEBUG(...)	Spiral::Log::coreDebug(__VA_ARGS__)
-#define SPRL_CORE_INFO(...)		Spiral::Log::coreInfo(__VA_ARGS__)
-#define SPRL_CORE_WARN(...)		Spiral::Log::coreWarn(__VA_ARGS__)
-#define SPRL_CORE_ERROR(...)	Spiral::Log::coreError(__VA_ARGS__)
-#define SPRL_CORE_CRIT(...)		Spiral::Log::coreCritical(__VA_ARGS__)
-
-#define SPRL_TRACE(...)			Spiral::Log::clientTrace(__VA_ARGS__)
-#define SPRL_DEBUG(...)			Spiral::Log::clientDebug(__VA_ARGS__)
-#define SPRL_INFO(...)			Spiral::Log::clientInfo(__VA_ARGS__)
-#define SPRL_WARN(...)			Spiral::Log::clientWarn(__VA_ARGS__)
-#define SPRL_ERROR(...)			Spiral::Log::clientError(__VA_ARGS__)
-#define SPRL_CRIT(...)			Spiral::Log::clientCritical(__VA_ARGS__)
-*/
-
-#define SPRL_CORE_TRACE(...)	Spiral::Log::core()->trace(__VA_ARGS__)
-#define SPRL_CORE_DEBUG(...)	Spiral::Log::core()->debug(__VA_ARGS__)
-#define SPRL_CORE_INFO(...)		Spiral::Log::core()->info(__VA_ARGS__)
-#define SPRL_CORE_WARN(...)		Spiral::Log::core()->warn(__VA_ARGS__)
-#define SPRL_CORE_ERROR(...)	Spiral::Log::core()->error(__VA_ARGS__)
-#define SPRL_CORE_CRIT(...)		Spiral::Log::core()->critical(__VA_ARGS__)
-
-#define SPRL_TRACE(...)			Spiral::Log::client()->trace(__VA_ARGS__)
-#define SPRL_DEBUG(...)			Spiral::Log::client()->debug(__VA_ARGS__)
-#define SPRL_INFO(...)			Spiral::Log::client()->info(__VA_ARGS__)
-#define SPRL_WARN(...)			Spiral::Log::client()->warn(__VA_ARGS__)
-#define SPRL_ERROR(...)			Spiral::Log::client()->error(__VA_ARGS__)
-#define SPRL_CRIT(...)			Spiral::Log::client()->critical(__VA_ARGS__)
-
-#define SPRL_INIT_CLIENT_LOGGER { spdlog::set_pattern("%^[%T] %n: %v%$"); Spiral::Log::client() = spdlog::stdout_color_mt("CLIENT"); Spiral::Log::client()->set_level(spdlog::level::trace); Spiral::Log::client()->debug("Logger initiated."); }
-#endif
+#define LOGF_TRACE(...)	Spiral::log::tracef(__VA_ARGS__);
+#define LOGF_DEBUG(...)	Spiral::log::debugf(__VA_ARGS__);
+#define LOGF_INFO(...)	Spiral::log::infof(__VA_ARGS__);
+#define LOGF_WARN(...)	Spiral::log::warnf(__VA_ARGS__);
+#define LOGF_ERROR(...)	Spiral::log::errorf(__VA_ARGS__);
+#define LOGF_CRIT(...)	Spiral::log::critf(__VA_ARGS__);
+#endif // NDEBUG

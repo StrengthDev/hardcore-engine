@@ -4,16 +4,16 @@
 
 namespace Spiral
 {
-	ECProperties Client::engineProperties = {
-		SPIRAL_NAME,
-		SPIRAL_MAJOR_VERSION,
-		SPIRAL_MINOR_VERSION,
-		SPIRAL_PATCH_VERSION
+	program_id Client::engine_id = {
+		ENGINE_NAME,
+		MAJOR_VERSION,
+		MINOR_VERSION,
+		PATCH_VERSION
 	};
 
 	Client* Client::instance = nullptr;
 
-	Client::Client() //TODO: might want to consider giving an absolute size to the layerstack and move it to the stack memory space instead of heap
+	Client::Client(const char* name, const unsigned int major_version, const unsigned int minor_version, const unsigned int patch_version) //TODO: might want to consider giving an absolute size to the layerstack and move it to the stack memory space instead of heap
 	{
 		instance = this;
 		layerStack = (Layer**)malloc(sizeof(Layer*) * INITIAL_STACK_CAPACITY);
@@ -66,15 +66,15 @@ namespace Spiral
 	void Client::init()
 	{
 		//SPRL_CORE_TRACE(properties.name);
-		renderer = Renderer::init(engineProperties, properties);
+		renderer = Renderer::init(engine_id, client_id);
 	}
 
-	void Client::setProperties(const char *name, unsigned int majorVersion, unsigned int minorVersion, unsigned int patchVersion)
+	void Client::setProperties(const char *name, const unsigned int major_version, const unsigned int minor_version, const unsigned int patch_version)
 	{
-		properties.name = name;
-		properties.major = majorVersion;
-		properties.minor = minorVersion;
-		properties.patch = patchVersion;
+		client_id.name = name;
+		client_id.major = major_version;
+		client_id.minor = minor_version;
+		client_id.patch = patch_version;
 	}
 
 	static std::mutex eventMutex;
@@ -91,7 +91,7 @@ namespace Spiral
 		}
 		else
 		{
-			SPRL_CORE_WARN("Event buffer overflow!");
+			LOG_INTERNAL_WARN("Event buffer overflow!");
 		}
 	}
 
@@ -104,25 +104,20 @@ namespace Spiral
 
 	void Client::pushLayer(Layer *layer)
 	{
-		index_t i;
 		if (pushLayerSize + 1 > pushLayerCapacity)
 		{
 			pushLayerCapacity += INITIAL_STACK_CAPACITY;
 			Layer** t = (Layer**)malloc(sizeof(Layer*) * pushLayerCapacity);
-			for (i = 0; i < pushLayerSize; i++)
+			/*for (index_t i = 0; i < pushLayerSize; i++)
 			{
 				t[i] = pushLayerBuffer[i];
-			}
-			t[pushLayerSize] = layer;
-			pushLayerSize++;
+			}*/
+			memcpy(t, pushLayerBuffer, sizeof(Layer*) * pushLayerSize);
 			free(pushLayerBuffer);
 			pushLayerBuffer = t;
 		}
-		else
-		{
-			pushLayerBuffer[pushLayerSize] = layer;
-			pushLayerSize++;
-		}
+		pushLayerBuffer[pushLayerSize] = layer;
+		pushLayerSize++;
 	}
 
 	void Client::popLayer()
@@ -132,25 +127,20 @@ namespace Spiral
 
 	void Client::pushOverlay(Layer *layer)
 	{
-		index_t i;
 		if (pushOverlaySize + 1 > pushOverlayCapacity)
 		{
 			pushOverlayCapacity += INITIAL_STACK_CAPACITY;
 			Layer** t = (Layer**)malloc(sizeof(Layer*) * pushOverlayCapacity);
-			for (i = 0; i < pushOverlaySize; i++)
+			/*for (index_t i = 0; i < pushOverlaySize; i++)
 			{
 				t[i] = pushOverlayBuffer[i];
-			}
-			t[pushOverlaySize] = layer;
-			pushOverlaySize++;
+			}*/
+			memcpy(t, pushOverlayBuffer, sizeof(Layer*) * pushOverlaySize);
 			free(pushOverlayBuffer);
 			pushOverlayBuffer = t;
 		}
-		else
-		{
-			pushOverlayBuffer[pushOverlaySize] = layer;
-			pushOverlaySize++;
-		}
+		pushOverlayBuffer[pushOverlaySize] = layer;
+		pushOverlaySize++;
 	}
 
 	void Client::popOverlay()
@@ -166,7 +156,7 @@ namespace Spiral
 	void Client::run()
 	{
 		index_t i, n;
-		Layer** t;
+		Layer** t = nullptr;
 		while (running)
 		{
 			for (i = 0; i < nLayers + nOverlays; i++)
@@ -221,10 +211,11 @@ namespace Spiral
 					delete layerStack[i];
 				}
 				nLayers -= popLayerBuffer;
-				for (i = nLayers; i < nLayers + nOverlays; i++)
+				/*for (i = nLayers; i < nLayers + nOverlays; i++)
 				{
 					layerStack[i] = layerStack[i + popLayerBuffer];
-				}
+				}*/
+				memmove(&layerStack[nLayers], &layerStack[nLayers + popLayerBuffer], sizeof(Layer*) * nOverlays);
 				popLayerBuffer = 0;
 			}
 
@@ -236,24 +227,27 @@ namespace Spiral
 					i = (n / INITIAL_STACK_CAPACITY + 1) * INITIAL_STACK_CAPACITY;
 					t = (Layer**)malloc(sizeof(Layer*) * i);
 					layerStackCapacity = i;
-					for (i = 0; i < nLayers + nOverlays; i++)
+					/*for (i = 0; i < nLayers + nOverlays; i++)
 					{
 						t[i] = layerStack[i];
-					}
+					}*/
+					memcpy(t, layerStack, sizeof(Layer*) * (nLayers + nOverlays));
 					free(layerStack);
 					layerStack = t;
 				}
 
 				if (pushLayerSize)
 				{
-					for (i = nLayers + nOverlays + pushLayerSize - 1; i > nLayers + pushLayerSize - 1; i--)
+					/*for (i = nLayers + nOverlays + pushLayerSize - 1; i > nLayers + pushLayerSize - 1; i--)
 					{
 						layerStack[i] = layerStack[i - pushLayerSize];
-					}
-					for (i = nLayers; i < nLayers + pushLayerSize; i++)
+					}*/
+					memmove(&layerStack[nLayers + pushLayerSize], &layerStack[nLayers], sizeof(Layer*) * nOverlays);
+					/*for (i = nLayers; i < nLayers + pushLayerSize; i++)
 					{
 						layerStack[i] = pushLayerBuffer[i - nLayers];
-					}
+					}*/
+					memcpy(&layerStack[nLayers], pushLayerBuffer, sizeof(Layer*) * pushLayerSize);
 					nLayers += pushLayerSize;
 					pushLayerSize = 0;
 				}
@@ -261,10 +255,11 @@ namespace Spiral
 				if (pushOverlaySize)
 				{
 					n = nLayers + nOverlays;
-					for (i = n; i < n + pushOverlaySize; i++)
+					/*for (i = n; i < n + pushOverlaySize; i++)
 					{
 						layerStack[i] = pushOverlayBuffer[i - n];
-					}
+					}*/
+					memcpy(&layerStack[nLayers + nOverlays], pushOverlayBuffer, sizeof(Layer*) * pushOverlaySize);
 					nOverlays += pushOverlaySize;
 					pushOverlaySize = 0;
 				}

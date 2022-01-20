@@ -15,5 +15,5 @@
 #include <mutex>
 
 
-#include "Spiral/Debug/Log.hpp"
+#include "spiral/debug/log_internal.hpp"
 

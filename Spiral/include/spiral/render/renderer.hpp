@@ -14,7 +14,7 @@ namespace Spiral
 		virtual void m_presentFrame() = 0;
 		virtual void m_loadMesh(Mesh mesh, uint32_t vertexShaderId, uint32_t fragShaderId) = 0;
 
-		static Renderer* init(ECProperties engineProps, ECProperties clientProps);
+		static Renderer* init(program_id engineProps, program_id clientProps);
 		static void loadMesh(Mesh mesh, uint32_t vertexShaderId, uint32_t fragShaderId);
 		//TODO: static functions
 	};

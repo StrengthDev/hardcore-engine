@@ -44,7 +44,7 @@ namespace Spiral
 		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
 		void* pUserData)
 	{
-		SPRL_CORE_DEBUG("[VULKAN] {0}", pCallbackData->pMessage);
+		LOGF_INTERNAL_TRACE("[VULKAN] {0}", pCallbackData->pMessage);
 		
 		return VK_FALSE;
 	}
@@ -71,7 +71,7 @@ namespace Spiral
 		}
 	}
 
-	RendererObject::RendererObject(ECProperties engineProps, ECProperties clientProps)
+	RendererObject::RendererObject(program_id engineProps, program_id clientProps)
 	{
 		if (enableValidationLayers && !checkValidationLayerSupport())
 		{
@@ -85,10 +85,10 @@ namespace Spiral
 			vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
 			std::vector<VkExtensionProperties> extensions(extensionCount);
 			vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
-			SPRL_CORE_INFO("[VULKAN] Available extensions:");
+			LOG_INTERNAL_DEBUG("[VULKAN] Available extensions:");
 			for (const auto& extension : extensions)
 			{
-				SPRL_CORE_INFO("[VULKAN]  - {0}", extension.extensionName);
+				LOGF_INTERNAL_DEBUG("[VULKAN]  - {0}", extension.extensionName);
 			}
 		}
 
@@ -98,9 +98,9 @@ namespace Spiral
 		VkApplicationInfo appInfo = {};	//has pNext for extension information
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
 		appInfo.pApplicationName = clientProps.name;
-		appInfo.applicationVersion = VK_MAKE_VERSION(clientProps.major, clientProps.minor, clientProps.patch);
+		appInfo.applicationVersion = VK_MAKE_API_VERSION(0, clientProps.major, clientProps.minor, clientProps.patch); //TODO: variant?
 		appInfo.pEngineName = engineProps.name;
-		appInfo.engineVersion = VK_MAKE_VERSION(engineProps.major, engineProps.minor, engineProps.patch);
+		appInfo.engineVersion = VK_MAKE_API_VERSION(0, engineProps.major, engineProps.minor, engineProps.patch); //TODO: variant?
 		appInfo.apiVersion = VK_API_VERSION_1_0;
 		uint32_t glfwExtensionCount = 0;
 		const char** glfwExtensions;
@@ -221,7 +221,7 @@ namespace Spiral
 	//TODO: submit function should have arguments like VertexData or something containing data/layout and an array of indexes
 	//NOTE: leaves and water wave effects should be done in geometry shaders, or maybe not, theyre not efficient
 
-	Renderer* Renderer::init(ECProperties engineProps, ECProperties clientProps)
+	Renderer* Renderer::init(program_id engineProps, program_id clientProps)
 	{
 		renderer = new RendererObject(engineProps, clientProps);
 		return renderer;

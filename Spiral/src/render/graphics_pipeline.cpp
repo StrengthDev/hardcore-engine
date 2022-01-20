@@ -392,7 +392,7 @@ namespace Spiral
 		extent = swapchain.extent;
 
 		Memory::init(memory, &commandPool);
-		SPRL_CORE_INFO("New pipeline initialised");
+		LOG_INTERNAL_INFO("New pipeline initialised");
 	}
 
 	void GraphicsPipeline::terminate(VkDevice logicalHandle, uint32_t nImages)

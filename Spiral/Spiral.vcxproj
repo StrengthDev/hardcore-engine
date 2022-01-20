@@ -91,7 +91,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.176.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.8.1\include;C:\dev\vendor\stb\stb-master;include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.176.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\stb\stb-master;include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions); SPIRAL_BUILD; NDEBUG</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
@@ -117,7 +117,7 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.176.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.8.1\include;C:\dev\vendor\stb\stb-master;include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.176.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\stb\stb-master;include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>C:\VulkanSDK\1.2.176.1\Lib;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\lib-vc2019;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -135,7 +135,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.176.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.8.1\include;C:\dev\vendor\stb\stb-master;include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.176.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\stb\stb-master;include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions); SPIRAL_BUILD</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
@@ -160,7 +160,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.176.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\spdlog\spdlog-1.8.1\include;C:\dev\vendor\stb\stb-master;include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.176.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\stb\stb-master;include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions); SPIRAL_BUILD</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
@@ -207,7 +207,9 @@
     <ClInclude Include="include\spiral\core\window.hpp" />
     <ClInclude Include="include\spiral\core\event.hpp" />
     <ClInclude Include="include\spiral\core\layer.hpp" />
+    <ClInclude Include="include\spiral\debug\ANSI_utility.hpp" />
     <ClInclude Include="include\spiral\debug\log.hpp" />
+    <ClInclude Include="include\spiral\debug\log_internal.hpp" />
     <ClInclude Include="include\spiral\render\device.hpp" />
     <ClInclude Include="include\spiral\render\graphics_pipeline.hpp" />
     <ClInclude Include="include\spiral\render\memory.hpp" />

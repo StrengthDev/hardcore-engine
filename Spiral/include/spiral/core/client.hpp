@@ -5,28 +5,22 @@
 #include "window.hpp"
 #include <spiral/render/renderer.hpp>
 
-
-static const char* SPIRAL_NAME = "Spiral Engine";
-static const unsigned int SPIRAL_MAJOR_VERSION = 1;
-static const unsigned int SPIRAL_MINOR_VERSION = 0;
-static const unsigned int SPIRAL_PATCH_VERSION = 0;
-
-using index_t = uint16_t;
-
-static const index_t EVENT_BUFFER_CAPACITY = 128;
-static const index_t INITIAL_STACK_CAPACITY = 5;
-
 namespace Spiral
 {
 	class SPIRAL_API Client
 	{
 	public:
-		Client();
+		Client() = delete;
+		Client(const Client& other) = delete;
+		Client(const char* name, const unsigned int major_version, const unsigned int minor_version, const unsigned int patch_version);
 		virtual ~Client();
+
+		Client& operator=(const Client& other) = delete;
+
 		void init();
 		virtual void pushInitialLayers() = 0;
 
-		inline void setProperties(const char *name, unsigned int majorVersion, unsigned int minorVersion, unsigned int patchVersion);
+		inline void setProperties(const char *name, const unsigned int major_version, const unsigned int minor_version, const unsigned int patch_version);
 
 		void pushEvent(Event e);
 		void pushWindowSize(int width, int height);
@@ -44,10 +38,15 @@ namespace Spiral
 		inline Renderer& getRenderer() const { return *renderer; };
 		inline static Client& get() { return *instance; };
 
+		using index_t = uint16_t;
+
+		static const index_t EVENT_BUFFER_CAPACITY = BIT(7);
+		static const index_t INITIAL_STACK_CAPACITY = 5;
+
 	private:
 		Window* window;
 		Renderer* renderer;
-		ECProperties properties;
+		program_id client_id;
 
 		Layer** layerStack;
 		index_t layerStackCapacity;
@@ -77,7 +76,7 @@ namespace Spiral
 
 
 		static Client* instance; //There will be only one Client class instance during runtime
-		static ECProperties engineProperties;
+		static program_id engine_id;
 	};
 
 	//Should be defined in client

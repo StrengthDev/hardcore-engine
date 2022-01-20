@@ -70,11 +70,11 @@ namespace Spiral
 		{
 		case ShaderType::Vertex:
 			shader.type = VK_SHADER_STAGE_VERTEX_BIT;
-			SPRL_CORE_DEBUG("Vertex shader loaded (ID-{0} SIZE: {1})", nShaders, filesize);
+			LOGF_INTERNAL_DEBUG("Vertex shader loaded (ID-{0} SIZE: {1})", nShaders, filesize);
 			break;
 		case ShaderType::Fragment:
 			shader.type = VK_SHADER_STAGE_FRAGMENT_BIT;
-			SPRL_CORE_DEBUG("Fragment shader loaded (ID-{0} SIZE: {1})", nShaders, filesize);
+			LOGF_INTERNAL_DEBUG("Fragment shader loaded (ID-{0} SIZE: {1})", nShaders, filesize);
 			break;
 		}
 		spirv_cross::Compiler comp(shader.source, shader.size / sizeof(uint32_t));

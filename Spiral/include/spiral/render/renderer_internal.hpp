@@ -14,7 +14,7 @@ namespace Spiral
 	class RendererObject : public Renderer
 	{
 	public:
-		RendererObject(ECProperties engineProps, ECProperties clientProps);
+		RendererObject(program_id engineProps, program_id clientProps);
 		~RendererObject();
 
 		void m_presentFrame() override;

@@ -9,7 +9,7 @@ namespace Spiral
 {
 	void errorCallback(int error, const char* description)
 	{
-		SPRL_CORE_ERROR("GLFW Error ({0}): {1}", error, description);
+		LOGF_INTERNAL_ERROR("GLFW Error ({0}): {1}", error, description);
 	}
 
 	WindowObject::WindowObject()

@@ -69,13 +69,13 @@ namespace Spiral
 			switch (presentMode)
 			{
 			case VK_PRESENT_MODE_IMMEDIATE_KHR:
-				SPRL_CORE_DEBUG("[RENDERER] Present mode: Immediate");
+				LOG_INTERNAL_DEBUG("[RENDERER] Present mode: Immediate");
 				break;
 			case VK_PRESENT_MODE_MAILBOX_KHR:
-				SPRL_CORE_DEBUG("[RENDERER] Present mode: Mailbox");
+				LOG_INTERNAL_DEBUG("[RENDERER] Present mode: Mailbox");
 				break;
 			case VK_PRESENT_MODE_FIFO_KHR:
-				SPRL_CORE_DEBUG("[RENDERER] Present mode: FIFO");
+				LOG_INTERNAL_DEBUG("[RENDERER] Present mode: FIFO");
 				break;
 			}
 		}
