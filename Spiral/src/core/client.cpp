@@ -1,6 +1,7 @@
 #include <pch.hpp>
 
 #include <spiral/core/client.hpp>
+#include <spiral/parallel/thread_manager.hpp>
 
 namespace Spiral
 {
@@ -34,17 +35,23 @@ namespace Spiral
 		running = true;
 
 		window = Window::init();
-		window->setEventCallback(std::bind(&Client::pushEvent, this, std::placeholders::_1)); //because pushEvent is a member function, a forwarder function must be used 
-		window->setSizeCallback(std::bind(&Client::pushWindowSize, this, std::placeholders::_1, std::placeholders::_2));
+		window->setEventCallback(std::bind(&Client::push_event, this, std::placeholders::_1)); //because pushEvent is a member function, a forwarder function must be used 
+		window->setSizeCallback(std::bind(&Client::push_window_size, this, std::placeholders::_1, std::placeholders::_2));
 
 		window->getDimensions(&windowWidth, &windowHeight);
 		windowSizeChanged = false;
 
-		setProperties("Spiral Application", 1, 0, 0);
+		client_id.name = name;
+		client_id.major = major_version;
+		client_id.minor = minor_version;
+		client_id.patch = patch_version;
 
 		eventBufferSize = 0;
 		eventStart = 0;
 		eventEnd = 0;
+		
+		renderer = Renderer::init(engine_id, client_id);
+		parallel::launch_threads();
 	}
 
 	Client::~Client()
@@ -57,29 +64,15 @@ namespace Spiral
 		{
 			delete layerStack[total - i];
 		}
-
+		parallel::terminate_threads();
 		free(layerStack);
 		free(pushLayerBuffer);
 		free(pushOverlayBuffer);
 	}
 
-	void Client::init()
-	{
-		//SPRL_CORE_TRACE(properties.name);
-		renderer = Renderer::init(engine_id, client_id);
-	}
-
-	void Client::setProperties(const char *name, const unsigned int major_version, const unsigned int minor_version, const unsigned int patch_version)
-	{
-		client_id.name = name;
-		client_id.major = major_version;
-		client_id.minor = minor_version;
-		client_id.patch = patch_version;
-	}
-
 	static std::mutex eventMutex;
 
-	void Client::pushEvent(Event e)
+	void Client::push_event(const Event& e)
 	{
 		std::lock_guard<std::mutex> lock(eventMutex);
 		if (eventBufferSize < EVENT_BUFFER_CAPACITY)
@@ -95,14 +88,14 @@ namespace Spiral
 		}
 	}
 
-	void Client::pushWindowSize(int width, int height)
+	void Client::push_window_size(int width, int height)
 	{
 		windowWidth = width;
 		windowHeight = height;
 		windowSizeChanged = true;
 	}
 
-	void Client::pushLayer(Layer *layer)
+	Layer* Client::push_layer(Layer *layer)
 	{
 		if (pushLayerSize + 1 > pushLayerCapacity)
 		{
@@ -118,14 +111,15 @@ namespace Spiral
 		}
 		pushLayerBuffer[pushLayerSize] = layer;
 		pushLayerSize++;
+		return layer;
 	}
 
-	void Client::popLayer()
+	void Client::pop_layer()
 	{
 		popLayerBuffer++;
 	}
 
-	void Client::pushOverlay(Layer *layer)
+	Layer* Client::push_overlay(Layer *layer)
 	{
 		if (pushOverlaySize + 1 > pushOverlayCapacity)
 		{
@@ -141,14 +135,15 @@ namespace Spiral
 		}
 		pushOverlayBuffer[pushOverlaySize] = layer;
 		pushOverlaySize++;
+		return layer;
 	}
 
-	void Client::popOverlay()
+	void Client::pop_overlay()
 	{
 		popOverlayBuffer++;
 	}
 
-	void Client::clearLayers()
+	void Client::clear_layers()
 	{
 		popLayerBuffer = nLayers;
 	}
@@ -169,13 +164,13 @@ namespace Spiral
 
 			if (windowSizeChanged)
 			{
-				pushEvent(Event::windowResize(windowWidth, windowHeight));
+				push_event(Event::windowResize(windowWidth, windowHeight));
 				windowSizeChanged = false;
 			}
-			//TODO: use function_name, var_name, struct_name, name_space, ClassName, TemplateParam -- add include directory, rename files with no capital letters
+			
 			while (eventBufferSize > 0) //TODO: replace goto with function
 			{
-				for (i = nLayers + nOverlays - 1; i != 65535U; i--) //Kinda assuming the layer stack will never get as big as 65535, but it shouldnt
+				for (i = nLayers + nOverlays - 1; i != std::numeric_limits<index_t>::max(); i--)
 				{
 					if (layerStack[i]->handleEvent(eventBuffer[eventStart])) //TODO: place the switch for event types here, and implement an event function for each type in the layer class, to avoid multiple switches per tick
 					{

@@ -178,6 +178,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\parallel\thread_manager.cpp" />
     <ClCompile Include="src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
@@ -210,6 +211,9 @@
     <ClInclude Include="include\spiral\debug\ANSI_utility.hpp" />
     <ClInclude Include="include\spiral\debug\log.hpp" />
     <ClInclude Include="include\spiral\debug\log_internal.hpp" />
+    <ClInclude Include="include\spiral\parallel\result.hpp" />
+    <ClInclude Include="include\spiral\parallel\task.hpp" />
+    <ClInclude Include="include\spiral\parallel\thread_manager.hpp" />
     <ClInclude Include="include\spiral\render\device.hpp" />
     <ClInclude Include="include\spiral\render\graphics_pipeline.hpp" />
     <ClInclude Include="include\spiral\render\memory.hpp" />

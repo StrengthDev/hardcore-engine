@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #ifdef _MSC_VER
 
 #ifdef SPIRAL_BUILD
@@ -36,6 +38,38 @@
 
 namespace Spiral
 {
+	inline void* ex_malloc(std::size_t size)
+	{
+		void* p = malloc(size);
+		if (!p)
+		{
+			throw std::bad_alloc();
+		}
+		return p;
+	}
+
+	inline void* ex_calloc(std::size_t count, std::size_t size)
+	{
+		void* p = calloc(count, size);
+		if (!p)
+		{
+			throw std::bad_alloc();
+		}
+		return p;
+	}
+
+	template<typename Type>
+	inline Type* t_malloc(std::size_t count)
+	{
+		return (Type*)ex_malloc(count * sizeof(Type));
+	}
+
+	template<typename Type>
+	inline Type* t_calloc(std::size_t count)
+	{
+		return (Type*)ex_calloc(count, sizeof(Type));
+	}
+
 	static const char* ENGINE_NAME = "Spiral Engine";
 	static const unsigned int MAJOR_VERSION = 1;
 	static const unsigned int MINOR_VERSION = 0;

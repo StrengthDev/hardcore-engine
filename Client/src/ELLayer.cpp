@@ -36,6 +36,11 @@ bool ELLayer::handleEvent(const Spiral::Event &e)
 		return false;
 	case Spiral::EventType::MouseButtonReleased:
 		LOGF_INFO("[EVENT] Mouse button released (Button: {0})", e.x.i);
+		LOG_DEBUG("Main thread: " << std::this_thread::get_id());
+		Spiral::parallel::immediate_task<void>([]()
+			{
+				LOG_DEBUG("Worker thread: " << std::this_thread::get_id());
+			});
 		return false;
 	case Spiral::EventType::MouseMoved:
 		//LOGF_INFO("[EVENT] Mouse moved ({0}, {1})", e.x.f, e.y.f);

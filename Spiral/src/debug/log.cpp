@@ -91,7 +91,7 @@ namespace Spiral
 			"CLIENT:  "
 		};
 
-		flag_t log_mask_flags = 0xff;
+		flag_t log_mask_flags = Spiral::log::TRACE_BIT ^ 0xff;// 0xff;
 		flag_t log_format_flags = 0xff;
 
 		flag_t log_file_mask_flags = 0xff;

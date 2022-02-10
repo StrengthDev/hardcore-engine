@@ -17,19 +17,14 @@ namespace Spiral
 
 		Client& operator=(const Client& other) = delete;
 
-		void init();
-		virtual void pushInitialLayers() = 0;
+		void push_event(const Event& e);
+		void push_window_size(int width, int height);
 
-		inline void setProperties(const char *name, const unsigned int major_version, const unsigned int minor_version, const unsigned int patch_version);
-
-		void pushEvent(Event e);
-		void pushWindowSize(int width, int height);
-
-		void pushLayer(Layer *layer);
-		inline void popLayer();
-		void pushOverlay(Layer *layer);
-		inline void popOverlay();
-		inline void clearLayers();
+		Layer* push_layer(Layer* layer);
+		inline void pop_layer();
+		Layer* push_overlay(Layer* layer);
+		inline void pop_overlay();
+		inline void clear_layers();
 
 		void run();
 		void shutdown();
@@ -38,7 +33,7 @@ namespace Spiral
 		inline Renderer& getRenderer() const { return *renderer; };
 		inline static Client& get() { return *instance; };
 
-		using index_t = uint16_t;
+		typedef uint16_t index_t;
 
 		static const index_t EVENT_BUFFER_CAPACITY = BIT(7);
 		static const index_t INITIAL_STACK_CAPACITY = 5;

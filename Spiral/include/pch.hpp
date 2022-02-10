@@ -13,6 +13,8 @@
 #include <thread>
 #include <functional>
 #include <mutex>
+#include <atomic>
+#include <limits>
 
 
 #include "spiral/debug/log_internal.hpp"

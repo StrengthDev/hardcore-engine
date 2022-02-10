@@ -21,24 +21,20 @@ public:
 		Spiral::log::set_log_format_flags(Spiral::log::CALLER_BIT);
 
 		getWindow().setIcon(files, 2);
+		push_layer(new TestLayer());
+		push_layer(new ELLayer());
 		//setProperties("Debug Program", 1, 0, 0);
-		LOG_TRACE("trace")
-		LOG_DEBUG("debug")
-		LOG_INFO("information")
-		LOG_WARN("warning")
-		LOG_ERROR("error")
-		LOG_CRIT("critical")
+		//LOG_TRACE("trace")
+		//LOG_DEBUG("debug")
+		//LOG_INFO("information")
+		//LOG_WARN("warning")
+		//LOG_ERROR("error")
+		//LOG_CRIT("critical")
 	}
 
 	~ExampleClient()
 	{
 		
-	}
-
-	void pushInitialLayers()
-	{
-		pushLayer(new TestLayer());
-		pushLayer(new ELLayer());
 	}
 };
 

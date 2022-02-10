@@ -23,8 +23,6 @@ int main(int argc, char** argv)
 {
 	LOGINIT;
 	auto client = Spiral::start();
-	client->init();
-	client->pushInitialLayers();
 	client->run();
 	delete client;
 	LOGSHUTDOWN;
