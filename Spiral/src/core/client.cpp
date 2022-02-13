@@ -1,86 +1,83 @@
 #include <pch.hpp>
 
 #include <spiral/core/client.hpp>
+#include <spiral/core/window.hpp>
+#include <spiral/core/window_internal.hpp>
 #include <spiral/parallel/thread_manager.hpp>
 
 namespace Spiral
 {
-	program_id Client::engine_id = {
+	program_id client::engine_id = {
 		ENGINE_NAME,
 		MAJOR_VERSION,
 		MINOR_VERSION,
 		PATCH_VERSION
 	};
 
-	Client* Client::instance = nullptr;
+	client* client::instance = nullptr;
 
-	Client::Client(const char* name, const unsigned int major_version, const unsigned int minor_version, const unsigned int patch_version) //TODO: might want to consider giving an absolute size to the layerstack and move it to the stack memory space instead of heap
+	client::client(const char* name, const unsigned int major_version, const unsigned int minor_version, const unsigned int patch_version) //TODO: might want to consider giving an absolute size to the layerstack and move it to the stack memory space instead of heap
 	{
 		instance = this;
-		layerStack = (Layer**)malloc(sizeof(Layer*) * INITIAL_STACK_CAPACITY);
-		layerStackCapacity = INITIAL_STACK_CAPACITY;
-		nLayers = 0;
-		nOverlays = 0;
-		overlayOffset = 0;
+		layer_stack = t_malloc<Layer*>(initial_stack_capacity);
+		layer_stack_capacity = initial_stack_capacity;
+		n_layers = 0;
+		n_overlays = 0;
 
-		popLayerBuffer = 0;
-		popOverlayBuffer = 0;
-		pushLayerBuffer = (Layer**)malloc(sizeof(Layer*) * INITIAL_STACK_CAPACITY);
-		pushLayerCapacity = INITIAL_STACK_CAPACITY;
-		pushLayerSize = 0;
-		pushOverlayBuffer = (Layer**)malloc(sizeof(Layer*) * INITIAL_STACK_CAPACITY);
-		pushOverlayCapacity = INITIAL_STACK_CAPACITY;
-		pushOverlaySize = 0;
+		pop_layer_buffer = 0;
+		pop_overlay_buffer = 0;
+		push_layer_buffer = t_malloc<Layer*>(initial_stack_capacity);
+		push_layer_capacity = initial_stack_capacity;
+		push_layer_size = 0;
+		push_overlay_buffer = t_malloc<Layer*>(initial_stack_capacity);
+		push_overlay_capacity = initial_stack_capacity;
+		push_overlay_size = 0;
 
 		running = true;
 
-		window = Window::init();
-		window->setEventCallback(std::bind(&Client::push_event, this, std::placeholders::_1)); //because pushEvent is a member function, a forwarder function must be used 
-		window->setSizeCallback(std::bind(&Client::push_window_size, this, std::placeholders::_1, std::placeholders::_2));
-
-		window->getDimensions(&windowWidth, &windowHeight);
-		windowSizeChanged = false;
+		window::init(std::bind(&client::push_event, this, std::placeholders::_1), std::bind(&client::push_window_size, this, std::placeholders::_1, std::placeholders::_2));
+		window::get_dimensions(&window_width, &window_height);
+		window_size_changed = false;
 
 		client_id.name = name;
 		client_id.major = major_version;
 		client_id.minor = minor_version;
 		client_id.patch = patch_version;
 
-		eventBufferSize = 0;
-		eventStart = 0;
-		eventEnd = 0;
+		event_buffer_size = 0;
+		event_start = 0;
+		event_end = 0;
 		
 		renderer = Renderer::init(engine_id, client_id);
 		parallel::launch_threads();
 	}
 
-	Client::~Client()
+	client::~client()
 	{
 		delete renderer;
-		delete window;
-		const index_t total = nLayers + nOverlays;
+		const index_t total = n_layers + n_overlays;
 		index_t i;
 		for (i = 1; i < total + 1; i++)
 		{
-			delete layerStack[total - i];
+			delete layer_stack[total - i];
 		}
 		parallel::terminate_threads();
-		free(layerStack);
-		free(pushLayerBuffer);
-		free(pushOverlayBuffer);
+		free(layer_stack);
+		free(push_layer_buffer);
+		free(push_overlay_buffer);
 	}
 
 	static std::mutex eventMutex;
 
-	void Client::push_event(const Event& e)
+	void client::push_event(const Event& e)
 	{
 		std::lock_guard<std::mutex> lock(eventMutex);
-		if (eventBufferSize < EVENT_BUFFER_CAPACITY)
+		if (event_buffer_size < event_buffer_capacity)
 		{
-			eventBuffer[eventEnd] = e;
+			event_buffer[event_end] = e;
 			//eventEnd = eventEnd + 1 == EVENT_BUFFER_CAPACITY ? 0 : eventEnd + 1; //because the capacity is fairly big, comparing is better than using the % operator (if the capacity was not a power of 2)
-			eventEnd = (eventEnd + 1) % EVENT_BUFFER_CAPACITY; //modulus on a power of 2 is really fast
-			eventBufferSize++;
+			event_end = (event_end + 1) % event_buffer_capacity; //modulus on a power of 2 is really fast
+			event_buffer_size++;
 		}
 		else
 		{
@@ -88,181 +85,153 @@ namespace Spiral
 		}
 	}
 
-	void Client::push_window_size(int width, int height)
+	void client::push_window_size(int width, int height)
 	{
-		windowWidth = width;
-		windowHeight = height;
-		windowSizeChanged = true;
+		window_width = width;
+		window_height = height;
+		window_size_changed = true;
 	}
 
-	Layer* Client::push_layer(Layer *layer)
+	Layer* client::push_layer(Layer *layer)
 	{
-		if (pushLayerSize + 1 > pushLayerCapacity)
+		if (push_layer_size + 1 > push_layer_capacity)
 		{
-			pushLayerCapacity += INITIAL_STACK_CAPACITY;
-			Layer** t = (Layer**)malloc(sizeof(Layer*) * pushLayerCapacity);
-			/*for (index_t i = 0; i < pushLayerSize; i++)
-			{
-				t[i] = pushLayerBuffer[i];
-			}*/
-			memcpy(t, pushLayerBuffer, sizeof(Layer*) * pushLayerSize);
-			free(pushLayerBuffer);
-			pushLayerBuffer = t;
+			push_layer_capacity += initial_stack_capacity;
+			Layer** t = t_malloc<Layer*>(push_layer_capacity);
+			memcpy(t, push_layer_buffer, sizeof(Layer*) * push_layer_size);
+			free(push_layer_buffer);
+			push_layer_buffer = t;
 		}
-		pushLayerBuffer[pushLayerSize] = layer;
-		pushLayerSize++;
+		push_layer_buffer[push_layer_size] = layer;
+		push_layer_size++;
 		return layer;
 	}
 
-	void Client::pop_layer()
+	void client::pop_layer()
 	{
-		popLayerBuffer++;
+		pop_layer_buffer++;
 	}
 
-	Layer* Client::push_overlay(Layer *layer)
+	Layer* client::push_overlay(Layer *layer)
 	{
-		if (pushOverlaySize + 1 > pushOverlayCapacity)
+		if (push_overlay_size + 1 > push_overlay_capacity)
 		{
-			pushOverlayCapacity += INITIAL_STACK_CAPACITY;
-			Layer** t = (Layer**)malloc(sizeof(Layer*) * pushOverlayCapacity);
-			/*for (index_t i = 0; i < pushOverlaySize; i++)
-			{
-				t[i] = pushOverlayBuffer[i];
-			}*/
-			memcpy(t, pushOverlayBuffer, sizeof(Layer*) * pushOverlaySize);
-			free(pushOverlayBuffer);
-			pushOverlayBuffer = t;
+			push_overlay_capacity += initial_stack_capacity;
+			Layer** t = t_malloc<Layer*>(push_overlay_capacity);
+			memcpy(t, push_overlay_buffer, sizeof(Layer*) * push_overlay_size);
+			free(push_overlay_buffer);
+			push_overlay_buffer = t;
 		}
-		pushOverlayBuffer[pushOverlaySize] = layer;
-		pushOverlaySize++;
+		push_overlay_buffer[push_overlay_size] = layer;
+		push_overlay_size++;
 		return layer;
 	}
 
-	void Client::pop_overlay()
+	void client::pop_overlay()
 	{
-		popOverlayBuffer++;
+		pop_overlay_buffer++;
 	}
 
-	void Client::clear_layers()
+	void client::clear_layers()
 	{
-		popLayerBuffer = nLayers;
+		pop_layer_buffer = n_layers;
 	}
 
-	void Client::run()
+	void client::run()
 	{
 		index_t i, n;
 		Layer** t = nullptr;
 		while (running)
 		{
-			for (i = 0; i < nLayers + nOverlays; i++)
+			for (i = 0; i < n_layers + n_overlays; i++)
 			{
-				layerStack[i]->tick();
+				layer_stack[i]->tick();
 			}
 
-			window->tick();
+			window::tick();
 			renderer->m_presentFrame();
 
-			if (windowSizeChanged)
+			if (window_size_changed)
 			{
-				push_event(Event::windowResize(windowWidth, windowHeight));
-				windowSizeChanged = false;
+				push_event(Event::windowResize(window_width, window_height));
+				window_size_changed = false;
 			}
 			
-			while (eventBufferSize > 0) //TODO: replace goto with function
+			while (event_buffer_size > 0) //TODO: replace goto with function
 			{
-				for (i = nLayers + nOverlays - 1; i != std::numeric_limits<index_t>::max(); i--)
+				for (i = n_layers + n_overlays - 1; i != std::numeric_limits<index_t>::max(); i--)
 				{
-					if (layerStack[i]->handleEvent(eventBuffer[eventStart])) //TODO: place the switch for event types here, and implement an event function for each type in the layer class, to avoid multiple switches per tick
+					if (layer_stack[i]->handleEvent(event_buffer[event_start])) //TODO: place the switch for event types here, and implement an event function for each type in the layer class, to avoid multiple switches per tick
 					{
 						goto endevent;
 					}
 				}
 				
-				if (eventBuffer[eventStart].type == EventType::WindowClose)
+				if (event_buffer[event_start].type == EventType::WindowClose)
 				{
 					running = false;
 				}
 
 				endevent:
-				eventStart = (eventStart + 1) % EVENT_BUFFER_CAPACITY;
-				eventBufferSize--;
+				event_start = (event_start + 1) % event_buffer_capacity;
+				event_buffer_size--;
 			}
 
-			if (popOverlayBuffer)
+			if (pop_overlay_buffer)
 			{
-				n = nLayers + nOverlays;
-				for (i = n - popOverlayBuffer; i < n; i++) 
+				n = n_layers + n_overlays;
+				for (i = n - pop_overlay_buffer; i < n; i++) 
 				{
-					delete layerStack[i];
+					delete layer_stack[i];
 				}
-				nOverlays -= popOverlayBuffer;
-				popOverlayBuffer = 0;
+				n_overlays -= pop_overlay_buffer;
+				pop_overlay_buffer = 0;
 			}
 
-			if (popLayerBuffer)
+			if (pop_layer_buffer)
 			{
-				for (i = nLayers - popOverlayBuffer; i < nLayers; i++)
+				for (i = n_layers - pop_overlay_buffer; i < n_layers; i++)
 				{
-					delete layerStack[i];
+					delete layer_stack[i];
 				}
-				nLayers -= popLayerBuffer;
-				/*for (i = nLayers; i < nLayers + nOverlays; i++)
-				{
-					layerStack[i] = layerStack[i + popLayerBuffer];
-				}*/
-				memmove(&layerStack[nLayers], &layerStack[nLayers + popLayerBuffer], sizeof(Layer*) * nOverlays);
-				popLayerBuffer = 0;
+				n_layers -= pop_layer_buffer;
+				memmove(&layer_stack[n_layers], &layer_stack[n_layers + pop_layer_buffer], sizeof(Layer*) * n_overlays);
+				pop_layer_buffer = 0;
 			}
 
-			if (pushLayerSize || pushOverlaySize)
+			if (push_layer_size || push_overlay_size)
 			{
-				n = pushLayerSize + pushOverlaySize + nLayers + nOverlays;
-				if (n > layerStackCapacity)
+				n = push_layer_size + push_overlay_size + n_layers + n_overlays;
+				if (n > layer_stack_capacity)
 				{
-					i = (n / INITIAL_STACK_CAPACITY + 1) * INITIAL_STACK_CAPACITY;
-					t = (Layer**)malloc(sizeof(Layer*) * i);
-					layerStackCapacity = i;
-					/*for (i = 0; i < nLayers + nOverlays; i++)
-					{
-						t[i] = layerStack[i];
-					}*/
-					memcpy(t, layerStack, sizeof(Layer*) * (nLayers + nOverlays));
-					free(layerStack);
-					layerStack = t;
+					i = (n / initial_stack_capacity + 1) * initial_stack_capacity;
+					t = t_malloc<Layer*>(i);
+					layer_stack_capacity = i;
+					memcpy(t, layer_stack, sizeof(Layer*) * ((std::size_t)n_layers + n_overlays)); //There was an arithmetic overflow warning and it was annoying me
+					free(layer_stack);
+					layer_stack = t;
 				}
 
-				if (pushLayerSize)
+				if (push_layer_size)
 				{
-					/*for (i = nLayers + nOverlays + pushLayerSize - 1; i > nLayers + pushLayerSize - 1; i--)
-					{
-						layerStack[i] = layerStack[i - pushLayerSize];
-					}*/
-					memmove(&layerStack[nLayers + pushLayerSize], &layerStack[nLayers], sizeof(Layer*) * nOverlays);
-					/*for (i = nLayers; i < nLayers + pushLayerSize; i++)
-					{
-						layerStack[i] = pushLayerBuffer[i - nLayers];
-					}*/
-					memcpy(&layerStack[nLayers], pushLayerBuffer, sizeof(Layer*) * pushLayerSize);
-					nLayers += pushLayerSize;
-					pushLayerSize = 0;
+					memmove(&layer_stack[n_layers + push_layer_size], &layer_stack[n_layers], sizeof(Layer*) * n_overlays);
+					memcpy(&layer_stack[n_layers], push_layer_buffer, sizeof(Layer*) * push_layer_size);
+					n_layers += push_layer_size;
+					push_layer_size = 0;
 				}
 
-				if (pushOverlaySize)
+				if (push_overlay_size)
 				{
-					n = nLayers + nOverlays;
-					/*for (i = n; i < n + pushOverlaySize; i++)
-					{
-						layerStack[i] = pushOverlayBuffer[i - n];
-					}*/
-					memcpy(&layerStack[nLayers + nOverlays], pushOverlayBuffer, sizeof(Layer*) * pushOverlaySize);
-					nOverlays += pushOverlaySize;
-					pushOverlaySize = 0;
+					n = n_layers + n_overlays;
+					memcpy(&layer_stack[n_layers + n_overlays], push_overlay_buffer, sizeof(Layer*) * push_overlay_size);
+					n_overlays += push_overlay_size;
+					push_overlay_size = 0;
 				}
 			}
 		}
 	}
 
-	void Client::shutdown()
+	void client::shutdown()
 	{
 		running = false;
 	}

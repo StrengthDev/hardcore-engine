@@ -3,13 +3,13 @@
 #include "TestLayer.hpp"
 #include "ELLayer.hpp"
 
-class ExampleClient : public Spiral::Client
+class ExampleClient : public Spiral::client
 {
 public:
-	ExampleClient() : Client("Spiral Application", 1, 0, 0)
+	ExampleClient() : client("Spiral Application", 1, 0, 0)
 	{
 		//TODO: this is stupid, change to loose functions instead of class static methods
-		getWindow().setTitle("Chad Engine");
+		Spiral::window::set_title("Chad Engine");
 
 		const char* files[2] =
 		{
@@ -20,7 +20,7 @@ public:
 		Spiral::log::set_log_mask_flags(Spiral::log::TRACE_BIT ^ 0xff);
 		Spiral::log::set_log_format_flags(Spiral::log::CALLER_BIT);
 
-		getWindow().setIcon(files, 2);
+		Spiral::window::set_icon(files, 2);
 		push_layer(new TestLayer());
 		push_layer(new ELLayer());
 		//setProperties("Debug Program", 1, 0, 0);
@@ -38,7 +38,7 @@ public:
 	}
 };
 
-Spiral::Client* Spiral::start()
+Spiral::client* Spiral::start()
 {
 	return new ExampleClient();
 }

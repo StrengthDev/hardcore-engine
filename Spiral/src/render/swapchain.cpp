@@ -2,6 +2,7 @@
 
 #include <spiral/render/swapchain.hpp>
 #include <spiral/core/client.hpp>
+#include <spiral/core/window.hpp>
 
 namespace Spiral
 {
@@ -87,7 +88,7 @@ namespace Spiral
 		}
 		else
 		{
-			Client::get().getWindow().getDimensions(&width, &height);
+			window::get_dimensions(&width, &height);
 			extent = {
 				(uint32_t)width,
 				(uint32_t)height

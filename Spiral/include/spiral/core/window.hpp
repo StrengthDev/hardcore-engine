@@ -1,34 +1,30 @@
 #pragma once
 
 #include "core.hpp"
-#include "event.hpp"
-
-#include <functional>
 
 namespace Spiral
 {
-	class SPIRAL_API Window
+	namespace window
 	{
-	public:
-		using fnEventCallback = std::function<void(Event)>;
-		using fnSizeCallback = std::function<void(int, int)>;
+		/**
+		 * @brief Retrives the width and height of the window.
+		 * This function assigns the width and height of the window, in pixels, to the arguments.
+		 * @param[out] out_width Where to store the window width value.
+		 * @param[out] out_height Where to store the window height value.
+		*/
+		SPIRAL_API void get_dimensions(int* out_width, int* out_height);
 
-		virtual ~Window() = default;
+		/**TODO
+		 * @brief 
+		 * @param title 
+		*/
+		SPIRAL_API void set_title(const char* title);
 
-		const virtual void getDimensions(int *width, int *height) const = 0;
-
-		virtual void setEventCallback(const fnEventCallback &callback) = 0;
-		virtual void setSizeCallback(const fnSizeCallback &callback) = 0;
-
-		virtual void setTitle(const char *title) = 0;
-		virtual void setIcon(const char **files, unsigned int num) = 0;
-
-		virtual void tick() = 0;
-
-		virtual void* getInstance() const = 0;
-
-
-		static Window* init();
-		//TODO: static functions
-	};
+		/**TODO
+		 * @brief 
+		 * @param files 
+		 * @param num 
+		*/
+		SPIRAL_API void set_icon(const char** files, unsigned int num);
+	}
 }

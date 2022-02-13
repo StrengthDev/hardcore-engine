@@ -3,6 +3,7 @@
 #include <spiral/render/renderer_internal.hpp>
 
 #include <spiral/core/client.hpp>
+#include <spiral/core/window_internal.hpp>
 
 namespace Spiral
 {
@@ -76,7 +77,7 @@ namespace Spiral
 		if (enableValidationLayers && !checkValidationLayerSupport())
 		{
 			DEBUG_BREAK;
-			Client::get().shutdown();
+			client::get().shutdown();
 			return;
 		}
 		else
@@ -128,7 +129,7 @@ namespace Spiral
 		if (result != VK_SUCCESS)
 		{
 			DEBUG_BREAK;
-			Client::get().shutdown();
+			client::get().shutdown();
 			return;
 		}
 
@@ -145,17 +146,17 @@ namespace Spiral
 			if (result != VK_SUCCESS)
 			{
 				DEBUG_BREAK;
-				Client::get().shutdown();
+				client::get().shutdown();
 				return;
 			}
 		}
 
-		GLFWwindow *window = (GLFWwindow*)Client::get().getWindow().getInstance();
+		GLFWwindow* window = window::get_handle();
 		result = glfwCreateWindowSurface(instance, window, nullptr, &surface);
 		if (result != VK_SUCCESS)
 		{
 			DEBUG_BREAK;
-			Client::get().shutdown();
+			client::get().shutdown();
 			return;
 		}
 
@@ -164,7 +165,7 @@ namespace Spiral
 		if (nAvailableDevices == 0)
 		{
 			DEBUG_BREAK;
-			Client::get().shutdown();
+			client::get().shutdown();
 			return;
 		}
 		VkPhysicalDevice* devices = (VkPhysicalDevice*)malloc(sizeof(VkPhysicalDevice) * nAvailableDevices);
@@ -180,7 +181,7 @@ namespace Spiral
 		if (!availableDevices[presentDeviceIndex].createSwapchain())
 		{
 			DEBUG_BREAK;
-			Client::get().shutdown();
+			client::get().shutdown();
 			return;
 		}
 		ShaderLibrary::init();

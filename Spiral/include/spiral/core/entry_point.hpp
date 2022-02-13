@@ -1,6 +1,7 @@
 #pragma once
 
 #include <spiral.hpp>
+#include <spiral/core/client.hpp>
 #include <spiral/debug/log_internal.hpp>
 
 #ifndef NDEBUG
@@ -17,7 +18,7 @@
 #endif // NDEBUG
 
 
-extern Spiral::Client* Spiral::start();
+extern Spiral::client* Spiral::start();
 
 int main(int argc, char** argv)
 {

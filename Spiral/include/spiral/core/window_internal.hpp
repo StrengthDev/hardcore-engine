@@ -1,39 +1,39 @@
 #pragma once
 
-#include "window.hpp"
+#include <functional>
+
+#include "event.hpp"
 
 #include <GLFW/glfw3.h>
 
 namespace Spiral
 {
-	class WindowObject : public Window
+	namespace window
 	{
-	public:
-		WindowObject();
+		typedef std::function<void(Event)> event_callback_t;
+		typedef std::function<void(int, int)> size_callback_t;
 
-		virtual ~WindowObject();
+		/**TODO
+		 * @brief 
+		 * @param ec 
+		 * @param sc 
+		*/
+		void init(event_callback_t&& ec, size_callback_t&& sc);
 
-		const inline void getDimensions(int *width, int *height) const override;
+		/**TODO
+		 * @brief 
+		*/
+		void terminate();
 
-		inline void setEventCallback(const fnEventCallback& callback) override;
-		inline void setSizeCallback(const fnSizeCallback &callback) override;
+		/**TODO
+		 * @brief 
+		*/
+		void tick();
 
-		inline void setTitle(const char *title) override;
-		inline void setIcon(const char **files, unsigned int num) override;
-
-		void tick() override;
-
-		inline void* getInstance() const override { return window; }
-
-	private:
-		GLFWwindow* window;
-
-		struct EventCallbackContainer
-		{
-			fnEventCallback eventCallback;
-			fnSizeCallback sizeCallback;
-		};
-
-		EventCallbackContainer callbackContainer;
-	};
+		/**TODO
+		 * @brief 
+		 * @return 
+		*/
+		GLFWwindow* get_handle();
+	}
 }

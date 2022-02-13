@@ -36,7 +36,7 @@ namespace Spiral
 			uint64_t u;
 			double f;
 			char c;
-			wchar_t w; //Cannot log this
+			wchar_t w;
 		};
 
 		val64 x;

@@ -10,6 +10,12 @@ namespace Spiral
 	{
 		SPIRAL_API void submit_immediate_task(std::function<void()> task);
 
+		/**
+		 * @brief Submits a task for immediate parallel execution.
+		 * @tparam Type Return type of the task.
+		 * @param task Function to be executed in parallel by another thread.
+		 * @return result object which will contain the result of the function once it has been executed.
+		*/
 		template<typename Type>
 		inline result<Type> immediate_task(func_t<Type> task)
 		{
@@ -21,6 +27,11 @@ namespace Spiral
 			return ret;
 		}
 
+		/**
+		 * @brief Submits a task for immediate parallel execution.
+		 * @param task Function to be executed in parallel by another thread.
+		 * @return something todo
+		*/
 		template<>
 		inline result<void> immediate_task<void>(func_t<void> task)
 		{
