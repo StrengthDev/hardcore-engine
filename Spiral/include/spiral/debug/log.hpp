@@ -48,6 +48,8 @@ namespace Spiral
 		template<typename... Types>
 		inline std::string str_format(const std::string& format, Types... args)
 		{
+			const char* no_arg = "";
+
 			if constexpr (sizeof...(Types) == 0)
 			{
 				return format;
@@ -81,14 +83,14 @@ namespace Spiral
 						}
 						else
 						{
-							str_stream << "NO_ARG";
+							str_stream << no_arg;
 						}
 						
 						t++;
 						save_index = t;
 						pos = t;
 					}
-					catch (std::exception e)
+					catch (std::invalid_argument e)
 					{
 						pos++;
 					}

@@ -47,6 +47,17 @@ bool ELLayer::handleEvent(const Spiral::Event &e)
 		return false;
 	case Spiral::EventType::MouseScrolled:
 		LOGF_INFO("[EVENT] Mouse scrolled ({0}, {1})", e.x.f, e.y.f);
+		Spiral::duration d;
+		LOG_DEBUG(d);
+		d += 2;
+		LOG_DEBUG(d);
+		Spiral::duration t = 1.23 + d;
+		LOG_DEBUG(d);
+		LOG_DEBUG(t);
+		d = t;
+		LOG_DEBUG(d % 2);
+		LOG_DEBUG(d % 0.1);
+		LOG_DEBUG(Spiral::elapsed_time())
 		return false;
 	}
 	return false;

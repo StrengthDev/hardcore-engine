@@ -16,7 +16,6 @@ public:
 	bool handleEvent(const Spiral::Event &e) override;
 
 private:
-	std::chrono::time_point<std::chrono::steady_clock> start;
-	long long timec;
+	double timec;
 	int framec;
 };

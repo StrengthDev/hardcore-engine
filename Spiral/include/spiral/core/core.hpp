@@ -38,9 +38,15 @@
 
 namespace Spiral
 {
+	/**
+	 * @brief Allocates uninitialized memory.
+	 * @param size Number of bytes to allocate.
+	 * @return Pointer to the allocated memory.
+	 * @exception std::bad_alloc If any error occurs with the allocation.
+	*/
 	inline void* ex_malloc(std::size_t size)
 	{
-		void* p = malloc(size);
+		void* p = std::malloc(size);
 		if (!p)
 		{
 			throw std::bad_alloc();
@@ -48,9 +54,16 @@ namespace Spiral
 		return p;
 	}
 
+	/**
+	 * @brief Allocates memory with all bits initialized to 0.
+	 * @param count Number of objects to allocate.
+	 * @param size Size of each object in bytes.
+	 * @return Pointer to the allocated memory.
+	 * @exception std::bad_alloc If any error occurs with the allocation.
+	*/
 	inline void* ex_calloc(std::size_t count, std::size_t size)
 	{
-		void* p = calloc(count, size);
+		void* p = std::calloc(count, size);
 		if (!p)
 		{
 			throw std::bad_alloc();
@@ -58,16 +71,60 @@ namespace Spiral
 		return p;
 	}
 
+	/**
+	 * @brief Reallocates the memory of a pointer.
+	 * @param ptr Pointer to already allocated memory.
+	 * @param size Number of bytes in the new allocation.
+	 * @return Pointer to the allocated memory.
+	 * @exception std::bad_alloc If any error occurs with the allocation.
+	*/
+	inline void* ex_realloc(void* ptr, std::size_t size)
+	{
+		void* np = std::realloc(ptr, size);
+		if (!np)
+		{
+			throw std::bad_alloc();
+		}
+		return np;
+	}
+
+	/**
+	 * @brief Allocates uninitialized memory.
+	 * @tparam Type Type of objects contained in the allocated memory.
+	 * @param count Number of objects in the allocated memory.
+	 * @return Pointer to the allocated memory.
+	 * @exception std::bad_alloc If any error occurs with the allocation.
+	*/
 	template<typename Type>
 	inline Type* t_malloc(std::size_t count)
 	{
-		return (Type*)ex_malloc(count * sizeof(Type));
+		return reinterpret_cast<Type*>(ex_malloc(count * sizeof(Type)));
 	}
 
+	/**
+	 * @brief Allocates memory with all bits initialized to 0.
+	 * @tparam Type Type of objects contained in the allocated memory.
+	 * @param count Number of objects in the allocated memory.
+	 * @return Pointer to the allocated memory.
+	 * @exception std::bad_alloc If any error occurs with the allocation.
+	*/
 	template<typename Type>
 	inline Type* t_calloc(std::size_t count)
 	{
-		return (Type*)ex_calloc(count, sizeof(Type));
+		return reinterpret_cast<Type*>(ex_calloc(count, sizeof(Type)));
+	}
+
+	/**
+	 * @brief Reallocates the memory of a pointer.
+	 * @tparam Type Type of objects contained in the allocated memory.
+	 * @param count Number of objects in the allocated memory.
+	 * @return Pointer to the allocated memory.
+	 * @exception std::bad_alloc If any error occurs with the allocation.
+	*/
+	template<typename Type>
+	inline Type* t_realloc(void* ptr, std::size_t count)
+	{
+		return reinterpret_cast<Type*>(ex_realloc(ptr, count * sizeof(Type)));
 	}
 
 	static const char* ENGINE_NAME = "Spiral Engine";

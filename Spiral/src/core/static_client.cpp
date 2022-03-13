@@ -35,4 +35,14 @@ namespace Spiral
 	{
 		client::instance->shutdown();
 	}
+
+	time_t delta_time()
+	{
+		return client::instance->delta_time;
+	}
+
+	duration elapsed_time()
+	{
+		return client::instance->elapsed_time;
+	}
 }

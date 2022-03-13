@@ -50,7 +50,15 @@ namespace Spiral
 				}
 			}
 
-			//TODO: stop workers
+			std::uint32_t i;
+			for (i = 0; i < n_immediate_workers; i++)
+			{
+				immediate_queues[i].close();
+			}
+			for (i = 0; i < n_background_workers; i++)
+			{
+				background_queues[i].close();
+			}
 
 			LOG_INTERNAL_INFO("Master thread exiting (ID: " << std::this_thread::get_id() << ")");
 		}
@@ -89,7 +97,7 @@ namespace Spiral
 			LOG_INTERNAL_INFO("Maximum concurrent threads available: " << cores << " -> Launching " << n_immediate_workers << " immediate worker threads and " << n_background_workers << " background worker threads");
 
 			run_master.test_and_set();
-			task_master = std::move(std::thread(master));
+			task_master = std::thread(master);
 
 			std::uint32_t i;
 			immediate_workers = t_malloc<std::thread>(n_immediate_workers);
@@ -116,6 +124,22 @@ namespace Spiral
 			task_signal.notify_all();
 			task_signal_access.unlock();
 			task_master.join();
+
+			std::uint32_t i;
+			for (i = 0; i < n_immediate_workers; i++)
+			{
+				immediate_workers[i].join();
+				immediate_workers[i].~thread();
+			}
+			for (i = 0; i < n_background_workers; i++)
+			{
+				background_workers[i].join();
+				background_workers[i].~thread();
+			}
+			std::free(immediate_workers);
+			std::free(immediate_queues);
+			std::free(background_workers);
+			std::free(background_queues);
 		}
 
 		void submit_immediate_task(std::function<void()> task)

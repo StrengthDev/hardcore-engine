@@ -2,7 +2,7 @@
 
 #include <spiral/render/renderer_internal.hpp>
 
-#include <spiral/core/client.hpp>
+#include <spiral/core/static_client.hpp>
 #include <spiral/core/window_internal.hpp>
 
 namespace Spiral
@@ -77,7 +77,7 @@ namespace Spiral
 		if (enableValidationLayers && !checkValidationLayerSupport())
 		{
 			DEBUG_BREAK;
-			client::get().shutdown();
+			shutdown();
 			return;
 		}
 		else
@@ -129,7 +129,7 @@ namespace Spiral
 		if (result != VK_SUCCESS)
 		{
 			DEBUG_BREAK;
-			client::get().shutdown();
+			shutdown();
 			return;
 		}
 
@@ -146,7 +146,7 @@ namespace Spiral
 			if (result != VK_SUCCESS)
 			{
 				DEBUG_BREAK;
-				client::get().shutdown();
+				shutdown();
 				return;
 			}
 		}
@@ -156,7 +156,7 @@ namespace Spiral
 		if (result != VK_SUCCESS)
 		{
 			DEBUG_BREAK;
-			client::get().shutdown();
+			shutdown();
 			return;
 		}
 
@@ -165,7 +165,7 @@ namespace Spiral
 		if (nAvailableDevices == 0)
 		{
 			DEBUG_BREAK;
-			client::get().shutdown();
+			shutdown();
 			return;
 		}
 		VkPhysicalDevice* devices = (VkPhysicalDevice*)malloc(sizeof(VkPhysicalDevice) * nAvailableDevices);
@@ -181,7 +181,7 @@ namespace Spiral
 		if (!availableDevices[presentDeviceIndex].createSwapchain())
 		{
 			DEBUG_BREAK;
-			client::get().shutdown();
+			shutdown();
 			return;
 		}
 		ShaderLibrary::init();

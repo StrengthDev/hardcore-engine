@@ -155,5 +155,8 @@
     <ClInclude Include="include\spiral\render\instance.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\spiral\core\time.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

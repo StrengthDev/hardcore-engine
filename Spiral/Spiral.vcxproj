@@ -206,6 +206,7 @@
     <ClInclude Include="include\spiral\core\core.hpp" />
     <ClInclude Include="include\spiral\core\entry_point.hpp" />
     <ClInclude Include="include\spiral\core\static_client.hpp" />
+    <ClInclude Include="include\spiral\core\time.hpp" />
     <ClInclude Include="include\spiral\core\window_internal.hpp" />
     <ClInclude Include="include\spiral\core\window.hpp" />
     <ClInclude Include="include\spiral\core\event.hpp" />

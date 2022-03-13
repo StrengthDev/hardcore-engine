@@ -10,7 +10,7 @@ namespace Spiral
 {
 	namespace window
 	{
-		typedef std::function<void(Event)> event_callback_t;
+		typedef std::function<void(Event&&)> event_callback_t;
 		typedef std::function<void(int, int)> size_callback_t;
 
 		/**TODO

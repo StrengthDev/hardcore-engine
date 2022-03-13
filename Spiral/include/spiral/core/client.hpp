@@ -2,6 +2,8 @@
 
 #include "core.hpp"
 #include "layer.hpp"
+#include "time.hpp"
+#include "static_client.hpp"
 #include <spiral/render/renderer.hpp>
 
 namespace Spiral
@@ -16,20 +18,19 @@ namespace Spiral
 
 		client& operator=(const client& other) = delete;
 
-		void push_event(const Event& e);
+		void push_event(Event&& e);
 		void push_window_size(int width, int height);
 
 		Layer* push_layer(Layer* layer);
-		inline void pop_layer();
+		void pop_layer();
 		Layer* push_overlay(Layer* layer);
-		inline void pop_overlay();
-		inline void clear_layers();
+		void pop_overlay();
+		void clear_layers();
 
 		void run();
 		void shutdown();
 
 		inline Renderer& getRenderer() const { return *renderer; };
-		inline static client& get() { return *instance; };
 
 		typedef uint16_t index_t;
 
@@ -37,6 +38,9 @@ namespace Spiral
 		static const index_t initial_stack_capacity = 5;
 
 	private:
+		void handle_event();
+
+
 		Renderer* renderer;
 		program_id client_id;
 
@@ -56,6 +60,9 @@ namespace Spiral
 
 		bool running;
 
+		time_t delta_time = 0;
+		duration elapsed_time;
+
 		Event event_buffer[event_buffer_capacity] = {};
 		index_t event_buffer_size;
 		index_t event_start; //Inclusive
@@ -69,12 +76,14 @@ namespace Spiral
 		static client* instance; //There will be only one Client class instance during runtime
 		static program_id engine_id;
 
-		friend Layer* push_layer(Layer* layer);
-		friend void pop_layer();
-		friend Layer* push_overlay(Layer* layer);
-		friend void pop_overlay();
-		friend void clear_layers();
-		friend void shutdown();
+		friend Layer* Spiral::push_layer(Layer* layer);
+		friend void Spiral::pop_layer();
+		friend Layer* Spiral::push_overlay(Layer* layer);
+		friend void Spiral::pop_overlay();
+		friend void Spiral::clear_layers();
+		friend void Spiral::shutdown();
+		friend time_t Spiral::delta_time();
+		friend duration Spiral::elapsed_time();
 	};
 
 	//Should be defined in client

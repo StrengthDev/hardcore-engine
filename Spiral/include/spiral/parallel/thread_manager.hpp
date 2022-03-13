@@ -57,7 +57,7 @@ namespace Spiral
 
 			~task_queue()
 			{
-				free(tasks);
+				std::free(tasks);
 			}
 
 			inline void push(const task_t& task)
@@ -73,9 +73,9 @@ namespace Spiral
 					task_t* t = t_malloc<task_t>(new_capacity);
 
 					index_t n_copies = task_capacity - first_task_idx;
-					memcpy(t, &tasks[first_task_idx], n_copies * sizeof(task_t));
-					memcpy(&t[n_copies], tasks, first_task_idx * sizeof(task_t));
-					free(tasks);
+					std::memcpy(t, &tasks[first_task_idx], n_copies * sizeof(task_t));
+					std::memcpy(&t[n_copies], tasks, first_task_idx * sizeof(task_t));
+					std::free(tasks);
 					tasks = t;
 					task_capacity = new_capacity;
 				}
@@ -97,9 +97,9 @@ namespace Spiral
 					task_t* t = t_malloc<task_t>(new_capacity);
 
 					index_t n_copies = task_capacity - first_task_idx;
-					memcpy(t, &tasks[first_task_idx], n_copies * sizeof(task_t));
-					memcpy(&t[n_copies], tasks, first_task_idx * sizeof(task_t));
-					free(tasks);
+					std::memcpy(t, &tasks[first_task_idx], n_copies * sizeof(task_t));
+					std::memcpy(&t[n_copies], tasks, first_task_idx * sizeof(task_t));
+					std::free(tasks);
 					tasks = t;
 					task_capacity = new_capacity;
 				}

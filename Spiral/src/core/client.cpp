@@ -16,6 +16,8 @@ namespace Spiral
 
 	client* client::instance = nullptr;
 
+	std::chrono::high_resolution_clock::time_point last_frame;
+
 	client::client(const char* name, const unsigned int major_version, const unsigned int minor_version, const unsigned int patch_version) //TODO: might want to consider giving an absolute size to the layerstack and move it to the stack memory space instead of heap
 	{
 		instance = this;
@@ -34,6 +36,7 @@ namespace Spiral
 		push_overlay_size = 0;
 
 		running = true;
+		last_frame = std::chrono::high_resolution_clock::now();
 
 		window::init(std::bind(&client::push_event, this, std::placeholders::_1), std::bind(&client::push_window_size, this, std::placeholders::_1, std::placeholders::_2));
 		window::get_dimensions(&window_width, &window_height);
@@ -62,20 +65,19 @@ namespace Spiral
 			delete layer_stack[total - i];
 		}
 		parallel::terminate_threads();
-		free(layer_stack);
-		free(push_layer_buffer);
-		free(push_overlay_buffer);
+		std::free(layer_stack);
+		std::free(push_layer_buffer);
+		std::free(push_overlay_buffer);
 	}
 
-	static std::mutex eventMutex;
+	static std::mutex event_mutex;
 
-	void client::push_event(const Event& e)
+	void client::push_event(Event&& e)
 	{
-		std::lock_guard<std::mutex> lock(eventMutex);
+		std::lock_guard<std::mutex> lock(event_mutex);
 		if (event_buffer_size < event_buffer_capacity)
 		{
 			event_buffer[event_end] = e;
-			//eventEnd = eventEnd + 1 == EVENT_BUFFER_CAPACITY ? 0 : eventEnd + 1; //because the capacity is fairly big, comparing is better than using the % operator (if the capacity was not a power of 2)
 			event_end = (event_end + 1) % event_buffer_capacity; //modulus on a power of 2 is really fast
 			event_buffer_size++;
 		}
@@ -97,10 +99,7 @@ namespace Spiral
 		if (push_layer_size + 1 > push_layer_capacity)
 		{
 			push_layer_capacity += initial_stack_capacity;
-			Layer** t = t_malloc<Layer*>(push_layer_capacity);
-			memcpy(t, push_layer_buffer, sizeof(Layer*) * push_layer_size);
-			free(push_layer_buffer);
-			push_layer_buffer = t;
+			push_layer_buffer = t_realloc<Layer*>(push_layer_buffer, push_layer_capacity);
 		}
 		push_layer_buffer[push_layer_size] = layer;
 		push_layer_size++;
@@ -117,10 +116,7 @@ namespace Spiral
 		if (push_overlay_size + 1 > push_overlay_capacity)
 		{
 			push_overlay_capacity += initial_stack_capacity;
-			Layer** t = t_malloc<Layer*>(push_overlay_capacity);
-			memcpy(t, push_overlay_buffer, sizeof(Layer*) * push_overlay_size);
-			free(push_overlay_buffer);
-			push_overlay_buffer = t;
+			push_overlay_buffer = t_realloc<Layer*>(push_overlay_buffer, push_overlay_capacity);
 		}
 		push_overlay_buffer[push_overlay_size] = layer;
 		push_overlay_size++;
@@ -137,12 +133,35 @@ namespace Spiral
 		pop_layer_buffer = n_layers;
 	}
 
+	void client::handle_event()
+	{
+		for (index_t i = n_layers + n_overlays - 1; i != std::numeric_limits<index_t>::max(); i--)
+		{
+			if (layer_stack[i]->handleEvent(event_buffer[event_start]))
+			{
+				return;
+			}
+		}
+
+		if (event_buffer[event_start].type == EventType::WindowClose)
+		{
+			running = false;
+		}
+	}
+
 	void client::run()
 	{
 		index_t i, n;
 		Layer** t = nullptr;
+		std::chrono::high_resolution_clock::time_point current_frame;
 		while (running)
 		{
+			current_frame = std::chrono::high_resolution_clock::now();
+			delta_time = std::chrono::duration_cast<std::chrono::duration<time_t, std::chrono::seconds::period>>(current_frame - last_frame).count();
+			last_frame = std::move(current_frame);
+
+			elapsed_time += delta_time;
+
 			for (i = 0; i < n_layers + n_overlays; i++)
 			{
 				layer_stack[i]->tick();
@@ -157,22 +176,9 @@ namespace Spiral
 				window_size_changed = false;
 			}
 			
-			while (event_buffer_size > 0) //TODO: replace goto with function
+			while (event_buffer_size > 0)
 			{
-				for (i = n_layers + n_overlays - 1; i != std::numeric_limits<index_t>::max(); i--)
-				{
-					if (layer_stack[i]->handleEvent(event_buffer[event_start])) //TODO: place the switch for event types here, and implement an event function for each type in the layer class, to avoid multiple switches per tick
-					{
-						goto endevent;
-					}
-				}
-				
-				if (event_buffer[event_start].type == EventType::WindowClose)
-				{
-					running = false;
-				}
-
-				endevent:
+				handle_event();
 				event_start = (event_start + 1) % event_buffer_capacity;
 				event_buffer_size--;
 			}
@@ -195,7 +201,7 @@ namespace Spiral
 					delete layer_stack[i];
 				}
 				n_layers -= pop_layer_buffer;
-				memmove(&layer_stack[n_layers], &layer_stack[n_layers + pop_layer_buffer], sizeof(Layer*) * n_overlays);
+				std::memmove(&layer_stack[n_layers], &layer_stack[n_layers + pop_layer_buffer], sizeof(Layer*) * n_overlays);
 				pop_layer_buffer = 0;
 			}
 
@@ -204,18 +210,14 @@ namespace Spiral
 				n = push_layer_size + push_overlay_size + n_layers + n_overlays;
 				if (n > layer_stack_capacity)
 				{
-					i = (n / initial_stack_capacity + 1) * initial_stack_capacity;
-					t = t_malloc<Layer*>(i);
-					layer_stack_capacity = i;
-					memcpy(t, layer_stack, sizeof(Layer*) * ((std::size_t)n_layers + n_overlays)); //There was an arithmetic overflow warning and it was annoying me
-					free(layer_stack);
-					layer_stack = t;
+					layer_stack_capacity = (n / initial_stack_capacity + 1) * initial_stack_capacity;
+					layer_stack = t_realloc<Layer*>(layer_stack, layer_stack_capacity);
 				}
 
 				if (push_layer_size)
 				{
-					memmove(&layer_stack[n_layers + push_layer_size], &layer_stack[n_layers], sizeof(Layer*) * n_overlays);
-					memcpy(&layer_stack[n_layers], push_layer_buffer, sizeof(Layer*) * push_layer_size);
+					std::memmove(&layer_stack[n_layers + push_layer_size], &layer_stack[n_layers], sizeof(Layer*) * n_overlays);
+					std::memcpy(&layer_stack[n_layers], push_layer_buffer, sizeof(Layer*) * push_layer_size);
 					n_layers += push_layer_size;
 					push_layer_size = 0;
 				}
@@ -223,7 +225,7 @@ namespace Spiral
 				if (push_overlay_size)
 				{
 					n = n_layers + n_overlays;
-					memcpy(&layer_stack[n_layers + n_overlays], push_overlay_buffer, sizeof(Layer*) * push_overlay_size);
+					std::memcpy(&layer_stack[n_layers + n_overlays], push_overlay_buffer, sizeof(Layer*) * push_overlay_size);
 					n_overlays += push_overlay_size;
 					push_overlay_size = 0;
 				}

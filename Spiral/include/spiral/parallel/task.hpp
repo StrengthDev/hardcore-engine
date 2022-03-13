@@ -20,9 +20,11 @@ namespace Spiral
 		inline result<Type> immediate_task(func_t<Type> task)
 		{
 			result<Type> ret;
-			submit_immediate_task([task, &ret]()
+			void* sc = ret.shared_container; //compiler was complaining "sc" was undeclared when it was of type result<Type>::container*, idk
+			submit_immediate_task([task, sc]()
 				{
-					ret.set(task()); //TODO: pointer sync with result
+					result<Type>::set(*reinterpret_cast<result<Type>::container*>(sc), task());
+					result<Type>::try_destroy_container(reinterpret_cast<result<Type>::container*>(sc));
 				});
 			return ret;
 		}
@@ -36,10 +38,12 @@ namespace Spiral
 		inline result<void> immediate_task<void>(func_t<void> task)
 		{
 			result<void> ret;
-			submit_immediate_task([task]()
+			void* sc = ret.shared_container;
+			submit_immediate_task([task, sc]()
 				{
 					task();
-					//ret.set();
+					result<void>::set(*reinterpret_cast<result<void>::container*>(sc));
+					result<void>::try_destroy_container(reinterpret_cast<result<void>::container*>(sc));
 				});
 			return ret;
 		}
@@ -47,7 +51,7 @@ namespace Spiral
 		SPIRAL_API void submit_background_task(std::function<void()> task);
 
 		template<typename Type>
-		inline result<Type> background_task(Type(*task)())
+		inline result<Type> background_task(func_t<Type> task)
 		{
 			result<Type> ret;
 			submit_background_task([task, &ret]()
@@ -58,7 +62,7 @@ namespace Spiral
 		}
 
 		template<>
-		inline result<void> background_task<void>(void(*task)())
+		inline result<void> background_task<void>(func_t<void> task)
 		{
 			result<void> ret;
 			submit_background_task([task, &ret]()
