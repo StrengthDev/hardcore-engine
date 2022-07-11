@@ -4,7 +4,6 @@
 #include "layer.hpp"
 #include "time.hpp"
 #include "static_client.hpp"
-#include <spiral/render/renderer.hpp>
 
 namespace Spiral
 {
@@ -30,8 +29,6 @@ namespace Spiral
 		void run();
 		void shutdown();
 
-		inline Renderer& getRenderer() const { return *renderer; };
-
 		typedef uint16_t index_t;
 
 		static const index_t event_buffer_capacity = BIT(7);
@@ -41,7 +38,6 @@ namespace Spiral
 		void handle_event();
 
 
-		Renderer* renderer;
 		program_id client_id;
 
 		Layer** layer_stack;

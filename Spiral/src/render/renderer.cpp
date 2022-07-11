@@ -1,235 +1,249 @@
 #include <pch.hpp>
 
+#include <spiral/render/renderer.hpp>
 #include <spiral/render/renderer_internal.hpp>
+#include <spiral/render/render_core.hpp>
+#include <spiral/render/shader_library.hpp>
 
 #include <spiral/core/static_client.hpp>
 #include <spiral/core/window_internal.hpp>
 
 namespace Spiral
 {
-	Renderer* renderer;
-
-	bool checkValidationLayerSupport()
+	namespace renderer
 	{
-		uint32_t layerCount;
-		vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+		const uint8_t max_devices = 8;
 
-		std::vector<VkLayerProperties> availableLayers(layerCount);
-		vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+		VkInstance instance;
+		VkSurfaceKHR surface;
+		device available_devices[max_devices];
+		uint32_t n_available_devices;
+		uint32_t present_device_idx;
 
-		for (const char* layerName : validationLayers)
+		VkDebugUtilsMessengerEXT debug_messenger;
+
+		bool check_validation_layer_support()
 		{
-			bool layerFound = false;
+			uint32_t layer_count;
+			vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
 
-			for (const auto& layerProperties : availableLayers)
+			std::vector<VkLayerProperties> available_layers(layer_count);
+			vkEnumerateInstanceLayerProperties(&layer_count, available_layers.data());
+
+			for (const char* layer_name : validation_layers)
 			{
-				if (strcmp(layerName, layerProperties.layerName) == 0)
+				bool layer_found = false;
+
+				for (const auto& layer_properties : available_layers)
 				{
-					layerFound = true;
-					break;
+					if (strcmp(layer_name, layer_properties.layerName) == 0)
+					{
+						layer_found = true;
+						break;
+					}
+				}
+
+				if (!layer_found)
+				{
+					return false;
 				}
 			}
 
-			if (!layerFound)
+			return true;
+		}
+
+		static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
+			VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+			VkDebugUtilsMessageTypeFlagsEXT message_type,
+			const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
+			void* user_data)
+		{
+			switch (message_severity)
 			{
-				return false;
+			case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
+				LOGF_INTERNAL_TRACE("[VULKAN] {0}", callback_data->pMessage);
+				break;
+			case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
+				LOGF_INTERNAL_INFO("[VULKAN] {0}", callback_data->pMessage);
+				break;
+			case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
+				LOGF_INTERNAL_WARN("[VULKAN] {0}", callback_data->pMessage);
+				break;
+			case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
+				LOGF_INTERNAL_ERROR("[VULKAN] {0}", callback_data->pMessage);
+				break;
+			}
+			return VK_FALSE;
+		}
+
+		VkResult create_debug_utils_messenger_EXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* create_info, const VkAllocationCallbacks* allocator, VkDebugUtilsMessengerEXT* debug_messenger)
+		{
+			PFN_vkCreateDebugUtilsMessengerEXT func = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
+			if (func != nullptr)
+			{
+				return func(instance, create_info, allocator, debug_messenger);
+			}
+			else
+			{
+				return VK_ERROR_EXTENSION_NOT_PRESENT;
 			}
 		}
 
-		return true;
-	}
-
-	static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-		VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-		VkDebugUtilsMessageTypeFlagsEXT messageType,
-		const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-		void* pUserData)
-	{
-		LOGF_INTERNAL_TRACE("[VULKAN] {0}", pCallbackData->pMessage);
-		
-		return VK_FALSE;
-	}
-
-	VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger)
-	{
-		auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
-		if (func != nullptr)
+		void destroy_debug_utils_messenger_EXT(VkInstance instance, VkDebugUtilsMessengerEXT debug_messenger, const VkAllocationCallbacks* allocator)
 		{
-			return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
-		}
-		else
-		{
-			return VK_ERROR_EXTENSION_NOT_PRESENT;
-		}
-	}
-
-	void DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger, const VkAllocationCallbacks* pAllocator)
-	{
-		auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-		if (func != nullptr)
-		{
-			func(instance, debugMessenger, pAllocator);
-		}
-	}
-
-	RendererObject::RendererObject(program_id engineProps, program_id clientProps)
-	{
-		if (enableValidationLayers && !checkValidationLayerSupport())
-		{
-			DEBUG_BREAK;
-			shutdown();
-			return;
-		}
-		else
-		{
-			uint32_t extensionCount = 0;
-			vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-			std::vector<VkExtensionProperties> extensions(extensionCount);
-			vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
-			LOG_INTERNAL_DEBUG("[VULKAN] Available extensions:");
-			for (const auto& extension : extensions)
+			PFN_vkDestroyDebugUtilsMessengerEXT func = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT"));
+			if (func != nullptr)
 			{
-				LOGF_INTERNAL_DEBUG("[VULKAN]  - {0}", extension.extensionName);
+				func(instance, debug_messenger, allocator);
 			}
 		}
 
-		VkResult result;
-		uint32_t i;
+		void init(program_id engine, program_id client)
+		{
+			if (enable_validation_layers && !check_validation_layer_support())
+			{
+				DEBUG_BREAK;
+				shutdown();
+				return;
+			}
+			else
+			{
+				uint32_t n_extensions = 0;
+				vkEnumerateInstanceExtensionProperties(nullptr, &n_extensions, nullptr);
+				std::vector<VkExtensionProperties> extensions(n_extensions);
+				vkEnumerateInstanceExtensionProperties(nullptr, &n_extensions, extensions.data());
+				LOG_INTERNAL_DEBUG("[VULKAN] Available extensions:");
+				for (const auto& extension : extensions)
+				{
+					LOGF_INTERNAL_DEBUG("[VULKAN]  - {0}", extension.extensionName);
+				}
+			}
 
-		VkApplicationInfo appInfo = {};	//has pNext for extension information
-		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-		appInfo.pApplicationName = clientProps.name;
-		appInfo.applicationVersion = VK_MAKE_API_VERSION(0, clientProps.major, clientProps.minor, clientProps.patch); //TODO: variant?
-		appInfo.pEngineName = engineProps.name;
-		appInfo.engineVersion = VK_MAKE_API_VERSION(0, engineProps.major, engineProps.minor, engineProps.patch); //TODO: variant?
-		appInfo.apiVersion = VK_API_VERSION_1_0;
-		uint32_t glfwExtensionCount = 0;
-		const char** glfwExtensions;
-		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);	//gets required platform interface extensions
-		std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
-		if (enableValidationLayers)
-		{
-			extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-		}
-		VkInstanceCreateInfo createInfo = {};
-		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-		createInfo.pApplicationInfo = &appInfo;
-		createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
-		createInfo.ppEnabledExtensionNames = extensions.data();
-		if (enableValidationLayers)
-		{
-			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
-			createInfo.ppEnabledLayerNames = validationLayers.data();
-		}
-		else
-		{
-			createInfo.enabledLayerCount = 0;
-		}
-		result = vkCreateInstance(&createInfo, nullptr, &instance);
-		if (result != VK_SUCCESS)
-		{
-			DEBUG_BREAK;
-			shutdown();
-			return;
-		}
+			VkResult result;
+			uint32_t i;
 
-		if (enableValidationLayers)
-		{
-			VkDebugUtilsMessengerCreateInfoEXT createInfo = {};
-			createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-			createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-			createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-			createInfo.pfnUserCallback = debugCallback;
-			createInfo.pUserData = nullptr; // Optional, passed to the callback function
-
-			result = CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, &debugMessenger);
+			VkApplicationInfo app_info = {};	//has pNext for extension information
+			app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+			app_info.pApplicationName = client.name;
+			app_info.applicationVersion = VK_MAKE_API_VERSION(0, client.major, client.minor, client.patch); //TODO: variant?
+			app_info.pEngineName = engine.name;
+			app_info.engineVersion = VK_MAKE_API_VERSION(0, engine.major, engine.minor, engine.patch); //TODO: variant?
+			app_info.apiVersion = VK_API_VERSION_1_1;
+			uint32_t n_glfw_extensions = 0;
+			const char** glfw_extensions;
+			glfw_extensions = glfwGetRequiredInstanceExtensions(&n_glfw_extensions);	//gets required platform interface extensions
+			std::vector<const char*> extensions(glfw_extensions, glfw_extensions + n_glfw_extensions);
+			if (enable_validation_layers)
+			{
+				extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+			}
+			VkInstanceCreateInfo instance_info = {};
+			instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+			instance_info.pApplicationInfo = &app_info;
+			instance_info.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+			instance_info.ppEnabledExtensionNames = extensions.data();
+			if (enable_validation_layers)
+			{
+				instance_info.enabledLayerCount = static_cast<uint32_t>(validation_layers.size());
+				instance_info.ppEnabledLayerNames = validation_layers.data();
+			}
+			else
+			{
+				instance_info.enabledLayerCount = 0;
+			}
+			result = vkCreateInstance(&instance_info, nullptr, &instance);
 			if (result != VK_SUCCESS)
 			{
 				DEBUG_BREAK;
 				shutdown();
 				return;
 			}
-		}
 
-		GLFWwindow* window = window::get_handle();
-		result = glfwCreateWindowSurface(instance, window, nullptr, &surface);
-		if (result != VK_SUCCESS)
-		{
-			DEBUG_BREAK;
-			shutdown();
-			return;
-		}
+			if (enable_validation_layers)
+			{
+				VkDebugUtilsMessengerCreateInfoEXT debug_info = {};
+				debug_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+				debug_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+				debug_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+				debug_info.pfnUserCallback = debug_callback;
+				debug_info.pUserData = nullptr; // Optional, passed to the callback function
 
-		nAvailableDevices = 0;
-		vkEnumeratePhysicalDevices(instance, &nAvailableDevices, nullptr);
-		if (nAvailableDevices == 0)
-		{
-			DEBUG_BREAK;
-			shutdown();
-			return;
-		}
-		VkPhysicalDevice* devices = (VkPhysicalDevice*)malloc(sizeof(VkPhysicalDevice) * nAvailableDevices);
-		vkEnumeratePhysicalDevices(instance, &nAvailableDevices, devices);
-		for (i = 0; i < nAvailableDevices; i++)
-		{
-			availableDevices[i].init(devices[i], surface);
-		}
-		free(devices);
+				result = create_debug_utils_messenger_EXT(instance, &debug_info, nullptr, &debug_messenger);
+				if (result != VK_SUCCESS)
+				{
+					DEBUG_BREAK;
+					shutdown();
+					return;
+				}
+			}
+
+			GLFWwindow* window = window::get_handle();
+			result = glfwCreateWindowSurface(instance, window, nullptr, &surface);
+			if (result != VK_SUCCESS)
+			{
+				DEBUG_BREAK;
+				shutdown();
+				return;
+			}
+
+			n_available_devices = 0;
+			vkEnumeratePhysicalDevices(instance, &n_available_devices, nullptr);
+			if (n_available_devices == 0)
+			{
+				DEBUG_BREAK;
+				shutdown();
+				return;
+			}
+			VkPhysicalDevice* devices = t_malloc<VkPhysicalDevice>(n_available_devices);
+			vkEnumeratePhysicalDevices(instance, &n_available_devices, devices);
+			for (i = 0; i < n_available_devices; i++)
+			{
+				new (&available_devices[i]) device(devices[i], surface);
+			}
+			free(devices);
 		
-		presentDeviceIndex = 0; //TODO: select present device
+			present_device_idx = 0; //TODO: select present device
 
-		if (!availableDevices[presentDeviceIndex].createSwapchain())
-		{
-			DEBUG_BREAK;
-			shutdown();
-			return;
-		}
-		ShaderLibrary::init();
-	}
-
-	RendererObject::~RendererObject()
-	{
-		uint32_t i;
-		for (i = 0; i < nAvailableDevices; i++)
-		{
-			availableDevices[i].terminate();
+			if (!available_devices[present_device_idx].create_swapchain())
+			{
+				DEBUG_BREAK;
+				shutdown();
+				return;
+			}
+			ShaderLibrary::init();
 		}
 
-		if (enableValidationLayers)
+		void terminate()
 		{
-			DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
+			uint32_t i;
+			for (i = 0; i < n_available_devices; i++)
+			{
+				available_devices[i].~device();
+			}
+
+			if (enable_validation_layers)
+			{
+				destroy_debug_utils_messenger_EXT(instance, debug_messenger, nullptr);
+			}
+
+			vkDestroySurfaceKHR(instance, surface, nullptr);
+			vkDestroyInstance(instance, nullptr);
+			ShaderLibrary::terminate();
 		}
 
-		vkDestroySurfaceKHR(instance, surface, nullptr);
-		vkDestroyInstance(instance, nullptr);
-		ShaderLibrary::terminate();
-	}
-
-	void RendererObject::m_presentFrame()
-	{
-		//TODO: draw commands and pipeline management
-		if (!availableDevices[presentDeviceIndex].drawFrame())
+		void tick()
 		{
-			//Client::get().shutdown();
+			available_devices[present_device_idx].draw();
 		}
-	}
 
-	void RendererObject::m_loadMesh(Mesh mesh, uint32_t vertexShaderId, uint32_t fragShaderId)
-	{
-		availableDevices[presentDeviceIndex].loadMesh(mesh, vertexShaderId, fragShaderId);
-	}
+		device& get_device()
+		{
+			return available_devices[present_device_idx];
+		}
 
-	//TODO: submit function should have arguments like VertexData or something containing data/layout and an array of indexes
-	//NOTE: leaves and water wave effects should be done in geometry shaders, or maybe not, theyre not efficient
-
-	Renderer* Renderer::init(program_id engineProps, program_id clientProps)
-	{
-		renderer = new RendererObject(engineProps, clientProps);
-		return renderer;
-	}
-
-	void Renderer::loadMesh(Mesh mesh, uint32_t vertexShaderId, uint32_t fragShaderId)
-	{
-		renderer->m_loadMesh(mesh, vertexShaderId, fragShaderId);
+		void loadMesh(Mesh mesh, uint32_t vertexShaderId, uint32_t fragShaderId)
+		{
+			available_devices[present_device_idx].loadMesh(mesh, vertexShaderId, fragShaderId);
+		}
 	}
 }

@@ -1,7 +1,7 @@
 #include <pch.hpp>
 
 #include <spiral/debug/log_internal.hpp>
-#include <spiral/debug/ANSI_utility.hpp>
+#include <spiral/debug/ansi_utility.hpp>
 
 #ifdef _MSC_VER
 #include <Windows.h>
@@ -91,8 +91,8 @@ namespace Spiral
 			"CLIENT:  "
 		};
 
-		flag_t log_mask_flags = Spiral::log::TRACE_BIT ^ 0xff;// 0xff;
-		flag_t log_format_flags = 0xff;
+		flag_t log_mask_flags = TRACE_BIT ^ 0xff;// 0xff;
+		flag_t log_format_flags = CALLER_BIT;// 0xff;
 
 		flag_t log_file_mask_flags = 0xff;
 		flag_t log_file_format_flags = 0xff;

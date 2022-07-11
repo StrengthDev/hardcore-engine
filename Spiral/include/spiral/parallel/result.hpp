@@ -30,8 +30,15 @@ namespace Spiral
 			{
 				shared_container->owner = this;
 			}
+
+			result<Type>& operator=(result<Type>&& other) noexcept
+			{
+				//TODO
+				return *this;
+			}
 			
 			result(const result<Type>&) = delete;
+			result<Type>& operator=(const result<Type>& other) = delete;
 
 			~result()
 			{
@@ -127,7 +134,14 @@ namespace Spiral
 				shared_container->owner = this;
 			}
 
+			result<void>& operator=(result<void>&& other) noexcept
+			{
+				//TODO
+				return *this;
+			}
+
 			result(const result<void>&) = delete;
+			result<void>& operator=(const result<void>& other) = delete;
 
 			~result()
 			{

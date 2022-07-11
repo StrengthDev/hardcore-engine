@@ -4,18 +4,28 @@
 
 namespace Spiral
 {
-	struct Swapchain
+
+	class device;
+
+	class swapchain
 	{
+	public:
+		~swapchain();
+
+		void init(device& owner);
+		void terminate();
+
+	private:
 		VkSwapchainKHR handle;
-		VkImage* images;
-		uint32_t nImages;
-		VkImageView* imageViews;
-		VkFormat imageFormat;
+		VkImage* images = nullptr;
+		uint32_t n_images;
+		VkImageView* image_views = nullptr;
+		VkFormat image_format;
 		VkExtent2D extent;
 
-		bool valid;
+		device* owner = nullptr;
 
-		void init(VkPhysicalDevice physicalHandle, VkDevice logicalHandle, VkSurfaceKHR surface, uint32_t graphicsIndex, uint32_t presentIndex);
-		void terminate(VkDevice logicalHandle);
+		friend device;
+		friend class graphics_pipeline;
 	};
 }

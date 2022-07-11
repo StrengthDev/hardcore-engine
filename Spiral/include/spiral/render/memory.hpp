@@ -1,16 +1,16 @@
 #pragma once
 
 #include "render_core.hpp"
-
-//NOTE: with the way the system is implemented, having 8MB pools assumes vertexes will have no more than 128 bytes of data
-//TODO: use push constants for model matrix and other object related variables, uniform buffer for view, world matrices and such, regular buffers for the rest
+#include "memory_reference.hpp"
 
 namespace Spiral
 {
-	struct Range
+	class device;
+
+	struct memory_slot
 	{
-		bool valid;
-		uint32_t offset;
+		bool in_use;
+		VkDeviceSize offset;
 		VkDeviceSize size;
 	};
 
@@ -22,19 +22,33 @@ namespace Spiral
 		VkDeviceSize size;
 	};
 
-	struct Pool
+	struct transfer_memory
+	{
+		VkDeviceMemory device;
+		VkBuffer buffer;
+		void* host;
+		VkSemaphore semaphore;
+		VkFence fence;
+		bool ready;
+		VkDeviceSize offset;
+	};
+
+	struct memory_pool
 	{
 		VkDeviceMemory memory;
 		VkBuffer buffer;
-		Range* ranges;
-		uint32_t nRanges;
-		uint32_t capacity;
-		Range largestFreeRange;
+		memory_slot* slots;
+		std::uint32_t n_slots;
+		std::uint32_t capacity;
+		std::uint32_t largest_free_slot;
+		VkBufferCopy* pending_copies;
+		std::uint32_t pending_copy_counts[max_frames_in_flight];
+		std::uint32_t pending_copy_capacity;
 	};
 
 	struct MemoryNexus
 	{
-		Pool* pools;
+		memory_pool* pools;
 		uint32_t nPools;
 		uint32_t capacity;
 		VkDeviceMemory transientDeviceMemory;
@@ -64,5 +78,56 @@ namespace Spiral
 		void waitFlush(MemoryNexus &nexus);
 
 		//NOTE: May want to add a function for pre allocation
+	};
+
+	class device_memory
+	{
+	public:
+		~device_memory();
+
+		void init(device& owner);
+		void terminate();
+
+		//void update_largest_slots();
+		//void tick(); could maybe replace the above function and performa all updates and cleanup
+
+		void flush_in(const std::uint16_t current_frame);
+		//void flush_out();
+
+		void synchronize();
+
+		memory_reference alloc_object(const VkDeviceSize size);
+		memory_reference ialloc_object(const void* data, const VkDeviceSize size);
+		//memory_reference alloc_dynamic_object();
+		//memory_reference alloc_indexes();
+		//memory_reference alloc_storage();
+		//memory_reference alloc_texture();
+
+		void submit_upload(const memory_reference& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset);
+		//void upload(const memory_reference& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset);
+
+	private:
+		std::uint32_t find_memory_type(std::uint32_t type_filter, VkMemoryPropertyFlags properties);
+
+		void alloc_buffer(VkDeviceMemory& memory, VkBuffer& buffer, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties);
+
+		template<VkBufferUsageFlags BFlags, VkMemoryPropertyFlags MFlags>
+		void alloc_slot(memory_pool* pools, const std::uint32_t& n_pools,
+			std::uint32_t& pool_idx, std::uint32_t& slot_idx, const VkDeviceSize size);
+
+		device* owner = nullptr;
+
+		VkDeviceSize mem_granularity; //from physical device properties
+		VkPhysicalDeviceMemoryProperties mem_properties;
+
+		VkCommandPool cmd_pool;
+		VkCommandBuffer cmd_buffers[max_frames_in_flight];
+
+		transfer_memory device_in[max_frames_in_flight];
+		transfer_memory device_out[max_frames_in_flight];
+
+	public:
+		std::uint32_t n_pools = 1;
+		memory_pool* pools;
 	};
 }

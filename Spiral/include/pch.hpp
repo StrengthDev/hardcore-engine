@@ -13,6 +13,7 @@
 #include <mutex>
 #include <atomic>
 #include <limits>
+#include <bitset>
 
 
 #include "spiral/debug/log_internal.hpp"

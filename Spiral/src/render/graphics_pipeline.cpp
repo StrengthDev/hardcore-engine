@@ -1,7 +1,8 @@
 #include <pch.hpp>
 
+#include <spiral/render/device.hpp>
 #include <spiral/render/graphics_pipeline.hpp>
-
+/*
 //TODO: delet this
 #include "glm/glm.hpp"
 struct Vertex
@@ -27,19 +28,150 @@ struct Vertex
 		attributeDescriptions[0].location = 0;
 		attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attributeDescriptions[0].offset = offsetof(Vertex, pos);
-		/*
-		attributeDescriptions[1].binding = 0;
-		attributeDescriptions[1].location = 1;
-		attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attributeDescriptions[1].offset = offsetof(Vertex, color);
-		*/
+		
+		//attributeDescriptions[1].binding = 0;
+		//attributeDescriptions[1].location = 1;
+		//attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+		//attributeDescriptions[1].offset = offsetof(Vertex, color);
+		
 		return attributeDescriptions;
 	}
-};
+};*/
 
 namespace Spiral
 {
-	void GraphicsPipeline::init(VkDevice logicalHandle, Swapchain swapchain, VkCommandPool commandPool, const Shader* shaders, uint16_t nShaders)
+	class data_layout_internal : data_layout
+	{
+	public:
+		data_layout_internal() = delete;
+
+		friend VkFormat to_vk_format(const data_layout::value&);
+		friend void get_vertex_inputs(const data_layout&,
+			std::uint32_t*, VkVertexInputBindingDescription**, std::uint32_t*, VkVertexInputAttributeDescription**);
+	};
+
+#define CASE(cond, form) case data_layout::component_type::cond: format = form; break;
+	inline VkFormat to_vk_format(const data_layout::value& type)
+	{
+		VkFormat format = VK_FORMAT_UNDEFINED;
+		switch (type.t)
+		{
+		case data_layout::type::SCALAR:
+			switch (type.ct)
+			{
+				CASE(FLOAT16, VK_FORMAT_R16_SFLOAT);
+				CASE(FLOAT32, VK_FORMAT_R32_SFLOAT);
+				CASE(FLOAT64, VK_FORMAT_R64_SFLOAT);
+				CASE(INT8, VK_FORMAT_R8_SINT);
+				CASE(INT16, VK_FORMAT_R16_SINT);
+				CASE(INT32, VK_FORMAT_R32_SINT);
+				CASE(INT64, VK_FORMAT_R64_SINT);
+				CASE(UINT8, VK_FORMAT_R8_UINT);
+				CASE(UINT16, VK_FORMAT_R16_UINT);
+				CASE(UINT32, VK_FORMAT_R32_UINT);
+				CASE(UINT64, VK_FORMAT_R64_UINT);
+			default:
+				break;
+			}
+			break;
+		case data_layout::type::VEC2:
+			switch (type.ct)
+			{
+				CASE(FLOAT16, VK_FORMAT_R16G16_SFLOAT);
+				CASE(FLOAT32, VK_FORMAT_R32G32_SFLOAT);
+				CASE(FLOAT64, VK_FORMAT_R64G64_SFLOAT);
+				CASE(INT8, VK_FORMAT_R8G8_SINT);
+				CASE(INT16, VK_FORMAT_R16G16_SINT);
+				CASE(INT32, VK_FORMAT_R32G32_SINT);
+				CASE(INT64, VK_FORMAT_R64G64_SINT);
+				CASE(UINT8, VK_FORMAT_R8G8_UINT);
+				CASE(UINT16, VK_FORMAT_R16G16_UINT);
+				CASE(UINT32, VK_FORMAT_R32G32_UINT);
+				CASE(UINT64, VK_FORMAT_R64G64_UINT);
+			default:
+				break;
+			}
+			break;
+		case data_layout::type::VEC3:
+			switch (type.ct)
+			{
+				CASE(FLOAT16, VK_FORMAT_R16G16B16_SFLOAT);
+				CASE(FLOAT32, VK_FORMAT_R32G32B32_SFLOAT);
+				CASE(FLOAT64, VK_FORMAT_R64G64B64_SFLOAT);
+				CASE(INT8, VK_FORMAT_R8G8B8_SINT);
+				CASE(INT16, VK_FORMAT_R16G16B16_SINT);
+				CASE(INT32, VK_FORMAT_R32G32B32_SINT);
+				CASE(INT64, VK_FORMAT_R64G64B64_SINT);
+				CASE(UINT8, VK_FORMAT_R8G8B8_UINT);
+				CASE(UINT16, VK_FORMAT_R16G16B16_UINT);
+				CASE(UINT32, VK_FORMAT_R32G32B32_UINT);
+				CASE(UINT64, VK_FORMAT_R64G64B64_UINT);
+			default:
+				break;
+			}
+			break;
+		case data_layout::type::VEC4:
+			switch (type.ct)
+			{
+				CASE(FLOAT16, VK_FORMAT_R16G16B16A16_SFLOAT);
+				CASE(FLOAT32, VK_FORMAT_R32G32B32A32_SFLOAT);
+				CASE(FLOAT64, VK_FORMAT_R64G64B64A64_SFLOAT);
+				CASE(INT8, VK_FORMAT_R8G8B8A8_SINT);
+				CASE(INT16, VK_FORMAT_R16G16B16A16_SINT);
+				CASE(INT32, VK_FORMAT_R32G32B32A32_SINT);
+				CASE(INT64, VK_FORMAT_R64G64B64A64_SINT);
+				CASE(UINT8, VK_FORMAT_R8G8B8A8_UINT);
+				CASE(UINT16, VK_FORMAT_R16G16B16A16_UINT);
+				CASE(UINT32, VK_FORMAT_R32G32B32A32_UINT);
+				CASE(UINT64, VK_FORMAT_R64G64B64A64_UINT);
+			default:
+				break;
+			}
+			break;
+		case data_layout::type::MAT2://TODO
+		case data_layout::type::MAT3://TODO
+		case data_layout::type::MAT4://TODO
+		default:
+			break;
+		}
+		return format;
+	}
+#undef CASE
+
+	inline void get_vertex_inputs(const data_layout& vertex_layout, 
+		std::uint32_t* out_binding_count, VkVertexInputBindingDescription** out_bindings,
+		std::uint32_t* out_attribute_description_count, VkVertexInputAttributeDescription** out_descriptions)
+	{
+		const std::uint32_t binding_count = 1;
+		*out_binding_count = binding_count;
+		*out_bindings = t_malloc<VkVertexInputBindingDescription>(binding_count);
+		(**out_bindings).binding = 0;
+		(**out_bindings).stride = vertex_layout.size();
+		(**out_bindings).inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+		const std::uint32_t attribute_description_count = vertex_layout.count();
+		*out_attribute_description_count = attribute_description_count;
+		*out_descriptions = t_malloc<VkVertexInputAttributeDescription>(attribute_description_count);
+		std::uint32_t offset = 0;
+		const data_layout_internal& layout = reinterpret_cast<const data_layout_internal&>(vertex_layout);
+		for (std::uint32_t i = 0; i < attribute_description_count; i++)
+		{
+			(*out_descriptions)[i].binding = 0;
+			(*out_descriptions)[i].location = i;
+
+			const VkFormat format = to_vk_format(layout[i]);
+			assertm(format != VK_FORMAT_UNDEFINED, "Invalid type.");
+			(*out_descriptions)[i].format = format;
+
+			(*out_descriptions)[i].offset = offset;
+			offset += layout[i].size();
+		}
+	}
+
+	graphics_pipeline::graphics_pipeline(device* owner, VkDevice logicalHandle, swapchain& target, VkRenderPass& renderPass,
+		VkCommandPool commandPool, const Shader* shaders, uint16_t nShaders, 
+		const data_layout vertex_layout, const data_layout object_layout, const data_layout global_layout)
+		: owner(owner), logicalHandle(logicalHandle), target(target), vertex_layout(vertex_layout), object_layout(object_layout), global_layout(global_layout)
 	{
 		uint32_t i;
 		valid = true;
@@ -65,13 +197,13 @@ namespace Spiral
 
 		VkDescriptorPoolSize poolSize = {};
 		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		poolSize.descriptorCount = swapchain.nImages;
+		poolSize.descriptorCount = target.n_images;
 
 		VkDescriptorPoolCreateInfo poolInfo = {};
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		poolInfo.poolSizeCount = 1;
 		poolInfo.pPoolSizes = &poolSize;
-		poolInfo.maxSets = swapchain.nImages;
+		poolInfo.maxSets = target.n_images;
 
 		if (vkCreateDescriptorPool(logicalHandle, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) //TODO: according to the example this shouldn't be so high, but I haven't found any relevant dependency
 		{
@@ -80,61 +212,19 @@ namespace Spiral
 			vkDestroyDescriptorSetLayout(logicalHandle, descriptorSetLayout, nullptr);
 			return;
 		}
+		std::uint32_t binding_count, attribute_description_count;
+		VkVertexInputBindingDescription* bindings;
+		VkVertexInputAttributeDescription* attribute_descriptions;
+		get_vertex_inputs(vertex_layout, &binding_count, &bindings, &attribute_description_count, &attribute_descriptions);
+		//VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
+		//std::array<VkVertexInputAttributeDescription, 1> attributeDescriptions = Vertex::getAttributeDescriptions(); //TODO: take array out
 
-		VkAttachmentDescription colorAttachment = {};
-		colorAttachment.format = swapchain.imageFormat;
-		colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;	//multisampling
-		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;	//clear to black, dont know how it works
-		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;	//define pixel layout of VkImages in memory
-
-		VkAttachmentReference colorAttachmentRef = {};
-		colorAttachmentRef.attachment = 0;
-		colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-		VkSubpassDescription subpass = {};
-		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-		subpass.colorAttachmentCount = 1;
-		subpass.pColorAttachments = &colorAttachmentRef;
-
-		VkSubpassDependency dependency = {};
-		dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-		dependency.dstSubpass = 0;
-		dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		dependency.srcAccessMask = 0;
-		dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-
-		VkRenderPassCreateInfo renderPassInfo = {};
-		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		renderPassInfo.attachmentCount = 1;
-		renderPassInfo.pAttachments = &colorAttachment;
-		renderPassInfo.subpassCount = 1;
-		renderPassInfo.pSubpasses = &subpass;
-		renderPassInfo.dependencyCount = 1;
-		renderPassInfo.pDependencies = &dependency;
-
-		if (vkCreateRenderPass(logicalHandle, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS)
-		{
-			DEBUG_BREAK;
-			valid = false;
-			vkDestroyDescriptorPool(logicalHandle, descriptorPool, nullptr);
-			vkDestroyDescriptorSetLayout(logicalHandle, descriptorSetLayout, nullptr);
-			return;
-		}
-
-		VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
-		std::array<VkVertexInputAttributeDescription, 1> attributeDescriptions = Vertex::getAttributeDescriptions(); //TODO: take array out
-
-		VkPipelineVertexInputStateCreateInfo vertexInputInfo = {};
-		vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		vertexInputInfo.vertexBindingDescriptionCount = 1;
-		vertexInputInfo.pVertexBindingDescriptions = &bindingDescription; // Optional, but not really
-		vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-		vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data(); // Optional, but not really
+		VkPipelineVertexInputStateCreateInfo vertex_input_info = {};
+		vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		vertex_input_info.vertexBindingDescriptionCount = binding_count;
+		vertex_input_info.pVertexBindingDescriptions = bindings;
+		vertex_input_info.vertexAttributeDescriptionCount = attribute_description_count;
+		vertex_input_info.pVertexAttributeDescriptions = attribute_descriptions;
 
 		VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
 		inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -144,14 +234,14 @@ namespace Spiral
 		VkViewport viewport = {};
 		viewport.x = 0.0f;
 		viewport.y = 0.0f;
-		viewport.width = (float)swapchain.extent.width;
-		viewport.height = (float)swapchain.extent.height;
+		viewport.width = (float)target.extent.width;
+		viewport.height = (float)target.extent.height;
 		viewport.minDepth = 0.0f;
 		viewport.maxDepth = 1.0f; //always between 1 and 0
 
 		VkRect2D scissor = {};
 		scissor.offset = { 0, 0 };
-		scissor.extent = swapchain.extent;
+		scissor.extent = target.extent;
 
 		VkPipelineViewportStateCreateInfo viewportState = {};
 		viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -228,7 +318,6 @@ namespace Spiral
 		{
 			DEBUG_BREAK;
 			valid = false;
-			vkDestroyRenderPass(logicalHandle, renderPass, nullptr);
 			vkDestroyDescriptorPool(logicalHandle, descriptorPool, nullptr);
 			vkDestroyDescriptorSetLayout(logicalHandle, descriptorSetLayout, nullptr);
 			return;
@@ -262,7 +351,7 @@ namespace Spiral
 		pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 		pipelineInfo.stageCount = nShaders;
 		pipelineInfo.pStages = shaderStages;
-		pipelineInfo.pVertexInputState = &vertexInputInfo;
+		pipelineInfo.pVertexInputState = &vertex_input_info;
 		pipelineInfo.pInputAssemblyState = &inputAssembly;
 		pipelineInfo.pViewportState = &viewportState;
 		pipelineInfo.pRasterizationState = &rasterizer;
@@ -290,56 +379,23 @@ namespace Spiral
 			return;
 		}
 
+		std::free(bindings);
+		std::free(attribute_descriptions);
+
 		for (i = 0; i < nShaders; i++)
 		{
 			vkDestroyShaderModule(logicalHandle, modules[i], nullptr);
 		}
-
-		frameBuffers = (VkFramebuffer*)malloc(sizeof(VkFramebuffer) * swapchain.nImages);
-		for (i = 0; i < swapchain.nImages; i++)
-		{
-			VkFramebufferCreateInfo framebufferInfo = {};
-			framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-			framebufferInfo.renderPass = renderPass;
-			framebufferInfo.attachmentCount = 1;
-			framebufferInfo.pAttachments = &swapchain.imageViews[i];
-			framebufferInfo.width = swapchain.extent.width;
-			framebufferInfo.height = swapchain.extent.height;
-			framebufferInfo.layers = 1;
-
-			if (vkCreateFramebuffer(logicalHandle, &framebufferInfo, nullptr, &frameBuffers[i]) != VK_SUCCESS)
-			{
-				//TODO: cleanup properly
-				DEBUG_BREAK;
-				valid = false;
-				return;
-			}
-		}
-
-		VkCommandBufferAllocateInfo allocInfo = {};
-		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		allocInfo.commandPool = commandPool;
-		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		allocInfo.commandBufferCount = swapchain.nImages;
-
-		commandBuffers = (VkCommandBuffer*)malloc(sizeof(VkCommandBuffer) * swapchain.nImages);
-		if (vkAllocateCommandBuffers(logicalHandle, &allocInfo, commandBuffers) != VK_SUCCESS)
-		{
-			//TODO: cleanup properly
-			DEBUG_BREAK;
-			valid = false;
-			return;
-		}
 		/*
 		VkDescriptorPoolSize poolSize = {};
 		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		poolSize.descriptorCount = swapchain.nImages;
+		poolSize.descriptorCount = target.n_images;
 
 		VkDescriptorPoolCreateInfo poolInfo = {};
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		poolInfo.poolSizeCount = 1;
 		poolInfo.pPoolSizes = &poolSize;
-		poolInfo.maxSets = swapchain.nImages;
+		poolInfo.maxSets = target.n_images;
 
 		if (vkCreateDescriptorPool(logicalHandle, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS)
 		{
@@ -348,16 +404,16 @@ namespace Spiral
 			return;
 		}
 		*/
-		descriptorSets = (VkDescriptorSet*)malloc(sizeof(VkDescriptorSet) * swapchain.nImages);
-		VkDescriptorSetLayout* layouts = (VkDescriptorSetLayout*)malloc(sizeof(VkDescriptorSetLayout) * swapchain.nImages);
-		for (i = 0; i < swapchain.nImages; i++)
+		descriptorSets = (VkDescriptorSet*)malloc(sizeof(VkDescriptorSet) * target.n_images);
+		VkDescriptorSetLayout* layouts = (VkDescriptorSetLayout*)malloc(sizeof(VkDescriptorSetLayout) * target.n_images);
+		for (i = 0; i < target.n_images; i++)
 		{
 			layouts[i] = descriptorSetLayout;
 		}
 		VkDescriptorSetAllocateInfo setAllocInfo = {};
 		setAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		setAllocInfo.descriptorPool = descriptorPool;
-		setAllocInfo.descriptorSetCount = swapchain.nImages;
+		setAllocInfo.descriptorSetCount = target.n_images;
 		setAllocInfo.pSetLayouts = layouts;
 		if (vkAllocateDescriptorSets(logicalHandle, &setAllocInfo, descriptorSets) != VK_SUCCESS)
 		{
@@ -367,7 +423,7 @@ namespace Spiral
 			return;
 		}
 		/*
-		for (i = 0; i < swapchain.nImages; i++)
+		for (i = 0; i < target.n_images; i++)
 		{
 			VkDescriptorBufferInfo bufferInfo = {};
 			bufferInfo.buffer = uniformBuffers[i];
@@ -389,94 +445,65 @@ namespace Spiral
 		}
 		*/
 
-		extent = swapchain.extent;
-
-		Memory::init(memory, &commandPool);
+		extent = target.extent;
 		LOG_INTERNAL_INFO("New pipeline initialised");
 	}
 
-	void GraphicsPipeline::terminate(VkDevice logicalHandle, uint32_t nImages)
+	graphics_pipeline::~graphics_pipeline()
 	{
-		uint32_t i;
-		for (i = 0; i < nImages; i++)
-		{
-			vkDestroyFramebuffer(logicalHandle, frameBuffers[i], nullptr);
-		}
 		free(descriptorSets);
 
 		vkDestroyPipeline(logicalHandle, graphicsPipeline, nullptr);
 		vkDestroyPipelineLayout(logicalHandle, pipelineLayout, nullptr);
-		vkDestroyRenderPass(logicalHandle, renderPass, nullptr);
 		vkDestroyDescriptorPool(logicalHandle, descriptorPool, nullptr);
 		vkDestroyDescriptorSetLayout(logicalHandle, descriptorSetLayout, nullptr);
-
-		Memory::terminate(memory);
 	}
 
-	void GraphicsPipeline::loadMesh(Mesh mesh)
+	void graphics_pipeline::record_commands(VkCommandBuffer& buffer)
 	{
-		Memory::createBuffer(mesh.vertices, mesh.vSize, 0, memory);
-		Memory::createBuffer(mesh.indices, mesh.iSize, 0, memory);
-	}
-
-	void GraphicsPipeline::draw(size_t frame)
-	{
-		uint32_t i;
-		Memory::flush(memory);
-
-		//vkResetCommandBuffer(commandBuffers[frame], 0);
-		if (vkResetCommandBuffer(commandBuffers[frame], 0) != VK_SUCCESS)
-		{
-			//do stuff
-			DEBUG_BREAK;
-		}
-
-		VkCommandBufferBeginInfo beginInfo = {};
-		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // | VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-		beginInfo.pInheritanceInfo = nullptr; // Optional
-
-		if (vkBeginCommandBuffer(commandBuffers[frame], &beginInfo) != VK_SUCCESS)
-		{
-			//do stuff
-			DEBUG_BREAK;
-		}
-
-		VkRenderPassBeginInfo renderPassInfo = {};
-		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassInfo.renderPass = renderPass;
-		renderPassInfo.framebuffer = frameBuffers[frame];
-		renderPassInfo.renderArea.offset = { 0, 0 };
-		renderPassInfo.renderArea.extent = extent;
-
-		VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
-		renderPassInfo.clearValueCount = 1;
-		renderPassInfo.pClearValues = &clearColor;
-
-		vkCmdBeginRenderPass(commandBuffers[frame], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-		vkCmdBindPipeline(commandBuffers[frame], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
-		for (i = 0; i < memory.pools[0].nRanges; i += 2)
+		vkCmdBindPipeline(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+		/*
+		for (i = 0; i < memory.pools[0].n_slots; i += 2)
 		{
 			VkBuffer vertexBuffers[] = { memory.pools[0].buffer };
 			VkDeviceSize offsets[] = { memory.pools[0].ranges[i].offset };
-			vkCmdBindVertexBuffers(commandBuffers[frame], 0, 1, vertexBuffers, offsets);
+			vkCmdBindVertexBuffers(buffer, 0, 1, vertexBuffers, offsets);
 
-			vkCmdBindIndexBuffer(commandBuffers[frame], memory.pools[0].buffer, memory.pools[0].ranges[i + 1].offset, VK_INDEX_TYPE_UINT16);
+			vkCmdBindIndexBuffer(buffer, memory.pools[0].buffer, memory.pools[0].ranges[i + 1].offset, VK_INDEX_TYPE_UINT16);
 
 			//vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
 
-			vkCmdDrawIndexed(commandBuffers[frame], memory.pools[0].ranges[i + 1].size / sizeof(uint16_t), 1, 0, 0, 0);
-		}
+			vkCmdDrawIndexed(buffer, memory.pools[0].ranges[i + 1].size / sizeof(uint16_t), 1, 0, 0, 0); //TODO warning conversion from 'VkDeviceSize' to 'uint32_t', possible loss of data
+		}*/
 
-		vkCmdEndRenderPass(commandBuffers[frame]);
-
-		if (vkEndCommandBuffer(commandBuffers[frame]) != VK_SUCCESS)
+		for (std::uint32_t i = 0; i < n_targets; i++)
 		{
-			//do stuff
-			DEBUG_BREAK;
-		}
+			object& target = targets[i];
+			vkCmdBindVertexBuffers(buffer, 0, 1, &owner->get_memory().pools[target.vertex_buffer].buffer, &target.v_offset);
 
-		Memory::waitFlush(memory);
+			if (target.index_type == index_format::NONE)
+			{
+				vkCmdDraw(buffer, target.count, target.n_instances, 0, 0);
+			}
+			else
+			{
+				switch (target.index_type)
+				{
+				case index_format::UINT8:
+					vkCmdBindIndexBuffer(buffer, VK_NULL_HANDLE, target.i_offset, VK_INDEX_TYPE_UINT8_EXT); //TODO
+					break;
+				case index_format::UINT16:
+					vkCmdBindIndexBuffer(buffer, VK_NULL_HANDLE, target.i_offset, VK_INDEX_TYPE_UINT16); //TODO
+					break;
+				case index_format::UINT32:
+					vkCmdBindIndexBuffer(buffer, VK_NULL_HANDLE, target.i_offset, VK_INDEX_TYPE_UINT32); //TODO
+					break;
+				default:
+					assertm(false, "Index format not implemented.");
+					break;
+				}
+				vkCmdDrawIndexed(buffer, target.count, target.n_instances, 0, 0, 0);
+			}
+		}
 	}
 }

@@ -93,7 +93,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.176.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\stb\stb-master;include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions); SPIRAL_BUILD; NDEBUG</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions); SPIRAL_BUILD</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
@@ -113,7 +113,7 @@
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions); SPIRAL_BUILD; NDEBUG</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions); SPIRAL_BUILD</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
@@ -137,7 +137,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.176.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\stb\stb-master;include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions); SPIRAL_BUILD</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions); SPIRAL_BUILD; NDEBUG</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
@@ -162,7 +162,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>C:\VulkanSDK\1.2.176.1\Include;C:\dev\vendor\GLFW\glfw-3.3.2.bin.WIN64\include;C:\dev\vendor\glm;C:\dev\vendor\stb\stb-master;include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions); SPIRAL_BUILD</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions); SPIRAL_BUILD; NDEBUG</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.hpp</PrecompiledHeaderFile>
@@ -194,7 +194,9 @@
     <ClCompile Include="src\render\device.cpp" />
     <ClCompile Include="src\render\graphics_pipeline.cpp" />
     <ClCompile Include="src\render\memory.cpp" />
+    <ClCompile Include="src\render\pipeline.cpp" />
     <ClCompile Include="src\render\renderer.cpp" />
+    <ClCompile Include="src\render\resource.cpp" />
     <ClCompile Include="src\render\shader_library.cpp" />
     <ClCompile Include="src\render\swapchain.cpp" />
     <ClCompile Include="src\Tmp\Test.cpp" />
@@ -202,6 +204,7 @@
   <ItemGroup>
     <ClInclude Include="include\pch.hpp" />
     <ClInclude Include="include\spiral.hpp" />
+    <ClInclude Include="include\spiral\core\api.hpp" />
     <ClInclude Include="include\spiral\core\client.hpp" />
     <ClInclude Include="include\spiral\core\core.hpp" />
     <ClInclude Include="include\spiral\core\entry_point.hpp" />
@@ -211,17 +214,23 @@
     <ClInclude Include="include\spiral\core\window.hpp" />
     <ClInclude Include="include\spiral\core\event.hpp" />
     <ClInclude Include="include\spiral\core\layer.hpp" />
-    <ClInclude Include="include\spiral\debug\ANSI_utility.hpp" />
+    <ClInclude Include="include\spiral\debug\ansi_utility.hpp" />
+    <ClInclude Include="include\spiral\debug\api.hpp" />
     <ClInclude Include="include\spiral\debug\log.hpp" />
     <ClInclude Include="include\spiral\debug\log_internal.hpp" />
+    <ClInclude Include="include\spiral\parallel\api.hpp" />
     <ClInclude Include="include\spiral\parallel\result.hpp" />
     <ClInclude Include="include\spiral\parallel\task.hpp" />
     <ClInclude Include="include\spiral\parallel\thread_manager.hpp" />
+    <ClInclude Include="include\spiral\render\api.hpp" />
+    <ClInclude Include="include\spiral\render\data_layout.hpp" />
     <ClInclude Include="include\spiral\render\device.hpp" />
     <ClInclude Include="include\spiral\render\graphics_pipeline.hpp" />
     <ClInclude Include="include\spiral\render\instance.hpp" />
     <ClInclude Include="include\spiral\render\memory.hpp" />
+    <ClInclude Include="include\spiral\render\memory_reference.hpp" />
     <ClInclude Include="include\spiral\render\mesh.hpp" />
+    <ClInclude Include="include\spiral\render\pipeline.hpp" />
     <ClInclude Include="include\spiral\render\renderer.hpp" />
     <ClInclude Include="include\spiral\render\renderer_internal.hpp" />
     <ClInclude Include="include\spiral\render\render_core.hpp" />

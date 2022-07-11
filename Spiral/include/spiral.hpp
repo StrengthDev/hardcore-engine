@@ -1,8 +1,6 @@
 #pragma once
 
-#include <spiral/core/static_client.hpp>
-#include <spiral/core/layer.hpp>
-#include <spiral/core/window.hpp>
-#include <spiral/debug/log.hpp>
-#include <spiral/render/renderer.hpp>
-#include <spiral/parallel/task.hpp>
+#include <spiral/core/api.hpp>
+#include <spiral/debug/api.hpp>
+#include <spiral/render/api.hpp>
+#include <spiral/parallel/api.hpp>

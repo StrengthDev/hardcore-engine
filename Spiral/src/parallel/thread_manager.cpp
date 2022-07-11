@@ -20,11 +20,13 @@ namespace Spiral
 		task_queue immediate_tasks;
 		task_queue background_tasks;
 
-		std::uint32_t n_immediate_workers = 1;
+		typedef std::uint32_t thread_idx_t;
+
+		thread_idx_t n_immediate_workers = 1;
 		std::thread* immediate_workers;
 		task_queue* immediate_queues;
 
-		std::uint32_t n_background_workers = 1;
+		thread_idx_t n_background_workers = 1;
 		std::thread* background_workers;
 		task_queue* background_queues;
 
@@ -50,7 +52,7 @@ namespace Spiral
 				}
 			}
 
-			std::uint32_t i;
+			thread_idx_t i;
 			for (i = 0; i < n_immediate_workers; i++)
 			{
 				immediate_queues[i].close();
@@ -99,7 +101,7 @@ namespace Spiral
 			run_master.test_and_set();
 			task_master = std::thread(master);
 
-			std::uint32_t i;
+			thread_idx_t i;
 			immediate_workers = t_malloc<std::thread>(n_immediate_workers);
 			immediate_queues = t_malloc<task_queue>(n_immediate_workers);
 			for (i = 0; i < n_immediate_workers; i++)
@@ -125,7 +127,7 @@ namespace Spiral
 			task_signal_access.unlock();
 			task_master.join();
 
-			std::uint32_t i;
+			thread_idx_t i;
 			for (i = 0; i < n_immediate_workers; i++)
 			{
 				immediate_workers[i].join();

@@ -87,6 +87,14 @@ namespace Spiral
 				{
 					event_callback(Event::mouseScrolled(xoffset, yoffset));
 				});
+
+			glfwSetDropCallback(window, [](GLFWwindow* window, int count, const char** paths)
+				{
+					for (int i = 0; i < count; i++)
+					{
+						LOG_INTERNAL_DEBUG("Path dropped: " << paths[i]) //TODO: actual event
+					}
+				});
 		}
 
 		void terminate()

@@ -11,9 +11,11 @@
 #endif // SPIRAL_BUILD
 
 #ifdef NDEBUG
-#define DEBUG_BREAK __debugbreak();
-#else
 #define DEBUG_BREAK
+#define assertm(exp, msg)
+#else
+#define DEBUG_BREAK __debugbreak();
+#define assertm(exp, msg) assert(exp && msg)
 #endif // NDEBUG
 
 #else // _MSC_VER
@@ -35,6 +37,10 @@
 
 
 #define BIT(x) (1 << x)
+
+#define KILOBYTES(x) x * BIT(10)
+#define MEGABYTES(x) KILOBYTES(x) * BIT(10)
+#define GIGABYTES(x) MEGABYTES(x) * BIT(10)
 
 namespace Spiral
 {

@@ -4,7 +4,7 @@
 #include <spiral/core/client.hpp>
 #include <spiral/debug/log_internal.hpp>
 
-#ifndef NDEBUG
+#ifdef NDEBUG
 
 #ifdef _MSC_VER
 #pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup") //TODO: adapt to be platform independent

@@ -5,6 +5,8 @@
 #include <spiral/core/window_internal.hpp>
 #include <spiral/parallel/thread_manager.hpp>
 
+#include <spiral/render/renderer_internal.hpp>
+
 namespace Spiral
 {
 	program_id client::engine_id = {
@@ -51,13 +53,13 @@ namespace Spiral
 		event_start = 0;
 		event_end = 0;
 		
-		renderer = Renderer::init(engine_id, client_id);
+		renderer::init(engine_id, client_id);
 		parallel::launch_threads();
 	}
 
 	client::~client()
 	{
-		delete renderer;
+		renderer::terminate();
 		const index_t total = n_layers + n_overlays;
 		index_t i;
 		for (i = 1; i < total + 1; i++)
@@ -168,7 +170,7 @@ namespace Spiral
 			}
 
 			window::tick();
-			renderer->m_presentFrame();
+			renderer::tick();
 
 			if (window_size_changed)
 			{

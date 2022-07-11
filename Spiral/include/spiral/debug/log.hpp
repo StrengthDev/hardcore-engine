@@ -129,7 +129,7 @@ namespace Spiral
 	}
 }
 
-#ifndef NDEBUG
+#ifdef NDEBUG
 #define LOG_TRACE(message)
 #define LOG_DEBUG(message)
 #define LOG_INFO(message)

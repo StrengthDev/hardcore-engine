@@ -1,6 +1,6 @@
 #pragma once
 
-#include <vector>
+#include <array>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
@@ -9,18 +9,18 @@
 
 #include <spiral/core/core.hpp>
 
-const std::vector<const char*> validationLayers = {
+const std::array<const char*, 1> validation_layers = {
 	"VK_LAYER_KHRONOS_validation"
 };
 
-const std::vector<const char*> deviceExtensions = {
+const std::array<const char*, 1> device_extensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
 #ifndef NDEBUG
-const bool enableValidationLayers = false;
+const bool enable_validation_layers = false;
 #else
-const bool enableValidationLayers = true;
+const bool enable_validation_layers = true;
 #endif
 
-#define MAX_FRAMES_IN_FLIGHT 2
+const uint8_t max_frames_in_flight = 2;

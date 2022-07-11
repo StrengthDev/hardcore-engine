@@ -6,48 +6,72 @@
 
 namespace Spiral
 {
-	struct Device //TODO: SLI/crossfire support
+	class device //TODO: SLI/crossfire support
 	{
-		VkSurfaceKHR surfaceHandle;
-		VkPhysicalDevice physicalHandle;
+	public:
+		device(VkPhysicalDevice physical, VkSurfaceKHR surface);
+		device() = default;
+		~device();
+
+		bool create_swapchain();
+		bool recreate_swapchain();
+
+		inline device_memory& get_memory() { return memory; }
+
+		void loadMesh(Mesh mesh, uint32_t vertexShaderId, uint32_t fragShaderId);
+		bool draw();
+
+	private:
+		VkSurfaceKHR surface;
+		VkPhysicalDevice physical_handle;
 		VkPhysicalDeviceProperties properties;
 		VkPhysicalDeviceFeatures features;
 		VkDevice handle;
-		bool hasHandle;
-		uint32_t score; //TODO: calculate score
+		bool has_handle = false;
+		uint32_t score = 0; //TODO: calculate score
 
+		typedef uint32_t queue_idx_t;
+		const queue_idx_t invalid_queue_idx = std::numeric_limits<queue_idx_t>::max();
 
 		//Queue families
-		int64_t graphicsIndex;
-		VkQueue graphicsQueue;
+		queue_idx_t graphicsIndex = invalid_queue_idx;
+		VkQueue graphicsQueue = VK_NULL_HANDLE; //dedicated to graphics operations, graphics related compute operations and device->device transfers
 
-		int64_t presentIndex;
-		VkQueue presentQueue;
+		queue_idx_t presentIndex = invalid_queue_idx;
+		VkQueue presentQueue = VK_NULL_HANDLE; //ideally the same as graphics queue
 
-		int64_t computeIndex;
-		VkQueue computeQueue;
+		queue_idx_t computeIndex = invalid_queue_idx;
+		VkQueue computeQueue = VK_NULL_HANDLE; //dedicated to compute operations unrelated to graphics
 
+		queue_idx_t transfer_idx = invalid_queue_idx;
+		VkQueue transfer_queue = VK_NULL_HANDLE; //dedicated to host->device transfers and vice versa
 
-		//Rendering pipeline
-		size_t currentFrame;
-		VkSemaphore imageAvailableSemaphores[MAX_FRAMES_IN_FLIGHT];
-		VkSemaphore renderFinishedSemaphores[MAX_FRAMES_IN_FLIGHT];
-		VkFence inFlightFences[MAX_FRAMES_IN_FLIGHT];
+		device_memory memory;
 
-		Swapchain swapchain;
-		bool hasSwapchain;
+		typedef uint16_t index_t;
 
-		GraphicsPipeline gPipeline;
-		VkCommandPool gCommandPool;
+		//Frame data
+		index_t current_frame = 0;
+		VkSemaphore image_available_semaphores[max_frames_in_flight] = {};
+		VkSemaphore render_finished_semaphores[max_frames_in_flight] = {};
+		VkFence frame_fences[max_frames_in_flight] = {};
 
+		bool has_swapchain = false;
+		swapchain main_swapchain;
+		VkRenderPass render_pass = VK_NULL_HANDLE;
+		VkFramebuffer* framebuffers = nullptr;
 
-		void init(VkPhysicalDevice physical, VkSurfaceKHR surface);
-		void terminate();
+		VkCommandPool* graphics_command_pools = nullptr;
+		index_t n_graphics_command_pools;
 
-		bool createSwapchain();
-		bool recreateSwapchain();
+		VkCommandBuffer* graphics_command_buffers = nullptr;
 
-		void loadMesh(Mesh mesh, uint32_t vertexShaderId, uint32_t fragShaderId);
-		bool drawFrame();
+		index_t n_graphics_pipelines = 0;
+		graphics_pipeline* graphics_pipelines = nullptr;
+
+		void record_secondary_graphics(index_t buffer_idx, uint32_t image_index);
+
+		friend device_memory;
+		friend swapchain;
 	};
 }

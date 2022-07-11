@@ -6,7 +6,7 @@
 
 namespace Spiral
 {
-	namespace parallel
+	namespace parallel //TODO: scrap results, use std::future/std::promise
 	{
 		SPIRAL_API void submit_immediate_task(std::function<void()> task);
 
