@@ -1,84 +1,36 @@
 #include <pch.hpp>
 
 #include <spiral/render/shader_library.hpp>
-#include <spiral/render/shader.hpp>
 
-Spiral::Shader* shaders;
-uint32_t nShaders;
-uint32_t capacity;
+std::unordered_map<std::string, Spiral::shader> shaders;
 
 namespace Spiral
 {
-	void ShaderLibrary::init()
+	/*
+	void shader_library::init()
+	{ }
+
+	void shader_library::terminate()
 	{
-		capacity = INITIAL_NUM_SHADERS;
-		shaders = (Shader*)malloc(sizeof(Shader) * capacity);
-		nShaders = 0;
+		shaders.clear();
+	}
+	*/
+
+	const shader& shader_library::add(shader&& s)
+	{
+		const char* name = s.get_name();
+		shaders[name] = std::move(s);
+		return shaders[name];
 	}
 
-	void ShaderLibrary::terminate()
+	const shader& shader_library::get(const char* name)
 	{
-		for (uint32_t i = 0; i < nShaders; i++)
-		{
-			free(shaders[i].source);
-		}
-		free(shaders);
+		return shaders.at(name);
 	}
 
-	uint32_t ShaderLibrary::add(Shader s)
+	bool shader_library::has(const char* name)
 	{
-		if (capacity < nShaders + 1)
-		{
-			uint32_t i;
-			capacity += INCREASE_STEP;
-			Shader* temp = (Shader*)malloc(sizeof(Shader) * capacity);
-			for (i = 0; i < nShaders; i++)
-			{
-				temp[i] = shaders[i];
-			}
-			free(shaders);
-			shaders = temp;
-		}
-		shaders[nShaders] = s;
-		nShaders++;
-		return nShaders - 1;
-	}
-
-	Shader& ShaderLibrary::get(int i)
-	{
-		return shaders[i];
-	}
-
-	uint32_t ShaderLibrary::load(const char* filename, ShaderType type)
-	{
-		//TODO: this assumes the file is in SPIR-V format, need to handle uncompiled case
-		std::ifstream file(filename, std::ios::ate | std::ios::binary);
-		if (!file.is_open())
-		{
-			DEBUG_BREAK;
-			return 0xFFFFFFFF;
-		}
-		Shader shader = {};
-		size_t filesize = (size_t)file.tellg();
-		char* t = (char*)malloc(filesize);
-		file.seekg(0);
-		file.read(t, filesize);
-		file.close();
-		shader.source = (uint32_t*)t;
-		shader.size = filesize;
-		switch (type)
-		{
-		case ShaderType::Vertex:
-			shader.type = VK_SHADER_STAGE_VERTEX_BIT;
-			LOGF_INTERNAL_DEBUG("Vertex shader loaded (ID-{0} SIZE: {1})", nShaders, filesize);
-			break;
-		case ShaderType::Fragment:
-			shader.type = VK_SHADER_STAGE_FRAGMENT_BIT;
-			LOGF_INTERNAL_DEBUG("Fragment shader loaded (ID-{0} SIZE: {1})", nShaders, filesize);
-			break;
-		}
-		spirv_cross::Compiler comp(shader.source, shader.size / sizeof(uint32_t));
-		shader.resources = comp.get_shader_resources();
-		return add(shader);
+		//C++20 has map::contains, could consider upgrading (TODO)
+		return shaders.find(name) == shaders.end();
 	}
 }

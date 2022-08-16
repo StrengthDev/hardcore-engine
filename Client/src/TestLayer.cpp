@@ -8,8 +8,8 @@ TestLayer::TestLayer()
 	timec = 0;
 	framec = 0;
 
-	uint32_t vi = Spiral::ShaderLibrary::load("resources/shaders/vert.spv", Spiral::ShaderType::Vertex);
-	uint32_t fi = Spiral::ShaderLibrary::load("resources/shaders/frag.spv", Spiral::ShaderType::Fragment);
+	Spiral::shader_library::add(Spiral::shader("resources/shaders/shader.vert.spv", "main"));
+	Spiral::shader_library::add(Spiral::shader("resources/shaders/shader.frag.spv", "main"));
 
 	Spiral::Mesh mesh = {};
 	mesh.vertices = verts;

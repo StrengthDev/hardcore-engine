@@ -2,7 +2,7 @@
 
 namespace Spiral
 {
-	class memory_reference
+	class SPIRAL_API memory_reference
 	{
 	public:
 		memory_reference() = default;

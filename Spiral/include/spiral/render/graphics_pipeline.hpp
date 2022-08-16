@@ -14,7 +14,7 @@ namespace Spiral
 	{
 	public:
 		graphics_pipeline(device* owner, VkDevice logicalHandle, swapchain& swapchain, VkRenderPass& renderPass, 
-			VkCommandPool commandPool, const Shader* shaders, uint16_t nShaders,
+			VkCommandPool commandPool, const shader*& shaders, uint16_t nShaders,
 			const data_layout vertex_layout, const data_layout object_layout, const data_layout global_layout);
 		~graphics_pipeline();
 

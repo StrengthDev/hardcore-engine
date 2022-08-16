@@ -18,7 +18,6 @@ namespace Spiral
 
 		inline device_memory& get_memory() { return memory; }
 
-		void loadMesh(Mesh mesh, uint32_t vertexShaderId, uint32_t fragShaderId);
 		bool draw();
 
 	private:

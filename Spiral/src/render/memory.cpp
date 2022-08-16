@@ -294,21 +294,15 @@ namespace Spiral
 
 		for (i = 1; i < pool.n_slots; i++)
 		{
-			pool.slots[0].in_use = false;
-			pool.slots[0].offset = buffer_pool_size;
-			pool.slots[0].size = 0;
+			pool.slots[i].in_use = false;
+			pool.slots[i].offset = buffer_pool_size;
+			pool.slots[i].size = 0;
 		}
 
 		pool.pending_copies = t_malloc<VkBufferCopy>(initial_pool_slot_size * max_frames_in_flight);
 		pool.pending_copy_capacity = initial_pool_slot_size;
 		for (i = 0; i < max_frames_in_flight; i++)
 			pool.pending_copy_counts[i] = 0;
-	}
-
-	device_memory::~device_memory()
-	{
-		if (owner)
-			terminate();
 	}
 
 	void device_memory::init(device& owner)
@@ -356,6 +350,7 @@ namespace Spiral
 			DEBUG_BREAK;
 		}
 
+		n_pools = 1;
 		pools = t_malloc<memory_pool>(1);
 		init_pool_data(pools[0]);
 
@@ -402,6 +397,7 @@ namespace Spiral
 		for (i = 0; i < n_pools; i++)
 		{
 			std::free(pools[i].slots);
+			std::free(pools[i].pending_copies);
 			vkDestroyBuffer(owner->handle, pools[i].buffer, nullptr);
 			vkFreeMemory(owner->handle, pools[i].memory, nullptr);
 		}
@@ -605,9 +601,9 @@ namespace Spiral
 		memory.offset += size;
 		pool.pending_copy_counts[current_frame]++;
 	}
-
+	//TODO: change refs to pointers
 	template<VkBufferUsageFlags BFlags, VkMemoryPropertyFlags MFlags>
-	inline void device_memory::alloc_slot(memory_pool* pools, const std::uint32_t& n_pools,
+	inline void device_memory::alloc_slot(memory_pool* pools, std::uint32_t& n_pools,
 		std::uint32_t& pool_idx, std::uint32_t& slot_idx, const VkDeviceSize size)
 	{
 		std::uint32_t selected_pool_idx = std::numeric_limits<std::uint32_t>::max();

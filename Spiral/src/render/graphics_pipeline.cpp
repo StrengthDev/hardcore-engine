@@ -43,11 +43,10 @@ namespace Spiral
 	class data_layout_internal : data_layout
 	{
 	public:
-		data_layout_internal() = delete;
+		data_layout_internal() = delete; //TODO delete this and add accessors, why wouldnt users be able to check the types???
 
 		friend VkFormat to_vk_format(const data_layout::value&);
-		friend void get_vertex_inputs(const data_layout&,
-			std::uint32_t*, VkVertexInputBindingDescription**, std::uint32_t*, VkVertexInputAttributeDescription**);
+		friend VkPipelineVertexInputStateCreateInfo get_vertex_inputs(const data_layout*, std::uint32_t);
 	};
 
 #define CASE(cond, form) case data_layout::component_type::cond: format = form; break;
@@ -75,6 +74,9 @@ namespace Spiral
 			}
 			break;
 		case data_layout::type::VEC2:
+		case data_layout::type::MAT2:
+		case data_layout::type::MAT3x2:
+		case data_layout::type::MAT4x2:
 			switch (type.ct)
 			{
 				CASE(FLOAT16, VK_FORMAT_R16G16_SFLOAT);
@@ -93,6 +95,9 @@ namespace Spiral
 			}
 			break;
 		case data_layout::type::VEC3:
+		case data_layout::type::MAT2x3:
+		case data_layout::type::MAT3:
+		case data_layout::type::MAT4x3:
 			switch (type.ct)
 			{
 				CASE(FLOAT16, VK_FORMAT_R16G16B16_SFLOAT);
@@ -111,6 +116,9 @@ namespace Spiral
 			}
 			break;
 		case data_layout::type::VEC4:
+		case data_layout::type::MAT2x4:
+		case data_layout::type::MAT3x4:
+		case data_layout::type::MAT4:
 			switch (type.ct)
 			{
 				CASE(FLOAT16, VK_FORMAT_R16G16B16A16_SFLOAT);
@@ -128,9 +136,6 @@ namespace Spiral
 				break;
 			}
 			break;
-		case data_layout::type::MAT2://TODO
-		case data_layout::type::MAT3://TODO
-		case data_layout::type::MAT4://TODO
 		default:
 			break;
 		}
@@ -138,38 +143,79 @@ namespace Spiral
 	}
 #undef CASE
 
-	inline void get_vertex_inputs(const data_layout& vertex_layout, 
-		std::uint32_t* out_binding_count, VkVertexInputBindingDescription** out_bindings,
-		std::uint32_t* out_attribute_description_count, VkVertexInputAttributeDescription** out_descriptions)
+	inline VkPipelineVertexInputStateCreateInfo get_vertex_inputs(const data_layout* vertex_layouts, std::uint32_t n_layouts)
 	{
-		const std::uint32_t binding_count = 1;
-		*out_binding_count = binding_count;
-		*out_bindings = t_malloc<VkVertexInputBindingDescription>(binding_count);
-		(**out_bindings).binding = 0;
-		(**out_bindings).stride = vertex_layout.size();
-		(**out_bindings).inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		VkPipelineVertexInputStateCreateInfo vertex_input_info = {};
+		vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
-		const std::uint32_t attribute_description_count = vertex_layout.count();
-		*out_attribute_description_count = attribute_description_count;
-		*out_descriptions = t_malloc<VkVertexInputAttributeDescription>(attribute_description_count);
-		std::uint32_t offset = 0;
-		const data_layout_internal& layout = reinterpret_cast<const data_layout_internal&>(vertex_layout);
-		for (std::uint32_t i = 0; i < attribute_description_count; i++)
+		vertex_input_info.vertexBindingDescriptionCount = n_layouts;
+		VkVertexInputBindingDescription* binding_descriptions = t_malloc<VkVertexInputBindingDescription>(n_layouts);
+		for (std::uint32_t i = 0; i < n_layouts; i++)
 		{
-			(*out_descriptions)[i].binding = 0;
-			(*out_descriptions)[i].location = i;
-
-			const VkFormat format = to_vk_format(layout[i]);
-			assertm(format != VK_FORMAT_UNDEFINED, "Invalid type.");
-			(*out_descriptions)[i].format = format;
-
-			(*out_descriptions)[i].offset = offset;
-			offset += layout[i].size();
+			VkVertexInputBindingDescription desc = {};
+			binding_descriptions[i].binding = 0;
+			binding_descriptions[i].stride = vertex_layouts[i].size();
+			binding_descriptions[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 		}
+		vertex_input_info.pVertexBindingDescriptions = binding_descriptions;
+
+		std::uint32_t attribute_description_count = 0;
+		for (std::uint32_t i = 0; i < n_layouts; i++) attribute_description_count += vertex_layouts[i].vector_count();
+		vertex_input_info.vertexAttributeDescriptionCount = attribute_description_count;
+		VkVertexInputAttributeDescription* attribute_descriptions = 
+			t_malloc<VkVertexInputAttributeDescription>(attribute_description_count);
+
+		std::uint32_t c = 0;
+		for (std::uint32_t i = 0; i < n_layouts; i++)
+		{
+			std::uint32_t offset = 0;
+			const data_layout_internal& layouts = reinterpret_cast<const data_layout_internal&>(vertex_layouts[i]);
+			for (std::uint32_t k = 0; k < vertex_layouts[i].vector_count(); k++)
+			{
+				std::uint32_t iterations; //matrix inputs are passed as several vectors
+				switch (layouts[k].t)
+				{
+				case data_layout::type::MAT2:
+				case data_layout::type::MAT2x3:
+				case data_layout::type::MAT2x4:
+					iterations = 2;
+					break;
+				case data_layout::type::MAT3:
+				case data_layout::type::MAT3x2:
+				case data_layout::type::MAT3x4:
+					iterations = 3;
+					break;
+				case data_layout::type::MAT4:
+				case data_layout::type::MAT4x2:
+				case data_layout::type::MAT4x3:
+					iterations = 4;
+					break;
+				default:
+					iterations = 1;
+					break;
+				}
+
+				const VkFormat format = to_vk_format(layouts[k]);
+				INTERNAL_ASSERT(format != VK_FORMAT_UNDEFINED, "Invalid type.");
+				for (std::uint32_t j = 0; j < iterations; j++)
+				{
+					attribute_descriptions[c].binding = i;
+					attribute_descriptions[c].location = k + j;
+					attribute_descriptions[c].format = format;
+					attribute_descriptions[c].offset = offset;
+
+					offset += layouts[k].size() / iterations;
+					c++;
+				}
+			}
+		}
+		vertex_input_info.pVertexAttributeDescriptions = attribute_descriptions;
+
+		return vertex_input_info;
 	}
 
 	graphics_pipeline::graphics_pipeline(device* owner, VkDevice logicalHandle, swapchain& target, VkRenderPass& renderPass,
-		VkCommandPool commandPool, const Shader* shaders, uint16_t nShaders, 
+		VkCommandPool commandPool, const shader*& shaders, uint16_t nShaders, 
 		const data_layout vertex_layout, const data_layout object_layout, const data_layout global_layout)
 		: owner(owner), logicalHandle(logicalHandle), target(target), vertex_layout(vertex_layout), object_layout(object_layout), global_layout(global_layout)
 	{
@@ -212,19 +258,8 @@ namespace Spiral
 			vkDestroyDescriptorSetLayout(logicalHandle, descriptorSetLayout, nullptr);
 			return;
 		}
-		std::uint32_t binding_count, attribute_description_count;
-		VkVertexInputBindingDescription* bindings;
-		VkVertexInputAttributeDescription* attribute_descriptions;
-		get_vertex_inputs(vertex_layout, &binding_count, &bindings, &attribute_description_count, &attribute_descriptions);
-		//VkVertexInputBindingDescription bindingDescription = Vertex::getBindingDescription();
-		//std::array<VkVertexInputAttributeDescription, 1> attributeDescriptions = Vertex::getAttributeDescriptions(); //TODO: take array out
 
-		VkPipelineVertexInputStateCreateInfo vertex_input_info = {};
-		vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		vertex_input_info.vertexBindingDescriptionCount = binding_count;
-		vertex_input_info.pVertexBindingDescriptions = bindings;
-		vertex_input_info.vertexAttributeDescriptionCount = attribute_description_count;
-		vertex_input_info.pVertexAttributeDescriptions = attribute_descriptions;
+		VkPipelineVertexInputStateCreateInfo vertex_input_info = get_vertex_inputs(&vertex_layout, 1);
 
 		VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
 		inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -323,28 +358,12 @@ namespace Spiral
 			return;
 		}
 
-		//TODO: free this
-		VkShaderModule* modules = (VkShaderModule*)malloc(sizeof(VkShaderModule) * nShaders);
-		VkPipelineShaderStageCreateInfo* shaderStages = (VkPipelineShaderStageCreateInfo*)calloc(nShaders, sizeof(VkPipelineShaderStageCreateInfo));
+		VkPipelineShaderStageCreateInfo* shaderStages = t_calloc<VkPipelineShaderStageCreateInfo>(nShaders);
 		for (i = 0; i < nShaders; i++)
 		{
-			VkShaderModuleCreateInfo createInfo = {};
-			createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-			createInfo.codeSize = shaders[i].size;
-			createInfo.pCode = shaders[i].source;
-
-			if (vkCreateShaderModule(logicalHandle, &createInfo, nullptr, &modules[i]) != VK_SUCCESS)
-			{
-				//TODO: stuff
-				DEBUG_BREAK;
-				valid = false;
-				return;
-			}
-
 			shaderStages[i].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			shaderStages[i].stage = shaders[i].type;
-			shaderStages[i].module = modules[i];
-			shaderStages[i].pName = "main";
+			shaderStages[i].module = internal_shader::create_shader_module(shaders[i], logicalHandle, &shaderStages[i].stage, 
+				&shaderStages[i].pName);
 		}
 
 		VkGraphicsPipelineCreateInfo pipelineInfo = {};
@@ -379,13 +398,15 @@ namespace Spiral
 			return;
 		}
 
-		std::free(bindings);
-		std::free(attribute_descriptions);
-
 		for (i = 0; i < nShaders; i++)
 		{
-			vkDestroyShaderModule(logicalHandle, modules[i], nullptr);
+			vkDestroyShaderModule(logicalHandle, shaderStages[i].module, nullptr);
+			std::free(const_cast<char*>(shaderStages[i].pName)); //a bit messy, but shouldn't cause issues
 		}
+
+		std::free(shaderStages);
+		std::free(const_cast<VkVertexInputBindingDescription*>(vertex_input_info.pVertexBindingDescriptions)); //a bit messy, but shouldn't cause issues
+		std::free(const_cast<VkVertexInputAttributeDescription*>(vertex_input_info.pVertexAttributeDescriptions)); //a bit messy, but shouldn't cause issues
 		/*
 		VkDescriptorPoolSize poolSize = {};
 		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -499,7 +520,7 @@ namespace Spiral
 					vkCmdBindIndexBuffer(buffer, VK_NULL_HANDLE, target.i_offset, VK_INDEX_TYPE_UINT32); //TODO
 					break;
 				default:
-					assertm(false, "Index format not implemented.");
+					INTERNAL_ASSERT(false, "Index format not implemented.");
 					break;
 				}
 				vkCmdDrawIndexed(buffer, target.count, target.n_instances, 0, 0, 0);

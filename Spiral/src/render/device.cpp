@@ -277,15 +277,6 @@ namespace Spiral
 		return true;
 	}
 
-	void device::loadMesh(Mesh mesh, uint32_t vertexShaderId, uint32_t fragShaderId)
-	{
-		Shader shaders[2];
-		shaders[0] = ShaderLibrary::get(vertexShaderId);
-		shaders[1] = ShaderLibrary::get(fragShaderId);
-		//graphics_pipelines.init(handle, target, command_pool, shaders, 2);
-		//graphics_pipelines.loadMesh(mesh);
-	}
-
 	void device::record_secondary_graphics(index_t buffer_idx, uint32_t image_index)
 	{
 		if (vkResetCommandBuffer(graphics_command_buffers[buffer_idx], 0) != VK_SUCCESS)
@@ -381,7 +372,7 @@ namespace Spiral
 		}
 		for (i = 0; i < n_graphics_command_pools - 1; i++)
 		{
-			//wait for thread i to finish recording
+			//TODO: wait for thread i to finish recording
 			vkCmdExecuteCommands(graphics_command_buffers[current_frame], 1, &graphics_command_buffers[(i + 1) * max_frames_in_flight + current_frame]);
 		}
 		vkCmdEndRenderPass(graphics_command_buffers[current_frame]);

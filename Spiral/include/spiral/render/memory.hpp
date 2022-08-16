@@ -26,7 +26,7 @@ namespace Spiral
 	{
 		VkDeviceMemory device;
 		VkBuffer buffer;
-		void* host;
+		void* host = nullptr;
 		VkSemaphore semaphore;
 		VkFence fence;
 		bool ready;
@@ -37,11 +37,11 @@ namespace Spiral
 	{
 		VkDeviceMemory memory;
 		VkBuffer buffer;
-		memory_slot* slots;
+		memory_slot* slots = nullptr;
 		std::uint32_t n_slots;
-		std::uint32_t capacity;
+		std::uint32_t capacity; //TODO: remove
 		std::uint32_t largest_free_slot;
-		VkBufferCopy* pending_copies;
+		VkBufferCopy* pending_copies = nullptr;
 		std::uint32_t pending_copy_counts[max_frames_in_flight];
 		std::uint32_t pending_copy_capacity;
 	};
@@ -83,8 +83,6 @@ namespace Spiral
 	class device_memory
 	{
 	public:
-		~device_memory();
-
 		void init(device& owner);
 		void terminate();
 
@@ -112,7 +110,7 @@ namespace Spiral
 		void alloc_buffer(VkDeviceMemory& memory, VkBuffer& buffer, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties);
 
 		template<VkBufferUsageFlags BFlags, VkMemoryPropertyFlags MFlags>
-		void alloc_slot(memory_pool* pools, const std::uint32_t& n_pools,
+		void alloc_slot(memory_pool* pools, std::uint32_t& n_pools,
 			std::uint32_t& pool_idx, std::uint32_t& slot_idx, const VkDeviceSize size);
 
 		device* owner = nullptr;
@@ -127,7 +125,7 @@ namespace Spiral
 		transfer_memory device_out[max_frames_in_flight];
 
 	public:
-		std::uint32_t n_pools = 1;
-		memory_pool* pools;
+		std::uint32_t n_pools;
+		memory_pool* pools = nullptr;
 	};
 }

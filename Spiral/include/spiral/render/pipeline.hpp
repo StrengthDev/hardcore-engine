@@ -4,6 +4,20 @@
 
 namespace Spiral
 {
+	enum class pipeline_t : std::uint8_t
+	{
+		RENDER = 0,
+		PIXEL,
+		COMPUTE
+	};
+
+	enum class pipeline_s : std::uint8_t
+	{
+		DISABLED = 0,
+		ACTIVE,
+		PASSIVE
+	};
+
 	class SPIRAL_API pipeline
 	{
 	public:
@@ -14,7 +28,16 @@ namespace Spiral
 
 		~pipeline();
 
+		inline bool valid() const
+		{
+			return id != std::numeric_limits<std::uint32_t>::max();
+		}
+
 	private:
-		bool valid = false;
+		std::uint32_t id = std::numeric_limits<std::uint32_t>::max();
+		pipeline_s status = pipeline_s::DISABLED;
+
+	public:
+		const pipeline_t type;
 	};
 }

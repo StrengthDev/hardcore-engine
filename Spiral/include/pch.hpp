@@ -14,6 +14,8 @@
 #include <atomic>
 #include <limits>
 #include <bitset>
+#include <map>
+#include <string>
 
 
 #include "spiral/debug/log_internal.hpp"

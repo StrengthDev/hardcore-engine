@@ -3,7 +3,6 @@
 #include <spiral/render/renderer.hpp>
 #include <spiral/render/renderer_internal.hpp>
 #include <spiral/render/render_core.hpp>
-#include <spiral/render/shader_library.hpp>
 
 #include <spiral/core/static_client.hpp>
 #include <spiral/core/window_internal.hpp>
@@ -210,7 +209,7 @@ namespace Spiral
 				shutdown();
 				return;
 			}
-			ShaderLibrary::init();
+			//shader_library::init();
 		}
 
 		void terminate()
@@ -228,7 +227,7 @@ namespace Spiral
 
 			vkDestroySurfaceKHR(instance, surface, nullptr);
 			vkDestroyInstance(instance, nullptr);
-			ShaderLibrary::terminate();
+			//shader_library::terminate();
 		}
 
 		void tick()
@@ -239,11 +238,6 @@ namespace Spiral
 		device& get_device()
 		{
 			return available_devices[present_device_idx];
-		}
-
-		void loadMesh(Mesh mesh, uint32_t vertexShaderId, uint32_t fragShaderId)
-		{
-			available_devices[present_device_idx].loadMesh(mesh, vertexShaderId, fragShaderId);
 		}
 	}
 }

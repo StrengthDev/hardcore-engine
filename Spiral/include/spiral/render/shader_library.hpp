@@ -1,19 +1,16 @@
 #pragma once
 
-#include "render_core.hpp"
-#include "shader_internal.hpp"
-
-#define INITIAL_NUM_SHADERS 10
-#define INCREASE_STEP 10
+#include "shader.hpp"
 
 namespace Spiral
 {
-	namespace ShaderLibrary
+	namespace shader_library
 	{
-		void init();
-		void terminate();
+		//void init();
+		//void terminate();
 
-		uint32_t add(Shader s);
-		Shader& get(int i);
+		SPIRAL_API const shader& add(shader&& s);
+		SPIRAL_API const shader& get(const char* name);
+		SPIRAL_API bool has(const char* name);
 	};
 }

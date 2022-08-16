@@ -1,7 +1,5 @@
 #pragma once
 
-#include <memory>
-
 #ifdef _MSC_VER
 
 #ifdef SPIRAL_BUILD
@@ -12,10 +10,11 @@
 
 #ifdef NDEBUG
 #define DEBUG_BREAK
-#define assertm(exp, msg)
+#define INTERNAL_ASSERT(exp, msg)
 #else
+#include <cassert>
 #define DEBUG_BREAK __debugbreak();
-#define assertm(exp, msg) assert(exp && msg)
+#define INTERNAL_ASSERT(exp, msg) assert(exp && msg)
 #endif // NDEBUG
 
 #else // _MSC_VER
@@ -28,13 +27,18 @@
 
 #ifdef NDEBUG
 #define DEBUG_BREAK //TODO: debug break for other platforms
+#define INTERNAL_ASSERT(exp, msg)
 #else
+#include <cassert>
 #define DEBUG_BREAK
+#define INTERNAL_ASSERT(exp, msg)
 #endif // NDEBUG
 
 #endif 
 
 
+
+#include <memory>
 
 #define BIT(x) (1 << x)
 

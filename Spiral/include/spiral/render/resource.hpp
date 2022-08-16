@@ -24,8 +24,6 @@ namespace Spiral
 
 		//inline void bind(memory_reference&& ref) { ref = std::move(ref); }
 
-		typedef size_t std::size_t;
-
 		memory_reference ref;
 	};
 
@@ -41,44 +39,44 @@ namespace Spiral
 		};
 
 		object_resource() = default;
-		object_resource(const void* data, const size_t size, const size_t offset, const bool vertex_data_first,
+		object_resource(const void* data, const std::size_t size, const std::size_t offset, const bool vertex_data_first,
 			const index_format index_type, const data_layout& layout);
-		object_resource(const void* vertex_data, const size_t vertex_data_size, const void* index_data,
-			const size_t index_data_size, const index_format index_type, const data_layout& layout);
-		object_resource(const void* vertex_data, const size_t vertex_data_size, const data_layout& layout);
+		object_resource(const void* vertex_data, const std::size_t vertex_data_size, const void* index_data,
+			const std::size_t index_data_size, const index_format index_type, const data_layout& layout);
+		object_resource(const void* vertex_data, const std::size_t vertex_data_size, const data_layout& layout);
 
-		object_resource(const size_t vertex_data_size, const size_t index_data_size, 
+		object_resource(const std::size_t vertex_data_size, const std::size_t index_data_size,
 			const index_format index_type, const data_layout& layout);
-		object_resource(const size_t vertex_data_size, const data_layout& layout);
+		object_resource(const std::size_t vertex_data_size, const data_layout& layout);
 
 		template<typename... Types>
-		static inline object_resource create(void* data, size_t size, size_t offset, bool vertex_data_first, index_format index_type)
+		static inline object_resource create(void* data, std::size_t size, std::size_t offset, bool vertex_data_first, index_format index_type)
 		{
 			return object_resource(data, size, offset, vertex_data_first, index_type, data_layout::create<Types...>());
 		}
 
 		template<typename... Types>
-		static inline object_resource create(const void* vertex_data, const size_t vertex_data_size,
-			const void* index_data, const size_t index_data_size, const index_format index_type)
+		static inline object_resource create(const void* vertex_data, const std::size_t vertex_data_size,
+			const void* index_data, const std::size_t index_data_size, const index_format index_type)
 		{
 			return object_resource(vertex_data, vertex_data_size, index_data, index_data_size, index_type, data_layout::create<Types...>());
 		}
 
 		template<typename... Types>
-		static inline object_resource create(const void* vertex_data, const size_t vertex_data_size)
+		static inline object_resource create(const void* vertex_data, const std::size_t vertex_data_size)
 		{
 			return object_resource(vertex_data, vertex_data_size, data_layout::create<Types...>());
 		}
 
 		template<typename... Types>
-		static inline object_resource create(const size_t vertex_data_size, const size_t index_data_size, 
+		static inline object_resource create(const std::size_t vertex_data_size, const std::size_t index_data_size,
 			const index_format index_type)
 		{
 			return object_resource(vertex_data_size, index_data_size, index_type, data_layout::create<Types...>());
 		}
 
 		template<typename... Types>
-		static inline object_resource create(const size_t vertex_data_size)
+		static inline object_resource create(const std::size_t vertex_data_size)
 		{
 			return object_resource(vertex_data_size, data_layout::create<Types...>());
 		}
