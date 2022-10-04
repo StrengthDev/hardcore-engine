@@ -8,7 +8,6 @@ class ExampleClient : public Spiral::client
 public:
 	ExampleClient() : client("Spiral Application", 1, 0, 0)
 	{
-		//TODO: this is stupid, change to loose functions instead of class static methods
 		Spiral::window::set_title("Chad Engine");
 
 		const char* files[2] =
@@ -23,7 +22,6 @@ public:
 		Spiral::window::set_icon(files, 2);
 		push_layer(new TestLayer());
 		push_layer(new ELLayer());
-		//setProperties("Debug Program", 1, 0, 0);
 		//LOG_TRACE("trace")
 		//LOG_DEBUG("debug")
 		//LOG_INFO("information")

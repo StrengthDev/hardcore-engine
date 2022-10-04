@@ -16,7 +16,7 @@ const std::array<const char*, 1> device_extensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
-#ifndef NDEBUG
+#ifdef NDEBUG
 const bool enable_validation_layers = false;
 #else
 const bool enable_validation_layers = true;

@@ -29,11 +29,13 @@
 #define ENABLE_MEM_CHECKING
 #else
 #endif // _MSC_VER
+#define END 
 
 #else
 
 #ifdef _MSC_VER
 #define ENABLE_MEM_CHECKING _CrtSetDbgFlag(_CrtSetDbgFlag(_CRTDBG_REPORT_FLAG) | _CRTDBG_ALLOC_MEM_DF | _CRTDBG_CHECK_ALWAYS_DF)
+#define END system("pause")
 #else
 #endif // _MSC_VER
 
@@ -50,6 +52,8 @@ int main(int argc, char** argv)
 	client->run();
 	delete client;
 	Spiral::log::shutdown();
+	END;
 }
 
 #undef ENABLE_MEM_CHECKING
+#undef END

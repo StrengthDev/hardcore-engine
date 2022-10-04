@@ -7,7 +7,6 @@ inline void set_type_s<t1>(std::uint8_t index) noexcept			\
 	set_type(index, t2, t3);									\
 }
 
-
 namespace Spiral
 {
 	class SPIRAL_API data_layout
@@ -45,7 +44,8 @@ namespace Spiral
 			UINT64
 		};
 
-		data_layout() = delete;
+		//empty layout constructor
+		data_layout() = default;
 
 		data_layout(std::uint8_t reserve) : n_values(reserve)
 		{
@@ -54,6 +54,7 @@ namespace Spiral
 
 		inline void set_type(std::uint8_t index, type t, component_type ct) noexcept
 		{
+			INTERNAL_ASSERT(index < n_values, "Index out of bounds");
 			values[index] = { t, ct };
 		}
 
@@ -74,12 +75,21 @@ namespace Spiral
 		SET_TYPE_S(std::uint64_t, type::SCALAR, component_type::UINT64)
 		SET_TYPE_S(float, type::SCALAR, component_type::FLOAT32)
 		SET_TYPE_S(double, type::SCALAR, component_type::FLOAT64)
+/*
+#if __has_include("glm/glm.hpp")
+#include "glm/glm.hpp"
 
+		SET_TYPE_S(glm::vec2, type::VEC2, component_type::FLOAT32)
+		SET_TYPE_S(glm::vec3, type::VEC3, component_type::FLOAT32)
+		SET_TYPE_S(glm::vec4, type::VEC4, component_type::FLOAT32)
+
+#endif // using glm
+*/
 		template<typename Type, typename... Types, std::uint8_t Index = 0>
 		inline void set_types_s()
 		{
 			set_type_s<Type>(Index);
-			if constexpr (!sizeof...(Types))
+			if constexpr (sizeof...(Types))
 			{
 				set_types_s<Types..., Index + 1>();
 			}
@@ -98,7 +108,7 @@ namespace Spiral
 
 		data_layout(const data_layout& other) : n_values(other.n_values), values(t_malloc<value>(other.n_values))
 		{
-			std::memcpy(values, &other.n_values, n_values * sizeof(value));
+			std::memcpy(values, other.values, n_values * sizeof(value));
 		}
 
 		data_layout(data_layout&& other) noexcept 
@@ -117,7 +127,7 @@ namespace Spiral
 				{
 					values = t_malloc<value>(other.n_values);
 				}
-				std::memcpy(values, &other.n_values, n_values * sizeof(value));
+				std::memcpy(values, other.values, n_values * sizeof(value));
 			}
 			return *this;
 		}
@@ -138,7 +148,7 @@ namespace Spiral
 
 		inline bool operator==(const data_layout& rhs) const noexcept
 		{
-			if (this->n_values == rhs.n_values && this->n_values != 0)
+			if (this->n_values == rhs.n_values)
 			{
 				for (std::uint8_t i = 0; i < this->n_values; i++)
 				{
@@ -156,6 +166,8 @@ namespace Spiral
 		*/
 		static inline data_layout vectorize(const data_layout& layout)
 		{
+			if (layout.n_values == 0) return data_layout();
+
 			data_layout converted(layout.vector_count());
 			std::uint8_t c = 0;
 			for (std::uint8_t i = 0; i < layout.n_values; i++)
@@ -189,8 +201,10 @@ namespace Spiral
 
 		static inline bool convertion_equals(const data_layout& x, const data_layout& y)
 		{
-			if (x.vector_count() == y.vector_count() && x.n_values != 0)
+			if (x.vector_count() == y.vector_count())
 			{
+				if (x.n_values == 0) return true;
+
 				return vectorize(x) == vectorize(y);
 			}
 			return false;
@@ -302,14 +316,81 @@ namespace Spiral
 			}
 
 			inline bool operator==(const value& rhs) const noexcept { return this->t == rhs.t && this->ct == rhs.ct; }
+
+			inline std::string to_string()
+			{
+				std::stringstream stream;
+				bool not_scalar = true;
+				switch (t)
+				{
+				case Spiral::data_layout::type::SCALAR:	not_scalar = false;	break;
+				case Spiral::data_layout::type::VEC2:	stream << "vec2";	break;
+				case Spiral::data_layout::type::VEC3:	stream << "vec3";	break;
+				case Spiral::data_layout::type::VEC4:	stream << "vec4";	break;
+				case Spiral::data_layout::type::MAT2:	stream << "mat2";	break;
+				case Spiral::data_layout::type::MAT3:	stream << "mat3";	break;
+				case Spiral::data_layout::type::MAT4:	stream << "mat4";	break;
+				case Spiral::data_layout::type::MAT2x3:	stream << "mat2x3";	break;
+				case Spiral::data_layout::type::MAT2x4:	stream << "mat2x4";	break;
+				case Spiral::data_layout::type::MAT3x2:	stream << "mat3x2";	break;
+				case Spiral::data_layout::type::MAT3x4:	stream << "mat3x4";	break;
+				case Spiral::data_layout::type::MAT4x2:	stream << "mat4x2";	break;
+				case Spiral::data_layout::type::MAT4x3:	stream << "mat4x3";	break;
+				default: INTERNAL_ASSERT(false, "Unimplemented type"); break;
+				}
+				if (not_scalar) stream << '<';
+				switch (ct)
+				{
+				case Spiral::data_layout::component_type::FLOAT32:	stream << "float";		break;
+				case Spiral::data_layout::component_type::FLOAT64:	stream << "double";		break;
+				case Spiral::data_layout::component_type::FLOAT16:	stream << "half_float";	break;
+				case Spiral::data_layout::component_type::INT8:		stream << "int8";		break;
+				case Spiral::data_layout::component_type::INT16:	stream << "int16";		break;
+				case Spiral::data_layout::component_type::INT32:	stream << "int32";		break;
+				case Spiral::data_layout::component_type::INT64:	stream << "int64";		break;
+				case Spiral::data_layout::component_type::UINT8:	stream << "uint8";		break;
+				case Spiral::data_layout::component_type::UINT16:	stream << "uint16";		break;
+				case Spiral::data_layout::component_type::UINT32:	stream << "uint32";		break;
+				case Spiral::data_layout::component_type::UINT64:	stream << "uint64";		break;
+				default: INTERNAL_ASSERT(false, "Unimplemented component type"); break;
+				}
+				if (not_scalar) stream << '>';
+				return stream.str();
+			}
 		};
 
-		inline const value& operator[](std::uint8_t index) const noexcept { return values[index]; }
+		inline const value& operator[](std::uint8_t index) const noexcept
+		{
+			INTERNAL_ASSERT(index < n_values, "Index out of bounds");
+			return values[index];
+		}
 
 	private:
 		std::uint8_t n_values = 0;
 		value* values = nullptr;
+
+		friend std::string to_string(const data_layout&);
+		friend std::ostream& operator<<(std::ostream&, const data_layout&);
 	};
+
+	inline std::string to_string(const data_layout& layout)
+	{
+		std::stringstream stream;
+		stream << '(';
+		for (std::uint8_t i = 0; i < layout.n_values; i++)
+		{
+			stream << layout.values[i].to_string();
+			if (i < layout.n_values - 1) stream << ", ";
+		}
+		stream << ')';
+		return stream.str();
+	}
+
+	inline std::ostream& operator<<(std::ostream& os, const data_layout& layout)
+	{
+		os << to_string(layout);
+		return os;
+	}
 }
 
 #undef SET_TYPE_S

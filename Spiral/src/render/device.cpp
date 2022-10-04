@@ -5,68 +5,127 @@
 
 namespace Spiral
 {
-	device::device(VkPhysicalDevice physical, VkSurfaceKHR surface) : surface(surface), physical_handle(physical), n_graphics_command_pools(1) //+ immediate_thread_num()
+	inline void calc_queue_indices(VkPhysicalDevice& physical_handle, VkSurfaceKHR& surface,
+		std::uint32_t* out_graphics_idx, std::uint32_t* out_present_idx, std::uint32_t* out_compute_idx, std::uint32_t* out_transfer_idx,
+		std::uint32_t invalid_idx)
 	{
-		uint32_t i;
-		vkGetPhysicalDeviceProperties(physical_handle, &properties);
-		vkGetPhysicalDeviceFeatures(physical_handle, &features);
+		std::uint32_t graphics_idx = invalid_idx, present_idx = invalid_idx, compute_idx = invalid_idx, transfer_idx = invalid_idx,
+			graphics_score = 0, present_score = 0, compute_score = 0, transfer_score = 0;
 
-		LOGF_INTERNAL_INFO("[RENDERER] Physical device found: {0}", properties.deviceName);
+		std::uint32_t queue_family_count = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(physical_handle, &queue_family_count, nullptr);
+		VkQueueFamilyProperties* queue_families = t_calloc<VkQueueFamilyProperties>(queue_family_count);
+		vkGetPhysicalDeviceQueueFamilyProperties(physical_handle, &queue_family_count, queue_families);
 
-		queue_idx_t queueFamilyCount = 0;
-		vkGetPhysicalDeviceQueueFamilyProperties(physical, &queueFamilyCount, nullptr);
-		VkQueueFamilyProperties* queueFamilies = t_malloc<VkQueueFamilyProperties>(queueFamilyCount);
-		vkGetPhysicalDeviceQueueFamilyProperties(physical, &queueFamilyCount, queueFamilies);
-		for (i = 0; i < queueFamilyCount; i++) //TODO: Performance is better if both graphics and present queues are in the same family, also should probably optimize queue selection
+		for (std::uint32_t i = 0; i < queue_family_count; i++)
 		{
-			if (queueFamilies[i].queueCount && queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) //TODO: graphis support implies compute and transfer support
+			if (queue_families[i].queueCount)
 			{
-				graphicsIndex = i;
-			}
+				if (graphics_score < 5 && (queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT))
+				{
+					graphics_idx = i;
+					graphics_score = 5;
+				}
 
-			if (queueFamilies[i].queueCount && queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT)
-			{
-				computeIndex = i;
-			}
+				VkBool32 presentSupport = false;
+				vkGetPhysicalDeviceSurfaceSupportKHR(physical_handle, i, surface, &presentSupport);
+				if (present_score < 10 && presentSupport)
+				{
+					present_idx = i;
+					present_score = 5;
+					if (queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)
+					{
+						//Optimal if both graphics and present queues are in the same family
+						graphics_idx = i;
+						graphics_score = 10;
+						present_score = 10;
+					}
+				}
 
-			VkBool32 presentSupport = false;
-			vkGetPhysicalDeviceSurfaceSupportKHR(physical, i, surface, &presentSupport);
-			if (queueFamilies[i].queueCount && presentSupport) //TODO: present support implies graphic support
-			{
-				presentIndex = i;
-			}
+				if (compute_score < 5 && (queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT))
+				{
+					compute_idx = i;
+					compute_score = 5;
+				}
 
-			if (graphicsIndex != invalid_queue_idx && presentIndex != invalid_queue_idx && computeIndex != invalid_queue_idx)
-			{
-				break;
+				if (compute_score < 10 && (queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT) && 
+					!(queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT))
+				{
+					//Async compute queue is ideal
+					compute_idx = i;
+					compute_score = 10;
+				}
+
+				if (transfer_score < 3 && (queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT))
+				{
+					transfer_idx = i;
+					transfer_score = 3;
+				}
+
+				if (transfer_score < 6 && (queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT) && 
+					!(queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT))
+				{
+					transfer_idx = i;
+					transfer_score = 6;
+				}
+
+				if (transfer_score < 10 && (queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT) && 
+					!(queue_families[i].queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)))
+				{
+					//Async transfer is ideal
+					transfer_idx = i;
+					transfer_score = 10;
+				}
+
+				LOG_INTERNAL_INFO("[RENDERER] Queue family " << i << " properties: " << queue_families[i].queueCount << ' '
+					//<< '(' << std::bitset<sizeof(VkQueueFlags) * 8>(queue_families[i].queueFlags) << ") => "
+					<< (queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT ? "GRAPHICS " : "")
+					<< (queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT ? "COMPUTE " : "")
+					<< (queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT ? "TRANSFER " : "")
+					<< (queue_families[i].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT ? "SPARSE_BINDING " : "")
+					<< (presentSupport ? "PRESENT " : ""));
 			}
 		}
-		//TODO: verify extension compatibility
+		if (out_graphics_idx) *out_graphics_idx = graphics_idx;
+		if (out_present_idx) *out_present_idx = present_idx;
+		if (out_compute_idx) *out_compute_idx = compute_idx;
+		if (out_transfer_idx) *out_transfer_idx = transfer_idx;
+		std::free(queue_families);
 
-		i = 0;
-		std::set<queue_idx_t> uniqueQueueFamilies = { graphicsIndex, presentIndex }; //TODO: no need to use a set, make an array with the max possible amount of different queue types and check if the one youre adding is already in the array, then malloc an array with the result
-		VkDeviceQueueCreateInfo* queueCreateInfos = t_malloc<VkDeviceQueueCreateInfo>(uniqueQueueFamilies.size());
-		float queuePriority = 1.0f;
-		for (queue_idx_t index : uniqueQueueFamilies)
+		LOGF_INTERNAL_INFO("[RENDERER] Selected queue indices: graphics = {0} | present = {1} | compute = {2} | transfer = {3}",
+			graphics_idx, present_idx, compute_idx, transfer_idx);
+	}
+
+	inline void create_logical_device(VkPhysicalDevice& physical_handle, VkDevice& handle,
+		VkQueue* graphics_queue, VkQueue* present_queue, VkQueue* compute_queue, VkQueue* transfer_queue,
+		std::uint32_t graphics_idx, std::uint32_t present_idx, std::uint32_t compute_idx, std::uint32_t transfer_idx, 
+		std::uint32_t invalid_idx)
+	{
+		std::set<std::uint32_t> unique_queue_families = { graphics_idx, present_idx, compute_idx, transfer_idx };
+		VkDeviceQueueCreateInfo* queue_create_infos = t_calloc<VkDeviceQueueCreateInfo>(unique_queue_families.size());
+		std::uint32_t count = 0;
+		float queue_priority = 1.0f;
+		for (std::uint32_t index : unique_queue_families)
 		{
-			if (index != invalid_queue_idx)
+			if (index != invalid_idx)
 			{
-				VkDeviceQueueCreateInfo info = {}; //TODO: make Queue struct, look at queue selection in DEV bookmarks
+				VkDeviceQueueCreateInfo info = {};
 				info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 				info.queueFamilyIndex = index;
 				info.queueCount = 1;
-				info.pQueuePriorities = &queuePriority;
-				queueCreateInfos[i] = info;
-				i++;
+				info.pQueuePriorities = &queue_priority;
+				queue_create_infos[count] = info;
+				count++;
 			}
 		}
-		
-		VkPhysicalDeviceFeatures deviceFeatures = {}; //TODO: idk
+
+		VkPhysicalDeviceFeatures device_features = {}; //TODO: idk
+
 		VkDeviceCreateInfo createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-		createInfo.pQueueCreateInfos = queueCreateInfos;
-		createInfo.queueCreateInfoCount = i;
-		createInfo.pEnabledFeatures = &deviceFeatures;
+		createInfo.pQueueCreateInfos = queue_create_infos;
+		createInfo.queueCreateInfoCount = count;
+		createInfo.pEnabledFeatures = &device_features;
 		createInfo.enabledExtensionCount = static_cast<uint32_t>(device_extensions.size());
 		createInfo.ppEnabledExtensionNames = device_extensions.data();
 		if (enable_validation_layers)
@@ -78,91 +137,113 @@ namespace Spiral
 		{
 			createInfo.enabledLayerCount = 0;
 		}
-		if (vkCreateDevice(physical, &createInfo, nullptr, &handle) == VK_SUCCESS) //This looks wrong and stupid
-		{
-			has_handle = true;
-			if (graphicsIndex != invalid_queue_idx)
-			{
-				vkGetDeviceQueue(handle, graphicsIndex, 0, &graphicsQueue);
-			}
-			if (presentIndex != invalid_queue_idx)
-			{
-				vkGetDeviceQueue(handle, presentIndex, 0, &presentQueue);
-			}
-			if (computeIndex != invalid_queue_idx)
-			{
-				vkGetDeviceQueue(handle, computeIndex, 0, &computeQueue);
-			}
-		}
-		//SPRL_CORE_TRACE("Graphics family index: {0}", graphicsIndex);
-		//SPRL_CORE_TRACE("Present family index: {0}", presentIndex);
-		//SPRL_CORE_TRACE("Compute family index: {0}", computeIndex);
-		std::free(queueFamilies);
-		std::free(queueCreateInfos);
-		transfer_idx = graphicsIndex;
-		transfer_queue = graphicsQueue; //TODO
 
-		graphics_command_pools = t_malloc<VkCommandPool>(n_graphics_command_pools);
+		VkResult result = vkCreateDevice(physical_handle, &createInfo, nullptr, &handle);
+		if (result != VK_SUCCESS)
+		{
+			CRASH("Failed to create logical device handle", result);
+		}
+
+		std::free(queue_create_infos);
+
+		if(graphics_idx != invalid_idx)
+			vkGetDeviceQueue(handle, graphics_idx, 0, graphics_queue);
+		if (present_idx != invalid_idx)
+			vkGetDeviceQueue(handle, present_idx, 0, present_queue);
+		if (compute_idx != invalid_idx)
+			vkGetDeviceQueue(handle, compute_idx, 0, compute_queue);
+		if (transfer_idx != invalid_idx)
+			vkGetDeviceQueue(handle, transfer_idx, 0, transfer_queue);
+	}
+
+	inline void create_command_buffers(VkDevice& handle,  std::uint32_t command_parallelism, 
+		std::uint32_t graphics_idx, VkCommandPool** graphics_command_pools, VkCommandBuffer** graphics_command_buffers)
+	{
+		*graphics_command_pools = t_malloc<VkCommandPool>(command_parallelism);
 		VkCommandPoolCreateInfo poolInfo = {};
 		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-		poolInfo.queueFamilyIndex = graphicsIndex;
-		poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // Optional
-		for (i = 0; i < n_graphics_command_pools; i++)
+		poolInfo.queueFamilyIndex = graphics_idx;
+		poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+		for (std::uint32_t i = 0; i < command_parallelism; i++)
 		{
-			if (vkCreateCommandPool(handle, &poolInfo, nullptr, &graphics_command_pools[i]) != VK_SUCCESS)
+			VkResult result = vkCreateCommandPool(handle, &poolInfo, nullptr, &(*graphics_command_pools)[i]);
+			if (result != VK_SUCCESS)
 			{
-				//do stuff
-				DEBUG_BREAK;
+				CRASH("Failed to create graphics command pool", result);
 			}
 		}
-		//TODO: could try reaaranging the buffer positions to be contiguous for a frame instead of type
-		graphics_command_buffers = t_malloc<VkCommandBuffer>(static_cast<size_t>(max_frames_in_flight) * n_graphics_command_pools);
-		VkCommandBufferAllocateInfo mainAllocInfo = {};
-		mainAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		mainAllocInfo.commandPool = graphics_command_pools[0];
-		mainAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		mainAllocInfo.commandBufferCount = max_frames_in_flight;
-		if (vkAllocateCommandBuffers(handle, &mainAllocInfo, graphics_command_buffers) != VK_SUCCESS)
+		
+		const std::uint32_t buffers_per_frame = command_parallelism + 1;
+		*graphics_command_buffers = t_malloc<VkCommandBuffer>(static_cast<std::size_t>(max_frames_in_flight) * buffers_per_frame);
+		for (std::uint32_t f = 0; f < max_frames_in_flight; f++)
 		{
-			//TODO: cleanup properly
-			DEBUG_BREAK;
-		}
-		for (i = 1; i < n_graphics_command_pools; i++)
-		{
-			VkCommandBufferAllocateInfo subAllocInfo = {};
-			subAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-			subAllocInfo.commandPool = graphics_command_pools[i];
-			subAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
-			subAllocInfo.commandBufferCount = max_frames_in_flight;
-			if (vkAllocateCommandBuffers(handle, &subAllocInfo, &graphics_command_buffers[max_frames_in_flight]) != VK_SUCCESS)
-			{
-				//TODO: cleanup properly
-				DEBUG_BREAK;
-			}
-		}
+			//Primary buffer allocation
+			VkCommandBufferAllocateInfo mainAllocInfo = {};
+			mainAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+			mainAllocInfo.commandPool = (*graphics_command_pools)[0];
+			mainAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+			mainAllocInfo.commandBufferCount = 1;
 
-		//Memory::init(&physical_handle, &handle, &graphicsQueue, &graphics_command_pools[0]);
+			VkResult result = vkAllocateCommandBuffers(handle, &mainAllocInfo, &(*graphics_command_buffers)[buffers_per_frame * f]);
+			if (result != VK_SUCCESS)
+			{
+				CRASH("Failed to create main graphics command buffers", result);
+			}
+
+			//Secondary buffer allocation
+			for (std::uint32_t i = 0; i < command_parallelism; i++)
+			{
+				VkCommandBufferAllocateInfo subAllocInfo = {};
+				subAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+				subAllocInfo.commandPool = (*graphics_command_pools)[i];
+				subAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+				subAllocInfo.commandBufferCount = 1;
+			
+				result = vkAllocateCommandBuffers(handle, &subAllocInfo, &(*graphics_command_buffers)[buffers_per_frame * f + i + 1]);
+				if (result != VK_SUCCESS)
+				{
+					CRASH("Failed to create secondary graphics command buffers", result);
+				}
+			}
+		}
+	}
+
+	device::device(VkPhysicalDevice&& physical, VkSurfaceKHR& surface) : surface(&surface), physical_handle(std::move(physical)),
+		command_parallelism(1) //TODO: + immediate_thread_num()
+	{
+		vkGetPhysicalDeviceProperties(physical_handle, &properties);
+		vkGetPhysicalDeviceFeatures(physical_handle, &features);
+
+		LOGF_INTERNAL_INFO("[RENDERER] Logical device being created for {0} ..", properties.deviceName);
+
+		calc_queue_indices(physical_handle, surface, &graphics_idx, &present_idx, &compute_idx, &transfer_idx, invalid_queue_idx);
+		
+		//TODO: verify extension compatibility
+
+		create_logical_device(physical_handle, handle, &graphics_queue, &present_queue, &compute_queue, &transfer_queue,
+			graphics_idx, present_idx, compute_idx, transfer_idx, invalid_queue_idx);
+
+		create_command_buffers(handle, command_parallelism, graphics_idx, &graphics_command_pools, &graphics_command_buffers);
+
 		memory.init(*this);
+		memory.map_ranges(current_frame);
 	}
 
 	device::~device()
 	{
-		size_t i;
 		if (has_swapchain)
 		{
 			vkDeviceWaitIdle(handle);
-			for (i = 0; i < n_graphics_pipelines; i++)
-			{
-				graphics_pipelines[i].~graphics_pipeline();
-			}
-			for (i = 0; i < main_swapchain.n_images; i++)
+			//Pipelines must be destroyed before anything else
+			graphics_pipelines.clear();
+			for (std::size_t i = 0; i < main_swapchain.n_images; i++)
 			{
 				vkDestroyFramebuffer(handle, framebuffers[i], nullptr);
 			}
 			std::free(framebuffers);
 			vkDestroyRenderPass(handle, render_pass, nullptr);
 			main_swapchain.terminate();
-			for (i = 0; i < max_frames_in_flight; i++)
+			for (std::size_t i = 0; i < max_frames_in_flight; i++)
 			{
 				vkDestroySemaphore(handle, render_finished_semaphores[i], nullptr);
 				vkDestroySemaphore(handle, image_available_semaphores[i], nullptr);
@@ -171,19 +252,25 @@ namespace Spiral
 			has_swapchain = false;
 		}
 		//Memory::terminate();
-		if (has_handle)
+		if (handle != VK_NULL_HANDLE)
 		{
 			vkDeviceWaitIdle(handle);
 			memory.terminate();
-			for (i = 0; i < n_graphics_command_pools; i++)
+			for (std::size_t i = 0; i < command_parallelism; i++)
 			{
-				vkDestroyCommandPool(handle, graphics_command_pools[i], nullptr); //Destroying a command pool frees all of its buffers as well
+				//Destroying a command pool frees all of its buffers as well
+				vkDestroyCommandPool(handle, graphics_command_pools[i], nullptr);
 			}
 			std::free(graphics_command_pools);
 			std::free(graphics_command_buffers);
 			vkDestroyDevice(handle, nullptr);
-			has_handle = false;
+			handle = VK_NULL_HANDLE;
 		}
+	}
+
+	std::size_t device::score()
+	{
+		return 0; //TODO
 	}
 
 	bool device::create_swapchain()
@@ -277,41 +364,42 @@ namespace Spiral
 		return true;
 	}
 
-	void device::record_secondary_graphics(index_t buffer_idx, uint32_t image_index)
+	void device::record_secondary_graphics(VkCommandBuffer& buffer, std::uint32_t image_index, 
+		const std::vector<graphics_pipeline*>& graphics_pipelines)
 	{
-		if (vkResetCommandBuffer(graphics_command_buffers[buffer_idx], 0) != VK_SUCCESS)
+		if (vkResetCommandBuffer(buffer, 0) != VK_SUCCESS)
 		{
 			//do stuff
 			DEBUG_BREAK;
 		}
 
-		VkCommandBufferInheritanceInfo inheritanceInfo = {};
-		inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
-		inheritanceInfo.pNext = nullptr;
-		inheritanceInfo.renderPass = render_pass;
-		inheritanceInfo.subpass = 0;
-		inheritanceInfo.framebuffer = framebuffers[image_index];
-		inheritanceInfo.occlusionQueryEnable = VK_FALSE;
-		inheritanceInfo.queryFlags = 0;
-		inheritanceInfo.pipelineStatistics = 0;
+		VkCommandBufferInheritanceInfo inheritance_info = {};
+		inheritance_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+		inheritance_info.pNext = nullptr;
+		inheritance_info.renderPass = render_pass;
+		inheritance_info.subpass = 0;
+		inheritance_info.framebuffer = framebuffers[image_index];
+		inheritance_info.occlusionQueryEnable = VK_FALSE;
+		inheritance_info.queryFlags = 0;
+		inheritance_info.pipelineStatistics = 0;
 
-		VkCommandBufferBeginInfo beginInfo = {};
-		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // | VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
-		beginInfo.pInheritanceInfo = &inheritanceInfo; // Optional
+		VkCommandBufferBeginInfo begin_info = {};
+		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT | VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
+		begin_info.pInheritanceInfo = &inheritance_info;
 
-		if (vkBeginCommandBuffer(graphics_command_buffers[current_frame], &beginInfo) != VK_SUCCESS)
+		if (vkBeginCommandBuffer(buffer, &begin_info) != VK_SUCCESS)
 		{
 			//do stuff
 			DEBUG_BREAK;
 		}
 
-		for (index_t i = (buffer_idx / max_frames_in_flight) - 1; i < n_graphics_pipelines; i += (n_graphics_command_pools - 1))
+		for (graphics_pipeline* pipeline : graphics_pipelines)
 		{
-			graphics_pipelines[i].record_commands(graphics_command_buffers[buffer_idx]);
+			pipeline->record_commands(buffer);
 		}
 
-		if (vkEndCommandBuffer(graphics_command_buffers[buffer_idx]) != VK_SUCCESS)
+		if (vkEndCommandBuffer(buffer) != VK_SUCCESS)
 		{
 			//do stuff
 			DEBUG_BREAK;
@@ -320,11 +408,11 @@ namespace Spiral
 
 	bool device::draw()
 	{
+		memory.unmap_ranges(current_frame);
 		memory.flush_in(current_frame);
 		vkWaitForFences(handle, 1, &frame_fences[current_frame], VK_TRUE, UINT64_MAX);
 
-		uint32_t imageIndex;
-		index_t i;
+		std::uint32_t imageIndex;
 		VkResult result = vkAcquireNextImageKHR(handle, main_swapchain.handle, UINT64_MAX, image_available_semaphores[current_frame], VK_NULL_HANDLE, &imageIndex);
 		if (result == VK_ERROR_OUT_OF_DATE_KHR)
 		{
@@ -336,8 +424,10 @@ namespace Spiral
 			DEBUG_BREAK;
 			return false;
 		}
+		
+		VkCommandBuffer& primary_buffer = graphics_command_buffers[current_frame * (command_parallelism + 1)];
 
-		if (vkResetCommandBuffer(graphics_command_buffers[current_frame], 0) != VK_SUCCESS)
+		if (vkResetCommandBuffer(primary_buffer, 0) != VK_SUCCESS)
 		{
 			//do stuff
 			DEBUG_BREAK;
@@ -348,7 +438,7 @@ namespace Spiral
 		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // | VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 		beginInfo.pInheritanceInfo = nullptr; // Optional
 
-		if (vkBeginCommandBuffer(graphics_command_buffers[current_frame], &beginInfo) != VK_SUCCESS)
+		if (vkBeginCommandBuffer(primary_buffer, &beginInfo) != VK_SUCCESS)
 		{
 			//do stuff
 			DEBUG_BREAK;
@@ -365,38 +455,53 @@ namespace Spiral
 		renderPassInfo.clearValueCount = 1;
 		renderPassInfo.pClearValues = &clearColor;
 
-		vkCmdBeginRenderPass(graphics_command_buffers[current_frame], &renderPassInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);// VK_SUBPASS_CONTENTS_INLINE);
-		for (i = 0; i < n_graphics_command_pools - 1; i++)
+		std::vector<graphics_pipeline*>* pipeline_stacks = t_malloc<std::vector<graphics_pipeline*>>(command_parallelism);
+		for (std::uint32_t i = 0; i < command_parallelism; i++)
 		{
-			record_secondary_graphics((i + 1) * max_frames_in_flight + current_frame, imageIndex);
+			new (&pipeline_stacks[i]) std::vector<graphics_pipeline*>();
 		}
-		for (i = 0; i < n_graphics_command_pools - 1; i++)
+		std::uint32_t index = 0;
+		for (graphics_pipeline& pipeline : graphics_pipelines)
 		{
-			//TODO: wait for thread i to finish recording
-			vkCmdExecuteCommands(graphics_command_buffers[current_frame], 1, &graphics_command_buffers[(i + 1) * max_frames_in_flight + current_frame]);
+			pipeline_stacks[index].push_back(&pipeline);
+			index = (index + 1) % command_parallelism;
 		}
-		vkCmdEndRenderPass(graphics_command_buffers[current_frame]);
+
+		vkCmdBeginRenderPass(primary_buffer, &renderPassInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);// VK_SUBPASS_CONTENTS_INLINE);
+		for (std::uint32_t i = 0; i < command_parallelism; i++)
+		{
+			record_secondary_graphics(graphics_command_buffers[(command_parallelism + 1) * current_frame + i + 1], 
+				imageIndex, pipeline_stacks[i]);
+		}
+
+		//TODO: wait for thread i to finish recording
+		std::free(pipeline_stacks);
+		vkCmdExecuteCommands(primary_buffer, command_parallelism, &graphics_command_buffers[(command_parallelism + 1) * current_frame + 1]);
+
+		vkCmdEndRenderPass(primary_buffer);
 		//TODO: update uniform buffer with imageIndex
 
-		if (vkEndCommandBuffer(graphics_command_buffers[current_frame]) != VK_SUCCESS)
+		if (vkEndCommandBuffer(primary_buffer) != VK_SUCCESS)
 		{
 			//do stuff
 			DEBUG_BREAK;
 		}
 
+		VkSemaphore pre_render[] = { image_available_semaphores[current_frame], memory.get_device_in_semaphore(current_frame) };
+
 		VkSubmitInfo submitInfo = {};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-		VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
-		submitInfo.waitSemaphoreCount = 1;
-		submitInfo.pWaitSemaphores = &image_available_semaphores[current_frame];
+		VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT };
+		submitInfo.waitSemaphoreCount = 2;
+		submitInfo.pWaitSemaphores = pre_render;//&image_available_semaphores[current_frame];
 		submitInfo.pWaitDstStageMask = waitStages;
 		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &graphics_command_buffers[current_frame];//&graphics_pipelines.commandBuffers[imageIndex];
+		submitInfo.pCommandBuffers = &primary_buffer;//&graphics_pipelines.commandBuffers[imageIndex];
 		submitInfo.signalSemaphoreCount = 1;
 		submitInfo.pSignalSemaphores = &render_finished_semaphores[current_frame];
 
 		vkResetFences(handle, 1, &frame_fences[current_frame]);
-		if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, frame_fences[current_frame]) != VK_SUCCESS) //TODO: porbably have to change this
+		if (vkQueueSubmit(graphics_queue, 1, &submitInfo, frame_fences[current_frame]) != VK_SUCCESS) //TODO: porbably have to change this
 		{
 			DEBUG_BREAK;
 			return false;
@@ -412,9 +517,10 @@ namespace Spiral
 		presentInfo.pImageIndices = &imageIndex;
 		presentInfo.pResults = nullptr; // Optional
 
-		result = vkQueuePresentKHR(presentQueue, &presentInfo);
+		result = vkQueuePresentKHR(present_queue, &presentInfo);
 		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
 		{
+			DEBUG_BREAK;
 			//TODO: recreate target, add framebuffer resized(?)
 		}
 		else if (result != VK_SUCCESS)
@@ -423,7 +529,26 @@ namespace Spiral
 			return false;
 		}
 		current_frame = (current_frame + 1) % max_frames_in_flight;
-		memory.synchronize(); //wait for the next frame's data transfers to finish, so nothing can be overwritten by the client
+		memory.synchronize(current_frame); //wait for the next frame's data transfers to finish, so nothing can be overwritten by the client
+		memory.map_ranges(current_frame);
 		return true;
+	}
+
+	device::index_t device::add_graphics_pipeline(const shader& vertex, const shader& fragment)
+	{
+
+		const shader* shaders[] = { &vertex, &fragment };
+		graphics_pipelines.push_back(graphics_pipeline(*this, shaders, 2, vertex.get_inputs()[0], data_layout(), data_layout()));
+		return static_cast<std::uint32_t>(graphics_pipelines.size() - 1);
+	}
+
+	void device::add_instanced_graphics_pipeline()
+	{
+
+	}
+
+	void device::add_indirect_graphics_pipeline()
+	{
+
 	}
 }

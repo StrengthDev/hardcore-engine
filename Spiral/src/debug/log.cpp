@@ -17,21 +17,18 @@ namespace Spiral
 
 		void init()
 		{
+#ifndef NDEBUG
 			DWORD out_mode = 0;
 			out_handle = GetStdHandle(STD_OUTPUT_HANDLE);
 
 			if (out_handle == INVALID_HANDLE_VALUE)
 			{
-				std::cout << "Failed to get output handle." << std::endl;
-				DEBUG_BREAK
-				exit(GetLastError());
+				CRASH("Failed to get output handle.", GetLastError());
 			}
 
 			if (!GetConsoleMode(out_handle, &out_mode))
 			{
-				std::cout << "Failed to get output mode." << std::endl;
-				DEBUG_BREAK
-				exit(GetLastError());
+				CRASH("Failed to get output mode.", GetLastError());
 			}
 
 			default_out_mode = out_mode;
@@ -39,22 +36,21 @@ namespace Spiral
 
 			if (!SetConsoleMode(out_handle, out_mode))
 			{
-				std::cout << "Failed to set output mode." << std::endl;
-				DEBUG_BREAK
-				exit(GetLastError());
+				CRASH("Failed to set output mode.", GetLastError());
 			}
+#endif // !NDEBUG
 		}
 
 		void shutdown()
 		{
+#ifndef NDEBUG
 			std::cout << ANSI_RESET;
 
 			if (!SetConsoleMode(out_handle, default_out_mode))
 			{
-				std::cout << "Failed to reset output mode." << std::endl;
-				DEBUG_BREAK
-				exit(GetLastError());
+				CRASH("Failed to reset output mode.", GetLastError());
 			}
+#endif // !NDEBUG
 		}
 
 		inline std::tm local_time(std::time_t* time)
@@ -164,7 +160,7 @@ namespace Spiral
 		void warn(const char* message)
 		{
 			if (log_mask_flags & WARN_BIT)
-				log(message, 1, 3, BRIGHT_YELLOW, BOLD, DEFAULT_FONT);
+				log(message, 1, 3, YELLOW, BOLD, DEFAULT_FONT);
 		}
 
 		void error(const char* message)
@@ -205,7 +201,7 @@ namespace Spiral
 			void warn(const char* message)
 			{
 				if (Spiral::log::log_mask_flags & Spiral::log::WARN_BIT)
-					Spiral::log::log(message, 0, 3, Spiral::log::BRIGHT_YELLOW, Spiral::log::BOLD, Spiral::log::DEFAULT_FONT);
+					Spiral::log::log(message, 0, 3, Spiral::log::YELLOW, Spiral::log::BOLD, Spiral::log::DEFAULT_FONT);
 			}
 
 			void error(const char* message)

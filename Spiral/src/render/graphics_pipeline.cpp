@@ -2,41 +2,6 @@
 
 #include <spiral/render/device.hpp>
 #include <spiral/render/graphics_pipeline.hpp>
-/*
-//TODO: delet this
-#include "glm/glm.hpp"
-struct Vertex
-{
-	glm::vec3 pos;
-	//glm::vec3 color;
-
-	static VkVertexInputBindingDescription getBindingDescription()
-	{
-		VkVertexInputBindingDescription bindingDescription = {};
-		bindingDescription.binding = 0;
-		bindingDescription.stride = sizeof(Vertex);
-		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-		return bindingDescription;
-	}
-
-	static std::array<VkVertexInputAttributeDescription, 1> getAttributeDescriptions()
-	{
-		std::array<VkVertexInputAttributeDescription, 1> attributeDescriptions = {};
-
-		attributeDescriptions[0].binding = 0;
-		attributeDescriptions[0].location = 0;
-		attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-		attributeDescriptions[0].offset = offsetof(Vertex, pos);
-		
-		//attributeDescriptions[1].binding = 0;
-		//attributeDescriptions[1].location = 1;
-		//attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-		//attributeDescriptions[1].offset = offsetof(Vertex, color);
-		
-		return attributeDescriptions;
-	}
-};*/
 
 namespace Spiral
 {
@@ -149,21 +114,21 @@ namespace Spiral
 		vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
 		vertex_input_info.vertexBindingDescriptionCount = n_layouts;
-		VkVertexInputBindingDescription* binding_descriptions = t_malloc<VkVertexInputBindingDescription>(n_layouts);
+		std::uint32_t attribute_description_count = 0;
+		VkVertexInputBindingDescription* binding_descriptions = t_calloc<VkVertexInputBindingDescription>(n_layouts);
 		for (std::uint32_t i = 0; i < n_layouts; i++)
 		{
 			VkVertexInputBindingDescription desc = {};
 			binding_descriptions[i].binding = 0;
-			binding_descriptions[i].stride = vertex_layouts[i].size();
+			binding_descriptions[i].stride = static_cast<std::uint32_t>(vertex_layouts[i].size());
 			binding_descriptions[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+			
+			attribute_description_count += vertex_layouts[i].vector_count();
 		}
 		vertex_input_info.pVertexBindingDescriptions = binding_descriptions;
-
-		std::uint32_t attribute_description_count = 0;
-		for (std::uint32_t i = 0; i < n_layouts; i++) attribute_description_count += vertex_layouts[i].vector_count();
 		vertex_input_info.vertexAttributeDescriptionCount = attribute_description_count;
 		VkVertexInputAttributeDescription* attribute_descriptions = 
-			t_malloc<VkVertexInputAttributeDescription>(attribute_description_count);
+			t_calloc<VkVertexInputAttributeDescription>(attribute_description_count);
 
 		std::uint32_t c = 0;
 		for (std::uint32_t i = 0; i < n_layouts; i++)
@@ -213,14 +178,14 @@ namespace Spiral
 
 		return vertex_input_info;
 	}
-
-	graphics_pipeline::graphics_pipeline(device* owner, VkDevice logicalHandle, swapchain& target, VkRenderPass& renderPass,
-		VkCommandPool commandPool, const shader*& shaders, uint16_t nShaders, 
-		const data_layout vertex_layout, const data_layout object_layout, const data_layout global_layout)
-		: owner(owner), logicalHandle(logicalHandle), target(target), vertex_layout(vertex_layout), object_layout(object_layout), global_layout(global_layout)
+	//TODO: change some of the initialisation to smaller functions and put them in the initialiser list
+	//TODO: remove layout args, they are unnecessary, everything can be extracted from the shaders
+	graphics_pipeline::graphics_pipeline(device& owner, const shader** shaders, uint16_t nShaders, 
+		const data_layout& vertex_layout, const data_layout& object_layout, const data_layout& global_layout)
+		: owner(&owner)
 	{
-		uint32_t i;
-		valid = true;
+		LOG_INTERNAL_INFO("Initialising new graphics pipeline..");
+		VkResult result;
 
 		VkDescriptorSetLayoutBinding uboLayoutBinding = {};
 		uboLayoutBinding.binding = 0;
@@ -234,29 +199,26 @@ namespace Spiral
 		layoutInfo.bindingCount = 1;
 		layoutInfo.pBindings = &uboLayoutBinding;
 
-		if (vkCreateDescriptorSetLayout(logicalHandle, &layoutInfo, nullptr, &descriptorSetLayout) != VK_SUCCESS)
+		result = vkCreateDescriptorSetLayout(owner.handle, &layoutInfo, nullptr, &descriptorSetLayout);
+		if (result != VK_SUCCESS)
 		{
-			DEBUG_BREAK;
-			valid = false;
-			return;
+			CRASH("Failed to create descriptor set layout", result);
 		}
 
 		VkDescriptorPoolSize poolSize = {};
 		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		poolSize.descriptorCount = target.n_images;
+		poolSize.descriptorCount = owner.main_swapchain.n_images;
 
 		VkDescriptorPoolCreateInfo poolInfo = {};
 		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		poolInfo.poolSizeCount = 1;
 		poolInfo.pPoolSizes = &poolSize;
-		poolInfo.maxSets = target.n_images;
+		poolInfo.maxSets = owner.main_swapchain.n_images;
 
-		if (vkCreateDescriptorPool(logicalHandle, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS) //TODO: according to the example this shouldn't be so high, but I haven't found any relevant dependency
+		result = vkCreateDescriptorPool(owner.handle, &poolInfo, nullptr, &descriptorPool);
+		if (result != VK_SUCCESS)
 		{
-			DEBUG_BREAK;
-			valid = false;
-			vkDestroyDescriptorSetLayout(logicalHandle, descriptorSetLayout, nullptr);
-			return;
+			CRASH("Failed to create descriptor pool", result);
 		}
 
 		VkPipelineVertexInputStateCreateInfo vertex_input_info = get_vertex_inputs(&vertex_layout, 1);
@@ -269,14 +231,14 @@ namespace Spiral
 		VkViewport viewport = {};
 		viewport.x = 0.0f;
 		viewport.y = 0.0f;
-		viewport.width = (float)target.extent.width;
-		viewport.height = (float)target.extent.height;
+		viewport.width = static_cast<float>(owner.main_swapchain.extent.width);
+		viewport.height = static_cast<float>(owner.main_swapchain.extent.height);
 		viewport.minDepth = 0.0f;
 		viewport.maxDepth = 1.0f; //always between 1 and 0
 
 		VkRect2D scissor = {};
 		scissor.offset = { 0, 0 };
-		scissor.extent = target.extent;
+		scissor.extent = owner.main_swapchain.extent;
 
 		VkPipelineViewportStateCreateInfo viewportState = {};
 		viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -344,25 +306,22 @@ namespace Spiral
 
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo.setLayoutCount = 1; // Optional
-		pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout; // Optional
+		pipelineLayoutInfo.setLayoutCount = 0; // Optional
+		pipelineLayoutInfo.pSetLayouts = nullptr;// &descriptorSetLayout; // Optional
 		pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
 		pipelineLayoutInfo.pPushConstantRanges = nullptr; // Optional
 
-		if (vkCreatePipelineLayout(logicalHandle, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS)
+		result = vkCreatePipelineLayout(owner.handle, &pipelineLayoutInfo, nullptr, &pipelineLayout);
+		if (result != VK_SUCCESS)
 		{
-			DEBUG_BREAK;
-			valid = false;
-			vkDestroyDescriptorPool(logicalHandle, descriptorPool, nullptr);
-			vkDestroyDescriptorSetLayout(logicalHandle, descriptorSetLayout, nullptr);
-			return;
+			CRASH("Failed to create pipeline layout", result);
 		}
 
 		VkPipelineShaderStageCreateInfo* shaderStages = t_calloc<VkPipelineShaderStageCreateInfo>(nShaders);
-		for (i = 0; i < nShaders; i++)
+		for (std::uint16_t i = 0; i < nShaders; i++)
 		{
 			shaderStages[i].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-			shaderStages[i].module = internal_shader::create_shader_module(shaders[i], logicalHandle, &shaderStages[i].stage, 
+			shaderStages[i].module = internal_shader::create_shader_module(*shaders[i], owner.handle, &shaderStages[i].stage,
 				&shaderStages[i].pName);
 		}
 
@@ -379,7 +338,7 @@ namespace Spiral
 		pipelineInfo.pColorBlendState = &colorBlending;
 		pipelineInfo.pDynamicState = nullptr; // Optional
 		pipelineInfo.layout = pipelineLayout;
-		pipelineInfo.renderPass = renderPass;
+		pipelineInfo.renderPass = owner.render_pass;
 		pipelineInfo.subpass = 0;
 		pipelineInfo.basePipelineHandle = VK_NULL_HANDLE; // Optional
 		pipelineInfo.basePipelineIndex = -1; // Optional
@@ -387,20 +346,15 @@ namespace Spiral
 		pipelineInfo.flags = 0;
 		pipelineInfo.pTessellationState = nullptr;
 
-		if (vkCreateGraphicsPipelines(logicalHandle, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline) != VK_SUCCESS)
+		result = vkCreateGraphicsPipelines(owner.handle, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline);
+		if (result != VK_SUCCESS)
 		{
-			DEBUG_BREAK;
-			vkDestroyPipelineLayout(logicalHandle, pipelineLayout, nullptr);
-			vkDestroyRenderPass(logicalHandle, renderPass, nullptr);
-			vkDestroyDescriptorPool(logicalHandle, descriptorPool, nullptr);
-			vkDestroyDescriptorSetLayout(logicalHandle, descriptorSetLayout, nullptr);
-			valid = false;
-			return;
+			CRASH("Failed to create pipeline", result);
 		}
 
-		for (i = 0; i < nShaders; i++)
+		for (std::uint16_t i = 0; i < nShaders; i++)
 		{
-			vkDestroyShaderModule(logicalHandle, shaderStages[i].module, nullptr);
+			vkDestroyShaderModule(owner.handle, shaderStages[i].module, nullptr);
 			std::free(const_cast<char*>(shaderStages[i].pName)); //a bit messy, but shouldn't cause issues
 		}
 
@@ -425,24 +379,24 @@ namespace Spiral
 			return;
 		}
 		*/
-		descriptorSets = (VkDescriptorSet*)malloc(sizeof(VkDescriptorSet) * target.n_images);
-		VkDescriptorSetLayout* layouts = (VkDescriptorSetLayout*)malloc(sizeof(VkDescriptorSetLayout) * target.n_images);
-		for (i = 0; i < target.n_images; i++)
+		descriptorSets = t_calloc<VkDescriptorSet>(owner.main_swapchain.n_images);
+		VkDescriptorSetLayout* layouts = t_calloc<VkDescriptorSetLayout>(owner.main_swapchain.n_images); //TODO both of these should be frames in flight
+		for (std::uint32_t i = 0; i < owner.main_swapchain.n_images; i++)
 		{
 			layouts[i] = descriptorSetLayout;
 		}
 		VkDescriptorSetAllocateInfo setAllocInfo = {};
 		setAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 		setAllocInfo.descriptorPool = descriptorPool;
-		setAllocInfo.descriptorSetCount = target.n_images;
+		setAllocInfo.descriptorSetCount = owner.main_swapchain.n_images;
 		setAllocInfo.pSetLayouts = layouts;
-		if (vkAllocateDescriptorSets(logicalHandle, &setAllocInfo, descriptorSets) != VK_SUCCESS)
+
+		result = vkAllocateDescriptorSets(owner.handle, &setAllocInfo, descriptorSets);
+		if (result != VK_SUCCESS)
 		{
-			//TODO: cleanup properly
-			DEBUG_BREAK;
-			valid = false;
-			return;
+			CRASH("Failed to allocate descriptor sets", result);
 		}
+
 		/*
 		for (i = 0; i < target.n_images; i++)
 		{
@@ -466,65 +420,99 @@ namespace Spiral
 		}
 		*/
 
-		extent = target.extent;
-		LOG_INTERNAL_INFO("New pipeline initialised");
+		if (object_layout.size()) use_instancing = true;
 	}
 
 	graphics_pipeline::~graphics_pipeline()
 	{
-		free(descriptorSets);
+		if (graphicsPipeline != VK_NULL_HANDLE)
+		{
+			vkDestroyPipeline(owner->handle, graphicsPipeline, nullptr);
+			vkDestroyPipelineLayout(owner->handle, pipelineLayout, nullptr);
+			vkDestroyDescriptorPool(owner->handle, descriptorPool, nullptr);
+			vkDestroyDescriptorSetLayout(owner->handle, descriptorSetLayout, nullptr);
 
-		vkDestroyPipeline(logicalHandle, graphicsPipeline, nullptr);
-		vkDestroyPipelineLayout(logicalHandle, pipelineLayout, nullptr);
-		vkDestroyDescriptorPool(logicalHandle, descriptorPool, nullptr);
-		vkDestroyDescriptorSetLayout(logicalHandle, descriptorSetLayout, nullptr);
+			free(descriptorSets);
+		}
+	}
+
+	inline VkIndexType to_vkindextype(object_resource::index_format format)
+	{
+		switch (format)
+		{
+		case object_resource::index_format::UINT8:
+			return VK_INDEX_TYPE_UINT8_EXT;
+		case object_resource::index_format::UINT16:
+			return VK_INDEX_TYPE_UINT16;
+		case object_resource::index_format::UINT32:
+			return VK_INDEX_TYPE_UINT32;
+		default:
+			INTERNAL_ASSERT(false, "Index format not implemented.");
+			return VK_INDEX_TYPE_NONE_KHR;
+		}
 	}
 
 	void graphics_pipeline::record_commands(VkCommandBuffer& buffer)
 	{
 		vkCmdBindPipeline(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-		/*
-		for (i = 0; i < memory.pools[0].n_slots; i += 2)
+
+		if (use_instancing)
 		{
-			VkBuffer vertexBuffers[] = { memory.pools[0].buffer };
-			VkDeviceSize offsets[] = { memory.pools[0].ranges[i].offset };
-			vkCmdBindVertexBuffers(buffer, 0, 1, vertexBuffers, offsets);
-
-			vkCmdBindIndexBuffer(buffer, memory.pools[0].buffer, memory.pools[0].ranges[i + 1].offset, VK_INDEX_TYPE_UINT16);
-
-			//vkCmdBindDescriptorSets(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr);
-
-			vkCmdDrawIndexed(buffer, memory.pools[0].ranges[i + 1].size / sizeof(uint16_t), 1, 0, 0, 0); //TODO warning conversion from 'VkDeviceSize' to 'uint32_t', possible loss of data
-		}*/
-
-		for (std::uint32_t i = 0; i < n_targets; i++)
-		{
-			object& target = targets[i];
-			vkCmdBindVertexBuffers(buffer, 0, 1, &owner->get_memory().pools[target.vertex_buffer].buffer, &target.v_offset);
-
-			if (target.index_type == index_format::NONE)
+			for (std::size_t i = 0; i < objects.size(); i++)
 			{
-				vkCmdDraw(buffer, target.count, target.n_instances, 0, 0);
-			}
-			else
-			{
-				switch (target.index_type)
+				const object_resource* target = objects[i];
+				const instance* instance_buffer = instances[i];
+				buffer_binding_args v_args = owner->get_memory().get_binding_args(*target);
+				vkCmdBindVertexBuffers(buffer, 0, 1, &v_args.buffer, &v_args.offset);
+				if (target->index_type == object_resource::index_format::NONE)
 				{
-				case index_format::UINT8:
-					vkCmdBindIndexBuffer(buffer, VK_NULL_HANDLE, target.i_offset, VK_INDEX_TYPE_UINT8_EXT); //TODO
-					break;
-				case index_format::UINT16:
-					vkCmdBindIndexBuffer(buffer, VK_NULL_HANDLE, target.i_offset, VK_INDEX_TYPE_UINT16); //TODO
-					break;
-				case index_format::UINT32:
-					vkCmdBindIndexBuffer(buffer, VK_NULL_HANDLE, target.i_offset, VK_INDEX_TYPE_UINT32); //TODO
-					break;
-				default:
-					INTERNAL_ASSERT(false, "Index format not implemented.");
-					break;
+					vkCmdDraw(buffer, target->get_count(), instance_buffer->get_count(), 0, 0);
 				}
-				vkCmdDrawIndexed(buffer, target.count, target.n_instances, 0, 0, 0);
+				else
+				{
+					buffer_binding_args i_args = owner->get_memory().get_binding_args(*instance_buffer); //TODO this is index, not instance
+					const VkIndexType index_t = to_vkindextype(target->index_type);
+					vkCmdBindIndexBuffer(buffer, i_args.buffer, i_args.offset, index_t);
+					vkCmdDrawIndexed(buffer, target->get_count(), instance_buffer->get_count(), 0, 0, 0);
+				}
 			}
 		}
+		else
+		{
+			for (std::size_t i = 0; i < objects.size(); i++)
+			{
+				const object_resource* target = objects[i];
+				buffer_binding_args v_args = owner->get_memory().get_binding_args(*target);
+				vkCmdBindVertexBuffers(buffer, 0, 1, &v_args.buffer, &v_args.offset);
+				if (target->index_type == object_resource::index_format::NONE)
+				{
+					vkCmdDraw(buffer, target->get_count(), 1, 0, 0);
+				}
+				else
+				{
+					buffer_binding_args i_args = owner->get_memory().get_binding_args(*target); //TODO this is index, not target
+					const VkIndexType index_t = to_vkindextype(target->index_type);
+					vkCmdBindIndexBuffer(buffer, i_args.buffer, i_args.offset, index_t);
+					vkCmdDrawIndexed(buffer, target->get_count(), 1, 0, 0, 0);
+				}
+			}
+		}
+	}
+
+	void graphics_pipeline::link(const object_resource& object)
+	{
+		INTERNAL_ASSERT(!use_instancing, "Objects must have per instance data"); //TODO move to API pipeline object
+
+
+		objects.push_back(&object);
+	}
+
+	void graphics_pipeline::link(const object_resource& object, const instance& instance)
+	{
+		INTERNAL_ASSERT(use_instancing, "Objects do not have per instance data"); //TODO move to API pipeline object
+
+
+		objects.push_back(&object);
+		instances.push_back(&instance);
 	}
 }

@@ -178,6 +178,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\core\core.cpp" />
     <ClCompile Include="src\core\static_client.cpp" />
     <ClCompile Include="src\parallel\thread_manager.cpp" />
     <ClCompile Include="src\pch.cpp">
@@ -193,6 +194,7 @@
     <ClCompile Include="src\debug\log.cpp" />
     <ClCompile Include="src\render\device.cpp" />
     <ClCompile Include="src\render\graphics_pipeline.cpp" />
+    <ClCompile Include="src\render\instance.cpp" />
     <ClCompile Include="src\render\memory.cpp" />
     <ClCompile Include="src\render\pipeline.cpp" />
     <ClCompile Include="src\render\renderer.cpp" />

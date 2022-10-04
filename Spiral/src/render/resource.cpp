@@ -5,7 +5,7 @@
 
 namespace Spiral
 {
-	void resource::free()
+	void resource::destroy()
 	{
 
 	}
@@ -25,8 +25,9 @@ namespace Spiral
 	}
 
 	object_resource::object_resource(const void* vertex_data, const std::size_t vertex_data_size, const data_layout& layout)
-		: layout(layout), index_type(index_format::NONE)
+		: layout(layout), index_type(index_format::NONE), count(static_cast<std::uint32_t>(vertex_data_size / layout.size()))
 	{
+		INTERNAL_ASSERT((vertex_data_size % layout.size()) == 0, "Allocated vertex memory does not align with vertex layout");
 		ref = renderer::get_device().get_memory().ialloc_object(vertex_data, vertex_data_size);
 	}
 
@@ -38,8 +39,9 @@ namespace Spiral
 	}
 
 	object_resource::object_resource(const std::size_t vertex_data_size, const data_layout& layout)
-		: layout(layout), index_type(index_format::NONE)
+		: layout(layout), index_type(index_format::NONE), count(static_cast<std::uint32_t>(vertex_data_size / layout.size()))
 	{
+		INTERNAL_ASSERT(vertex_data_size % layout.size() == 0, "Allocated vertex memory does not align with vertex layout");
 		ref = renderer::get_device().get_memory().alloc_object(vertex_data_size);
 	}
 }

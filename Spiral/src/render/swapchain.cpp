@@ -19,12 +19,12 @@ namespace Spiral
 		this->owner = &owner;
 
 		uint32_t n_formats;
-		vkGetPhysicalDeviceSurfaceFormatsKHR(owner.physical_handle, owner.surface, &n_formats, nullptr);
+		vkGetPhysicalDeviceSurfaceFormatsKHR(owner.physical_handle, *owner.surface, &n_formats, nullptr);
 		VkSurfaceFormatKHR surface_format = { VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
 		if (n_formats != 0)
 		{
 			VkSurfaceFormatKHR* available_formats = t_malloc<VkSurfaceFormatKHR>(n_formats);
-			vkGetPhysicalDeviceSurfaceFormatsKHR(owner.physical_handle, owner.surface, &n_formats, available_formats);
+			vkGetPhysicalDeviceSurfaceFormatsKHR(owner.physical_handle, *owner.surface, &n_formats, available_formats);
 			if (n_formats == 1 && available_formats[0].format == VK_FORMAT_UNDEFINED)
 			{
 				surface_format = { VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
@@ -46,11 +46,11 @@ namespace Spiral
 
 		VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR; //default
 		uint32_t n_present_modes;
-		vkGetPhysicalDeviceSurfacePresentModesKHR(owner.physical_handle, owner.surface, &n_present_modes, nullptr);
+		vkGetPhysicalDeviceSurfacePresentModesKHR(owner.physical_handle, *owner.surface, &n_present_modes, nullptr);
 		if (n_present_modes != 0)
 		{
 			VkPresentModeKHR* available_present_modes = t_malloc<VkPresentModeKHR>(n_present_modes);
-			vkGetPhysicalDeviceSurfacePresentModesKHR(owner.physical_handle, owner.surface, &n_present_modes, available_present_modes);
+			vkGetPhysicalDeviceSurfacePresentModesKHR(owner.physical_handle, *owner.surface, &n_present_modes, available_present_modes);
 			for (i = 0; i < n_present_modes; i++)
 			{
 				if (available_present_modes[i] == VK_PRESENT_MODE_MAILBOX_KHR)
@@ -83,7 +83,7 @@ namespace Spiral
 		}
 
 		VkSurfaceCapabilitiesKHR capabilities;
-		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(owner.physical_handle, owner.surface, &capabilities);
+		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(owner.physical_handle, *owner.surface, &capabilities);
 		if (capabilities.currentExtent.width != UINT32_MAX)
 		{
 			extent = capabilities.currentExtent;
@@ -110,7 +110,7 @@ namespace Spiral
 
 		VkSwapchainCreateInfoKHR create_info = {};
 		create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-		create_info.surface = owner.surface;
+		create_info.surface = *owner.surface;
 		create_info.minImageCount = n_images;
 		create_info.imageFormat = surface_format.format;
 		create_info.imageColorSpace = surface_format.colorSpace;
@@ -118,8 +118,8 @@ namespace Spiral
 		create_info.imageArrayLayers = 1;	//usually always 1
 		create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;	//how image is used, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT when direct rendering, VK_IMAGE_USAGE_TRANSFER_DST_BIT if theres post processing
 
-		uint32_t queue_family_indexes[] = { owner.graphicsIndex, owner.presentIndex };
-		if (owner.graphicsIndex != owner.presentIndex)
+		std::uint32_t queue_family_indexes[] = { owner.graphics_idx, owner.present_idx };
+		if (owner.graphics_idx != owner.present_idx)
 		{
 			create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
 			create_info.queueFamilyIndexCount = 2;

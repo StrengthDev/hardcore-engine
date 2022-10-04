@@ -8,6 +8,13 @@ namespace Spiral
 {
 	namespace parallel //TODO: scrap results, use std::future/std::promise
 	{
+		template<typename Func>
+		void execute(void* func_ptr)
+		{
+			Func& func = *static_cast<Func*>(func_ptr);
+			func();
+		} //TODO: use this helper function and pass it into submit function, eliminating the need to pass std::function 
+
 		SPIRAL_API void submit_immediate_task(std::function<void()> task);
 
 		/**

@@ -33,10 +33,10 @@ namespace Spiral
 		NONE = 0,
 		VERTEX, FRAGMENT,
 		COMPUTE,
-		MESH,
 		TESSELATION_CONTROL, TESSELATION_EVALUATION,
-		GEOMETRY, TASK,
-		RAY_GENERATION, RAY_INTERSECTION, RAY_ANY_HIT, RAY_CLOSEST_HIT, RAY_MISS, RAY_CALLABLE
+		GEOMETRY,
+		RAY_GENERATION, RAY_INTERSECTION, RAY_ANY_HIT, RAY_CLOSEST_HIT, RAY_MISS, RAY_CALLABLE,
+		MESH, TASK,
 	};
 
 	class SPIRAL_API shader
@@ -54,10 +54,11 @@ namespace Spiral
 		shader(shader&& other) noexcept;
 		shader& operator=(shader&& other) noexcept;
 
-		//shader(const shader& other) = delete;
+		shader(const shader& other) = delete;
 		shader& operator=(const shader& other) = delete;
 
 		const char* get_name() const noexcept { return name; }
+		const data_layout* get_inputs() const noexcept { return inputs; }
 
 	//this is protected to help with some operations in shader_internal
 	protected:
@@ -69,8 +70,6 @@ namespace Spiral
 		std::uint8_t n_inputs = 0;
 		data_layout* inputs = nullptr;
 
-		shader(const shader& other) : data(other.data), size(other.size), stage(other.stage), name(other.name), 
-			entry_point(other.entry_point) {}
 
 	private:
 		char* name = nullptr;

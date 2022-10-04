@@ -12,17 +12,25 @@ namespace Spiral
 	class SPIRAL_API resource
 	{
 	public:
-		void free();
+		resource() = default;
+		virtual ~resource() { destroy(); }
+
+		void destroy();
 		inline bool valid() const { return ref.valid(); }
 
 		resource(const resource&) = delete;
 		resource& operator=(const resource&) = delete;
 
-	protected:
-		resource() = default;
-		virtual ~resource() { free(); }
+		resource(resource&& other) noexcept : ref(std::move(other.ref)) { }
 
-		//inline void bind(memory_reference&& ref) { ref = std::move(ref); }
+		resource& operator=(resource&& other)
+		{
+			destroy();
+			ref = std::move(other.ref);
+			return *this;
+		}
+
+	protected:
 
 		memory_reference ref;
 	};
@@ -30,15 +38,19 @@ namespace Spiral
 	class SPIRAL_API object_resource : public resource
 	{
 	public:
+		object_resource() = default;
+
+		/**
+		 * @brief 
+		*/
 		enum class index_format : std::uint8_t
 		{
 			NONE = 0,
-			UINT8, //requires extension
+			UINT8, // requires extension
 			UINT16,
 			UINT32,
 		};
 
-		object_resource() = default;
 		object_resource(const void* data, const std::size_t size, const std::size_t offset, const bool vertex_data_first,
 			const index_format index_type, const data_layout& layout);
 		object_resource(const void* vertex_data, const std::size_t vertex_data_size, const void* index_data,
@@ -81,12 +93,24 @@ namespace Spiral
 			return object_resource(vertex_data_size, data_layout::create<Types...>());
 		}
 
-		object_resource(const object_resource&) = delete;
-		object_resource& operator=(const object_resource&) = delete;
+		object_resource(object_resource&& other) noexcept : resource(std::move(other)), layout(other.layout),
+			index_type(other.index_type), count(other.count)
+		{ }
+
+		object_resource& operator=(object_resource&& other) noexcept
+		{
+			this->~object_resource();
+			return *new (this) object_resource(std::move(other));
+		}
+
+		inline std::uint32_t get_count() const noexcept { return count; }
+
+	public:
+		const data_layout layout;
+		const index_format index_type = index_format::NONE;
 
 	private:
-		const data_layout layout;
-		const index_format index_type;
+		std::uint32_t count;
 	};
 
 	class SPIRAL_API texture_resource : public resource

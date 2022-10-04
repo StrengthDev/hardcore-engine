@@ -33,17 +33,17 @@ namespace Spiral
 		CASE(fn, fnl, shader_extensions::VERTEX, shader_t::VERTEX);
 		CASE(fn, fnl, shader_extensions::FRAGMENT, shader_t::FRAGMENT);
 		CASE(fn, fnl, shader_extensions::COMPUTE, shader_t::COMPUTE);
-		CASE(fn, fnl, shader_extensions::MESH, shader_t::MESH);
 		CASE(fn, fnl, shader_extensions::TESSELATION_CONTROL, shader_t::TESSELATION_CONTROL);
 		CASE(fn, fnl, shader_extensions::TESSELATION_EVALUATION, shader_t::TESSELATION_EVALUATION);
 		CASE(fn, fnl, shader_extensions::GEOMETRY, shader_t::GEOMETRY);
-		CASE(fn, fnl, shader_extensions::TASK, shader_t::TASK);
 		CASE(fn, fnl, shader_extensions::RAY_GENERATION, shader_t::RAY_GENERATION);
 		CASE(fn, fnl, shader_extensions::RAY_INTERSECTION, shader_t::RAY_INTERSECTION);
 		CASE(fn, fnl, shader_extensions::RAY_ANY_HIT, shader_t::RAY_ANY_HIT);
 		CASE(fn, fnl, shader_extensions::RAY_CLOSEST_HIT, shader_t::RAY_CLOSEST_HIT);
 		CASE(fn, fnl, shader_extensions::RAY_MISS, shader_t::RAY_MISS);
 		CASE(fn, fnl, shader_extensions::RAY_CALLABLE, shader_t::RAY_CALLABLE);
+		CASE(fn, fnl, shader_extensions::MESH, shader_t::MESH);
+		CASE(fn, fnl, shader_extensions::TASK, shader_t::TASK);
 
 		//TODO: stuff
 		DEBUG_BREAK;
@@ -69,8 +69,20 @@ namespace Spiral
 	{
 		switch (stage)
 		{
-		case shader_t::VERTEX:		return shaderc_vertex_shader;
-		case shader_t::FRAGMENT:	return shaderc_fragment_shader;
+		case shader_t::VERTEX:					return shaderc_vertex_shader;
+		case shader_t::FRAGMENT:				return shaderc_fragment_shader;
+		case shader_t::COMPUTE:					return shaderc_compute_shader;
+		case shader_t::TESSELATION_CONTROL:		return shaderc_tess_control_shader;
+		case shader_t::TESSELATION_EVALUATION:	return shaderc_tess_evaluation_shader;
+		case shader_t::GEOMETRY:				return shaderc_geometry_shader;
+		case shader_t::RAY_GENERATION:			return shaderc_raygen_shader;
+		case shader_t::RAY_INTERSECTION:		return shaderc_intersection_shader;
+		case shader_t::RAY_ANY_HIT:				return shaderc_anyhit_shader;
+		case shader_t::RAY_CLOSEST_HIT:			return shaderc_closesthit_shader;
+		case shader_t::RAY_MISS:				return shaderc_miss_shader;
+		case shader_t::RAY_CALLABLE:			return shaderc_callable_shader;
+		case shader_t::MESH:					return shaderc_mesh_shader;
+		case shader_t::TASK:					return shaderc_task_shader;
 		default:
 			//TODO: stuff
 			DEBUG_BREAK;
@@ -103,7 +115,7 @@ namespace Spiral
 		switch (shaderc_result_get_compilation_status(result))
 		{
 		case shaderc_compilation_status_success:
-			LOG_INTERNAL_TRACE("Sucessfuly compiled shader:\t" << error_name)
+			LOG_INTERNAL_INFO("Sucessfuly compiled shader:\t" << error_name)
 			break;
 		case shaderc_compilation_status_invalid_stage:  // error stage deduction
 			LOG_INTERNAL_ERROR("Failed to deduce correct shader stage. [" << error_name << ']')
@@ -235,7 +247,7 @@ namespace Spiral
 
 			if (static_cast<std::size_t>(binding) + 1 > inputs_vector.size())
 			{
-				for (std::size_t i = inputs_vector.size(); i < binding + 1; i++)
+				for (std::size_t i = inputs_vector.size(); i < static_cast<std::size_t>(binding) + 1; i++)
 				{
 					inputs_vector.emplace_back();
 				}
@@ -246,7 +258,7 @@ namespace Spiral
 
 			if (static_cast<std::size_t>(location) + 1 > binding_vector.size())
 			{
-				for (std::size_t i = binding_vector.size(); i < location + 1; i++)
+				for (std::size_t i = binding_vector.size(); i < static_cast<std::size_t>(location) + 1; i++)
 				{
 					binding_vector.emplace_back();
 				}
@@ -289,9 +301,11 @@ namespace Spiral
 			{
 				inputs[i].~data_layout();
 			}
+			std::free(data);
 			std::free(inputs);
 			std::free(name);
-			std::free(data);
+			std::free(entry_point);
+			data = nullptr;
 		}
 	}
 
@@ -317,24 +331,27 @@ namespace Spiral
 
 	
 
-	VkShaderModule internal_shader::create_shader_module(const internal_shader& shader, VkDevice& handle, 
+	VkShaderModule internal_shader::create_shader_module(const shader& shader, VkDevice& handle, 
 		VkShaderStageFlagBits* out_stage, const char** out_entry_point)
 	{
+		//cast should cause no issues, as internal shader is merely a helper class to help access base class variables
+		const internal_shader& cast_shader = reinterpret_cast<const internal_shader&>(shader);
+
 		VkShaderModule module;
 
 		VkShaderModuleCreateInfo create_info = {};
 		create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-		create_info.pCode = shader.data;
-		create_info.codeSize = shader.size;
+		create_info.pCode = cast_shader.data;
+		create_info.codeSize = cast_shader.size;
 
-		if (vkCreateShaderModule(handle, &create_info, nullptr, &module) != VK_SUCCESS)
+		VkResult result = vkCreateShaderModule(handle, &create_info, nullptr, &module);
+		if (result != VK_SUCCESS)
 		{
-			//TODO: stuff
-			DEBUG_BREAK;
+			CRASH("Failed to create shader module", result);
 		}
 
-		*out_stage = shader.get_stage();
-		*out_entry_point = create_cstr(shader.entry_point);
+		*out_stage = cast_shader.get_stage();
+		*out_entry_point = create_cstr(cast_shader.entry_point);
 
 		return module;
 	}

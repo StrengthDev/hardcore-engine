@@ -26,260 +26,21 @@ const VkMemoryPropertyFlags download_heap = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT 
 
 namespace Spiral
 {
-	VkPhysicalDevice* pHandle;
-	VkDevice* lHandle;
-	VkQueue* gQueue;
-	MemoryNexus global;
-	VkDeviceSize memGranularity;
-
-
-	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties)
-	{
-		VkPhysicalDeviceMemoryProperties memProperties;
-		vkGetPhysicalDeviceMemoryProperties(*pHandle, &memProperties);
-
-		for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++)
-		{
-			if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties)
-			{
-				return i;
-			}
-		}
-
-		//do stuff
-		DEBUG_BREAK;
-		return 0;
-	}
-
-	void createPool(VkDeviceMemory& memory, VkBuffer& buffer, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties)
-	{
-		VkBufferCreateInfo bufferInfo = {};
-		bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-		bufferInfo.size = buffer_pool_size;
-		bufferInfo.usage = usage;
-		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-		if (vkCreateBuffer(*lHandle, &bufferInfo, nullptr, &buffer) != VK_SUCCESS)
-		{
-			//do stuff
-			DEBUG_BREAK;
-		}
-
-		VkMemoryRequirements memRequirements;
-		vkGetBufferMemoryRequirements(*lHandle, buffer, &memRequirements);
-
-		VkMemoryAllocateInfo allocInfo = {};
-		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		allocInfo.allocationSize = memRequirements.size;
-		allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
-
-		if (vkAllocateMemory(*lHandle, &allocInfo, nullptr, &memory) != VK_SUCCESS)
-		{
-			//do stuff
-			DEBUG_BREAK;
-		}
-		vkBindBufferMemory(*lHandle, buffer, memory, 0);
-	}
-
-	void Memory::init(VkPhysicalDevice* physical, VkDevice* logical, VkQueue* queue, VkCommandPool* pool)
-	{
-		pHandle = physical;
-		lHandle = logical;
-		gQueue = queue;
-		init(global, pool);
-		VkPhysicalDeviceProperties properties;
-		vkGetPhysicalDeviceProperties(*pHandle, &properties);
-		memGranularity = properties.limits.nonCoherentAtomSize;
-	}
-
-	void Memory::terminate()
-	{
-	}
-
-	void Memory::init(MemoryNexus& nexus, VkCommandPool* pool)
-	{
-		nexus.nPools = 1;
-		nexus.pools = (memory_pool*)malloc(sizeof(memory_pool));
-
-		nexus.pools[0].n_slots = 0;
-		nexus.pools[0].capacity = initial_pool_slot_size;
-		nexus.pools[0].slots = (memory_slot*)malloc(sizeof(memory_slot) * initial_pool_slot_size);
-
-		nexus.transientOffset = 0;
-
-		//nexus.pools[0].largestFreeRange.in_use = true;
-		//nexus.pools[0].largestFreeRange.offset = 0;
-		//nexus.pools[0].largestFreeRange.size = buffer_pool_size;
-
-		createPool(nexus.pools[0].memory, nexus.pools[0].buffer, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-		createPool(nexus.transientDeviceMemory, nexus.transientBuffer, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-		nexus.transientMemory = malloc(buffer_pool_size);
-		vkMapMemory(*lHandle, nexus.transientDeviceMemory, 0, VK_WHOLE_SIZE, 0, &nexus.transientMemory);
-
-		nexus.nRanges = 0;
-		nexus.transientCapacity = initial_pool_slot_size;
-		nexus.ranges = (TransientRange*)malloc(sizeof(TransientRange) * initial_pool_slot_size);
-
-		nexus.cmdPool = pool;
-
-		VkCommandBufferAllocateInfo allocInfo = {};
-		allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		allocInfo.commandPool = *nexus.cmdPool;
-		allocInfo.commandBufferCount = 1;
-
-		if (vkAllocateCommandBuffers(*lHandle, &allocInfo, &nexus.cmdBuffer) != VK_SUCCESS)
-		{
-			//do stuff
-			DEBUG_BREAK;
-		}
-
-		VkFenceCreateInfo fenceInfo = {};
-		fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-		fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-		if (vkCreateFence(*lHandle, &fenceInfo, nullptr, &nexus.fence) != VK_SUCCESS)
-		{
-			//do stuff
-			DEBUG_BREAK;
-		}
-	}
-
-	void Memory::terminate(MemoryNexus &nexus)
-	{
-	}
-
-	//TODO: for uniform buffers, use HOST_VISIBLE_BIT, but not HOST_COHERENT_BIT and use vkFlushMappedMemoryRanges during frame setup, all in the same vkBuffer/DeviceMemory with different offsets
-	void Memory::createBuffer(void* data, VkDeviceSize size, VkBufferUsageFlags usage, MemoryNexus& nexus = global)
-	{
-		//TODO: check usage
-		uint32_t i, j;
-		for (i = 0; i < nexus.nPools; i++)
-		{
-			/*if (!nexus.pools[i].largestFreeRange.in_use)
-			{
-				//update largest range
-				nexus.pools[i].largestFreeRange.in_use = true;
-				nexus.pools[i].largestFreeRange.offset = 36;
-				nexus.pools[i].largestFreeRange.size = 100;
-			}
-			if (nexus.pools[i].largestFreeRange.size >= size)
-			{
-				break;
-			}*/
-		}
-		if (i == nexus.nPools)
-		{
-			//add more pools
-		}
-		for (j = 0; j < nexus.pools[i].n_slots; j++)
-		{
-			if (!nexus.pools[i].slots[j].in_use)
-			{
-				break;
-			}
-		}
-		if (j == nexus.pools[i].capacity)
-		{
-			//add more
-		}
-		nexus.pools[i].slots[j].in_use = true;
-		//nexus.pools[i].slots[j].offset = nexus.pools[i].largestFreeRange.offset;
-		nexus.pools[i].slots[j].size = size;
-
-		nexus.pools[i].n_slots++;
-
-		//nexus.pools[i].largestFreeRange.in_use = false;
-
-		if (buffer_pool_size < nexus.transientOffset + size)
-		{
-			flush(nexus);
-		}
-
-		if (nexus.transientCapacity < nexus.nRanges + 1)
-		{
-			//allocate space
-		}
-
-		nexus.ranges[nexus.nRanges].pool = i;
-		nexus.ranges[nexus.nRanges].srcOffset = nexus.transientOffset;
-		//nexus.ranges[nexus.nRanges].dstOffset = nexus.pools[i].largestFreeRange.offset;
-		nexus.ranges[nexus.nRanges].size = size;
-		nexus.nRanges++;
-		memcpy(static_cast<char*>(nexus.transientMemory) + nexus.transientOffset, data, size);
-		nexus.transientOffset += size;
-	}
-
-	void Memory::destroyBuffer(uint32_t pool, uint32_t buffer, MemoryNexus& nexus = global)
-	{
-	}
-
-	void Memory::flush(MemoryNexus& nexus = global)
-	{
-		if (nexus.transientOffset)
-		{
-			uint64_t i;
-			TransientRange range;
-			vkWaitForFences(*lHandle, 1, &nexus.fence, VK_TRUE, UINT64_MAX);
-
-			VkMappedMemoryRange mem = {};
-			mem.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-			mem.memory = nexus.transientDeviceMemory;
-			mem.offset = 0;
-			mem.size = ((nexus.transientOffset / memGranularity) + 1) * memGranularity;
-			vkFlushMappedMemoryRanges(*lHandle, 1, &mem);
-			nexus.transientOffset = 0;
-
-			vkResetCommandBuffer(nexus.cmdBuffer, 0);
-
-			VkCommandBufferBeginInfo beginInfo = {};
-			beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-			beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-			vkBeginCommandBuffer(nexus.cmdBuffer, &beginInfo);
-
-			//TODO: optimise maybe, if the buffers are the same you can submit multiple regions at once
-			for (i = 0; i < nexus.nRanges; i++)
-			{
-				range = nexus.ranges[i];
-
-				VkBufferCopy copyRegion = {};
-				copyRegion.srcOffset = range.srcOffset;
-				copyRegion.dstOffset = range.dstOffset;
-				copyRegion.size = range.size;
-				LOGF_INTERNAL_DEBUG("src:{0} dst:{1} size:{2}", range.srcOffset, range.dstOffset, range.size);
-				vkCmdCopyBuffer(nexus.cmdBuffer, nexus.transientBuffer, nexus.pools[range.pool].buffer, 1, &copyRegion);
-			}
-			nexus.nRanges = 0;
-
-			vkEndCommandBuffer(nexus.cmdBuffer);
-
-			VkSubmitInfo submitInfo = {};
-			submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-			submitInfo.commandBufferCount = 1;
-			submitInfo.pCommandBuffers = &nexus.cmdBuffer;
-
-			vkResetFences(*lHandle, 1, &nexus.fence);
-			vkQueueSubmit(*gQueue, 1, &submitInfo, nexus.fence);
-		}
-	}
-
-	void Memory::waitFlush(MemoryNexus& nexus = global)
-	{
-		vkWaitForFences(*lHandle, 1, &nexus.fence, VK_TRUE, UINT64_MAX);
-	}
-
 	class mem_ref_internal : protected memory_reference
 	{
-	private:
 		mem_ref_internal(std::uint32_t pool, std::size_t offset, std::size_t size) : memory_reference(pool, offset, size) { }
 
-	public:
-		static inline memory_reference create(std::uint32_t pool, std::size_t offset, std::size_t size)
-		{
-			return mem_ref_internal(pool, offset, size);
-		}
+		friend device_memory;
+	};
+
+	class object_resource_internal : protected object_resource
+	{
+		friend device_memory;
+	};
+
+	class instance_internal : protected instance
+	{
+		friend device_memory;
 	};
 
 	inline void init_pool_data(memory_pool& pool)
@@ -309,22 +70,20 @@ namespace Spiral
 	{
 		this->owner = &owner;
 
-		VkPhysicalDeviceProperties properties;
-		vkGetPhysicalDeviceProperties(owner.physical_handle, &properties);
-		mem_granularity = properties.limits.nonCoherentAtomSize;
+		mem_granularity = owner.properties.limits.nonCoherentAtomSize;
 
 		vkGetPhysicalDeviceMemoryProperties(owner.physical_handle, &mem_properties);
 
 		for (std::uint32_t i = 0; i < mem_properties.memoryTypeCount; i++)
 		{
-			LOG_INTERNAL_INFO("Memory type " << i << " properties: "
+			LOG_INTERNAL_INFO("[RENDERER] Memory type " << i << " properties: "
+				<< '(' << std::bitset<sizeof(VkMemoryPropertyFlags) * 8>(mem_properties.memoryTypes[i].propertyFlags) << ") => "
 				<< (mem_properties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT ? "DEVICE_LOCAL " : "")
 				<< (mem_properties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ? "HOST_VISIBLE " : "")
 				<< (mem_properties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT ? "HOST_COHERENT " : "")
 				<< (mem_properties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT ? "HOST_CACHED " : "")
 				<< (mem_properties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT ? "LAZILY_ALLOCATED " : "")
-				<< (mem_properties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_PROTECTED_BIT ? "PROTECTED " : ""))
-				//<< std::bitset<sizeof(VkMemoryPropertyFlags) * 8>(mem_properties.memoryTypes[i].propertyFlags))
+				<< (mem_properties.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_PROTECTED_BIT ? "PROTECTED " : ""));
 		}
 
 		VkCommandPoolCreateInfo pool_info = {};
@@ -363,8 +122,6 @@ namespace Spiral
 			alloc_buffer(device_in[i].device, device_in[i].buffer, buffer_pool_size, 
 				VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
 				VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-			//device_in.host = ex_malloc(buffer_pool_size); vkmapmemory allocates the memory
-			vkMapMemory(owner.handle, device_in[i].device, 0, VK_WHOLE_SIZE, 0, &device_in[i].host);
 
 			VkSemaphoreCreateInfo semaphore_info = {};
 			semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -401,9 +158,9 @@ namespace Spiral
 			vkDestroyBuffer(owner->handle, pools[i].buffer, nullptr);
 			vkFreeMemory(owner->handle, pools[i].memory, nullptr);
 		}
+		unmap_ranges(owner->current_frame);
 		for (i = 0; i < max_frames_in_flight; i++)
 		{
-			vkUnmapMemory(owner->handle, device_in[i].device);
 			vkDestroyBuffer(owner->handle, device_in[i].buffer, nullptr);
 			vkFreeMemory(owner->handle, device_in[i].device, nullptr);
 			vkDestroySemaphore(owner->handle, device_in[i].semaphore, nullptr);
@@ -418,11 +175,9 @@ namespace Spiral
 		vkDestroyCommandPool(owner->handle, cmd_pool, nullptr);
 	}
 
-	void device_memory::flush_in(const std::uint16_t current_frame)
+	void device_memory::flush_in(const std::uint8_t current_frame)
 	{
 		transfer_memory& memory = device_in[current_frame];
-		if (memory.offset)
-		{
 			//TODO: if not host coherent...
 
 			vkResetCommandBuffer(cmd_buffers[current_frame], 0);
@@ -433,13 +188,17 @@ namespace Spiral
 
 			vkBeginCommandBuffer(cmd_buffers[current_frame], &begin_info);
 
+		if (memory.offset)
+		{
 			for (std::uint32_t pool_idx = 0; pool_idx < n_pools; pool_idx++)
 			{
 				memory_pool& pool = pools[pool_idx];
+				LOGF_INTERNAL_INFO("Copying data over to {0} slot(s) in memory pool {1}", pool.pending_copy_counts[current_frame], pool_idx);
 				vkCmdCopyBuffer(cmd_buffers[current_frame], memory.buffer, pool.buffer, pool.pending_copy_counts[current_frame], 
 					&pool.pending_copies[pool.pending_copy_capacity * current_frame]);
 				pool.pending_copy_counts[current_frame] = 0;
 			}
+		}
 
 			vkEndCommandBuffer(cmd_buffers[current_frame]);
 
@@ -454,12 +213,21 @@ namespace Spiral
 			vkQueueSubmit(owner->transfer_queue, 1, &submit_info, memory.fence);
 
 			memory.offset = 0;
-		}
 	}
 
-	void device_memory::synchronize()
+	void device_memory::map_ranges(const std::uint8_t current_frame)
 	{
-		vkWaitForFences(owner->handle, 1, &device_in[owner->current_frame].fence, VK_TRUE, std::numeric_limits<std::uint64_t>::max());
+		vkMapMemory(owner->handle, device_in[current_frame].device, 0, VK_WHOLE_SIZE, 0, &device_in[current_frame].host);
+	}
+
+	void device_memory::unmap_ranges(const std::uint8_t current_frame)
+	{
+		vkUnmapMemory(owner->handle, device_in[current_frame].device);
+	}
+
+	void device_memory::synchronize(const std::uint8_t current_frame)
+	{
+		vkWaitForFences(owner->handle, 1, &device_in[current_frame].fence, VK_TRUE, std::numeric_limits<std::uint64_t>::max());
 	}
 
 	inline void search_pools(memory_pool* pools, const std::uint32_t n_pools, const VkDeviceSize size,
@@ -603,48 +371,70 @@ namespace Spiral
 	}
 	//TODO: change refs to pointers
 	template<VkBufferUsageFlags BFlags, VkMemoryPropertyFlags MFlags>
-	inline void device_memory::alloc_slot(memory_pool* pools, std::uint32_t& n_pools,
-		std::uint32_t& pool_idx, std::uint32_t& slot_idx, const VkDeviceSize size)
+	inline void device_memory::alloc_slot(memory_pool* pools, std::uint32_t* out_n_pools,
+		std::uint32_t* out_pool_idx, std::uint32_t* out_slot_idx, VkDeviceSize size)
 	{
 		std::uint32_t selected_pool_idx = std::numeric_limits<std::uint32_t>::max();
 		std::uint32_t selected_slot_idx = std::numeric_limits<std::uint32_t>::max();
-		search_pools(pools, n_pools, size, selected_pool_idx, selected_slot_idx);
+		search_pools(pools, *out_n_pools, size, selected_pool_idx, selected_slot_idx);
 		if (selected_pool_idx == std::numeric_limits<std::uint32_t>::max())
 		{
-			selected_pool_idx = n_pools;
+			selected_pool_idx = *out_n_pools;
 			selected_slot_idx = 0;
-			n_pools++;
-			pools = t_realloc<memory_pool>(pools, n_pools);
+			(*out_n_pools)++;
+			pools = t_realloc<memory_pool>(pools, *out_n_pools);
 			init_pool_data(pools[selected_pool_idx]);
 			alloc_buffer(pools[selected_pool_idx].memory, pools[selected_pool_idx].buffer, buffer_pool_size, BFlags, MFlags);
 		}
 
 		fill_slot(pools[selected_pool_idx], selected_slot_idx, size);
-		pool_idx = selected_pool_idx;
-		slot_idx = selected_slot_idx;
+		*out_pool_idx = selected_pool_idx;
+		*out_slot_idx = selected_slot_idx;
+		LOGF_INTERNAL_INFO("Allocated {0} bytes in slot {1} of pool {2}", size, selected_slot_idx, selected_pool_idx);
 	}
 
 	memory_reference device_memory::alloc_object(const VkDeviceSize size)
 	{
 		std::uint32_t selected_pool_idx = std::numeric_limits<std::uint32_t>::max();
 		std::uint32_t selected_slot_idx = std::numeric_limits<std::uint32_t>::max();
-		alloc_slot<vertex_buffer, main_heap>(pools, n_pools, selected_pool_idx, selected_slot_idx, size);
-		return mem_ref_internal::create(selected_pool_idx, pools[selected_pool_idx].slots[selected_slot_idx].offset, size);
+		alloc_slot<vertex_buffer, main_heap>(pools, &n_pools, &selected_pool_idx, &selected_slot_idx, size);
+		return mem_ref_internal(selected_pool_idx, pools[selected_pool_idx].slots[selected_slot_idx].offset, size);
 	}
 
 	memory_reference device_memory::ialloc_object(const void* data, const VkDeviceSize size)
 	{
 		std::uint32_t selected_pool_idx = std::numeric_limits<std::uint32_t>::max();
 		std::uint32_t selected_slot_idx = std::numeric_limits<std::uint32_t>::max();
-		alloc_slot<vertex_buffer, main_heap>(pools, n_pools, selected_pool_idx, selected_slot_idx, size);
+		alloc_slot<vertex_buffer, main_heap>(pools, &n_pools, &selected_pool_idx, &selected_slot_idx, size);
 		memory_pool& selected_pool = pools[selected_pool_idx];
 		Spiral::submit_upload(selected_pool, selected_slot_idx, device_in[owner->current_frame], owner->current_frame, data, size);
-		return mem_ref_internal::create(selected_pool_idx, selected_pool.slots[selected_slot_idx].offset, size);
+		return mem_ref_internal(selected_pool_idx, selected_pool.slots[selected_slot_idx].offset, size);
+	}
+
+	memory_reference device_memory::alloc_dynamic_object(const VkDeviceSize size)
+	{
+		std::uint32_t selected_pool_idx = std::numeric_limits<std::uint32_t>::max();
+		std::uint32_t selected_slot_idx = std::numeric_limits<std::uint32_t>::max();
+		return memory_reference();
 	}
 
 	void device_memory::submit_upload(const memory_reference& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset)
 	{
 
+	}
+
+	buffer_binding_args device_memory::get_binding_args(const object_resource& object)
+	{
+		const mem_ref_internal& ref
+			= reinterpret_cast<const mem_ref_internal&>(reinterpret_cast<const object_resource_internal&>(object).ref);
+		return { pools[ref.pool].buffer, ref.size, ref.offset };
+	}
+
+	buffer_binding_args device_memory::get_binding_args(const instance& instance)
+	{
+		const mem_ref_internal& ref
+			= reinterpret_cast<const mem_ref_internal&>(reinterpret_cast<const instance_internal&>(instance).ref);
+		return { pools[ref.pool].buffer, ref.size, ref.offset }; //TODO different types
 	}
 
 	uint32_t device_memory::find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties)
@@ -675,7 +465,8 @@ namespace Spiral
 		return std::numeric_limits<uint32_t>::max();
 	}
 
-	void device_memory::alloc_buffer(VkDeviceMemory& memory, VkBuffer& buffer, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties)
+	void device_memory::alloc_buffer(VkDeviceMemory& memory, VkBuffer& buffer, VkDeviceSize size, 
+		VkBufferUsageFlags usage, VkMemoryPropertyFlags properties)
 	{
 		VkBufferCreateInfo buffer_info = {};
 		buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;

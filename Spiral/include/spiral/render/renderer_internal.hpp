@@ -14,4 +14,9 @@ namespace Spiral
 
 		device& get_device();
 	}
+
+	namespace shader_library
+	{
+		void clear();
+	}
 }

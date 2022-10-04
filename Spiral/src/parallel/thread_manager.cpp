@@ -7,11 +7,12 @@ namespace Spiral
 {
 	namespace parallel
 	{
-		const unsigned int num_base_threads = 5; //main + renderer + network + logger + master
+		const unsigned int num_base_threads = 6; //main + renderer + network + logger + physics + master
 
 		std::thread renderer; //TODO
 		std::thread network; //TODO
 		std::thread logger; //TODO
+		std::thread physics; //TODO
 
 		std::thread task_master;
 		std::atomic_flag run_master;

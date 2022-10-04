@@ -18,4 +18,8 @@ public:
 private:
 	double timec;
 	int framec;
+
+	Spiral::object_resource resource;
+	Spiral::instance_vector instances;
+	Spiral::render_pipeline pipeline;
 };

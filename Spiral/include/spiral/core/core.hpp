@@ -13,9 +13,11 @@
 #define INTERNAL_ASSERT(exp, msg)
 #else
 #include <cassert>
-#define DEBUG_BREAK __debugbreak();
-#define INTERNAL_ASSERT(exp, msg) assert(exp && msg)
+#define DEBUG_BREAK __debugbreak()
+#define INTERNAL_ASSERT(exp, msg) assert((exp) && msg); if(!(exp)) __debugbreak()
 #endif // NDEBUG
+
+#define CRASH(msg, ...) DEBUG_BREAK; Spiral::crash(msg, __FILE__, __LINE__, __FUNCSIG__, __VA_ARGS__)
 
 #else // _MSC_VER
 
@@ -34,9 +36,9 @@
 #define INTERNAL_ASSERT(exp, msg)
 #endif // NDEBUG
 
+#define CRASH(msg, ...) DEBUG_BREAK; Spiral::crash(msg, __FILE__, __LINE__, __PRETTY_FUNCTION__, __VA_ARGS__)
+
 #endif 
-
-
 
 #include <memory>
 
@@ -137,10 +139,21 @@ namespace Spiral
 		return reinterpret_cast<Type*>(ex_realloc(ptr, count * sizeof(Type)));
 	}
 
+	inline void crash(const char* msg, const char* file, std::uint32_t line, const char* func, int error = -1)
+	{
+		
+		
+
+		exit(error);
+	}
+
 	static const char* ENGINE_NAME = "Spiral Engine";
 	static const unsigned int MAJOR_VERSION = 1;
 	static const unsigned int MINOR_VERSION = 0;
 	static const unsigned int PATCH_VERSION = 0;
+
+	extern const char* COMPILATION_DATE;
+	extern const char* COMPILATION_TIME;
 
 	struct program_id
 	{

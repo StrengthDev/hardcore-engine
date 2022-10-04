@@ -17,10 +17,14 @@ TestLayer::TestLayer()
 	mesh.indices = idx;
 	mesh.iSize = 6;
 
-	//Spiral::renderer::loadMesh(mesh, vi, fi);
-	//Spiral::Renderer::Pipeline pl();
-	//Spiral::Renderer::Resource res(mesh);
-	//Spiral::Renderer::Instance obj(res, pl);
+	Spiral::data_layout vert_layout(1);
+	vert_layout.set_type(0, Spiral::data_layout::type::VEC3, Spiral::data_layout::component_type::FLOAT32);
+	resource = Spiral::object_resource(verts, sizeof(verts), vert_layout);
+	instances = Spiral::instance_vector(1, Spiral::data_layout::create<std::uint32_t>());
+	pipeline = Spiral::render_pipeline(Spiral::shader_library::get("resources/shaders/shader.vert.spv"),
+		Spiral::shader_library::get("resources/shaders/shader.frag.spv"));
+
+	pipeline.link(resource);
 }
 
 TestLayer::~TestLayer()
