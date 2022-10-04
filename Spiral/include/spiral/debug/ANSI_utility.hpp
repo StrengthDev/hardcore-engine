@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	namespace log
 	{
@@ -90,7 +90,7 @@ namespace Spiral
 	}
 }
 
-#define ANSI_SETTING(arg) Spiral::log::ESC << '[' << arg << 'm'
-#define ANSI_SETTINGS(arg_0, arg_1, arg_2) Spiral::log::ESC << '[' << arg_0 << ';' << arg_1 << ';' << arg_2 << 'm'
+#define ANSI_SETTING(arg) ENGINE_NAMESPACE::log::ESC << '[' << arg << 'm'
+#define ANSI_SETTINGS(arg_0, arg_1, arg_2) ENGINE_NAMESPACE::log::ESC << '[' << arg_0 << ';' << arg_1 << ';' << arg_2 << 'm'
 
-#define ANSI_RESET Spiral::log::ESC << "[0m"
+#define ANSI_RESET ENGINE_NAMESPACE::log::ESC << "[0m"

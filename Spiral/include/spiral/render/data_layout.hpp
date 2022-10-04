@@ -1,5 +1,7 @@
 #pragma once
 
+#include <spiral/core/core.hpp>
+
 #define SET_TYPE_S(t1, t2, t3)									\
 template<>														\
 inline void set_type_s<t1>(std::uint8_t index) noexcept			\
@@ -7,9 +9,9 @@ inline void set_type_s<t1>(std::uint8_t index) noexcept			\
 	set_type(index, t2, t3);									\
 }
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
-	class SPIRAL_API data_layout
+	class ENGINE_API data_layout
 	{
 	public:
 		enum class type : std::uint8_t
@@ -323,35 +325,35 @@ namespace Spiral
 				bool not_scalar = true;
 				switch (t)
 				{
-				case Spiral::data_layout::type::SCALAR:	not_scalar = false;	break;
-				case Spiral::data_layout::type::VEC2:	stream << "vec2";	break;
-				case Spiral::data_layout::type::VEC3:	stream << "vec3";	break;
-				case Spiral::data_layout::type::VEC4:	stream << "vec4";	break;
-				case Spiral::data_layout::type::MAT2:	stream << "mat2";	break;
-				case Spiral::data_layout::type::MAT3:	stream << "mat3";	break;
-				case Spiral::data_layout::type::MAT4:	stream << "mat4";	break;
-				case Spiral::data_layout::type::MAT2x3:	stream << "mat2x3";	break;
-				case Spiral::data_layout::type::MAT2x4:	stream << "mat2x4";	break;
-				case Spiral::data_layout::type::MAT3x2:	stream << "mat3x2";	break;
-				case Spiral::data_layout::type::MAT3x4:	stream << "mat3x4";	break;
-				case Spiral::data_layout::type::MAT4x2:	stream << "mat4x2";	break;
-				case Spiral::data_layout::type::MAT4x3:	stream << "mat4x3";	break;
+				case ENGINE_NAMESPACE::data_layout::type::SCALAR:	not_scalar = false;	break;
+				case ENGINE_NAMESPACE::data_layout::type::VEC2:		stream << "vec2";	break;
+				case ENGINE_NAMESPACE::data_layout::type::VEC3:		stream << "vec3";	break;
+				case ENGINE_NAMESPACE::data_layout::type::VEC4:		stream << "vec4";	break;
+				case ENGINE_NAMESPACE::data_layout::type::MAT2:		stream << "mat2";	break;
+				case ENGINE_NAMESPACE::data_layout::type::MAT3:		stream << "mat3";	break;
+				case ENGINE_NAMESPACE::data_layout::type::MAT4:		stream << "mat4";	break;
+				case ENGINE_NAMESPACE::data_layout::type::MAT2x3:	stream << "mat2x3";	break;
+				case ENGINE_NAMESPACE::data_layout::type::MAT2x4:	stream << "mat2x4";	break;
+				case ENGINE_NAMESPACE::data_layout::type::MAT3x2:	stream << "mat3x2";	break;
+				case ENGINE_NAMESPACE::data_layout::type::MAT3x4:	stream << "mat3x4";	break;
+				case ENGINE_NAMESPACE::data_layout::type::MAT4x2:	stream << "mat4x2";	break;
+				case ENGINE_NAMESPACE::data_layout::type::MAT4x3:	stream << "mat4x3";	break;
 				default: INTERNAL_ASSERT(false, "Unimplemented type"); break;
 				}
 				if (not_scalar) stream << '<';
 				switch (ct)
 				{
-				case Spiral::data_layout::component_type::FLOAT32:	stream << "float";		break;
-				case Spiral::data_layout::component_type::FLOAT64:	stream << "double";		break;
-				case Spiral::data_layout::component_type::FLOAT16:	stream << "half_float";	break;
-				case Spiral::data_layout::component_type::INT8:		stream << "int8";		break;
-				case Spiral::data_layout::component_type::INT16:	stream << "int16";		break;
-				case Spiral::data_layout::component_type::INT32:	stream << "int32";		break;
-				case Spiral::data_layout::component_type::INT64:	stream << "int64";		break;
-				case Spiral::data_layout::component_type::UINT8:	stream << "uint8";		break;
-				case Spiral::data_layout::component_type::UINT16:	stream << "uint16";		break;
-				case Spiral::data_layout::component_type::UINT32:	stream << "uint32";		break;
-				case Spiral::data_layout::component_type::UINT64:	stream << "uint64";		break;
+				case ENGINE_NAMESPACE::data_layout::component_type::FLOAT32:	stream << "float";		break;
+				case ENGINE_NAMESPACE::data_layout::component_type::FLOAT64:	stream << "double";		break;
+				case ENGINE_NAMESPACE::data_layout::component_type::FLOAT16:	stream << "half_float";	break;
+				case ENGINE_NAMESPACE::data_layout::component_type::INT8:		stream << "int8";		break;
+				case ENGINE_NAMESPACE::data_layout::component_type::INT16:		stream << "int16";		break;
+				case ENGINE_NAMESPACE::data_layout::component_type::INT32:		stream << "int32";		break;
+				case ENGINE_NAMESPACE::data_layout::component_type::INT64:		stream << "int64";		break;
+				case ENGINE_NAMESPACE::data_layout::component_type::UINT8:		stream << "uint8";		break;
+				case ENGINE_NAMESPACE::data_layout::component_type::UINT16:		stream << "uint16";		break;
+				case ENGINE_NAMESPACE::data_layout::component_type::UINT32:		stream << "uint32";		break;
+				case ENGINE_NAMESPACE::data_layout::component_type::UINT64:		stream << "uint64";		break;
 				default: INTERNAL_ASSERT(false, "Unimplemented component type"); break;
 				}
 				if (not_scalar) stream << '>';

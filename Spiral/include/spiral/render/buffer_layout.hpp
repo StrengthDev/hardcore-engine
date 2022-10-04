@@ -1,8 +1,10 @@
 #pragma once
 
+#include <spiral/core/core.hpp>
+
 #include <cstdint>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	enum AttributeType
 	{

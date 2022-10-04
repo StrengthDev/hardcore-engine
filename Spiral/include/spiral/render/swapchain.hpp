@@ -2,7 +2,7 @@
 
 #include "render_core.hpp"
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 
 	class device;

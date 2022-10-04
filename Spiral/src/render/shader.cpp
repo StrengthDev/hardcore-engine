@@ -6,7 +6,7 @@
 #include <shaderc/shaderc.h>
 #include <spirv_cross/spirv_reflect.hpp>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	template<std::size_t N>
 	constexpr std::size_t len(const char (&str)[N]) noexcept

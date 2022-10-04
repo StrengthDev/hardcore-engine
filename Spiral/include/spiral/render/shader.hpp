@@ -4,7 +4,7 @@
 
 #include "data_layout.hpp"
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	namespace shader_extensions
 	{
@@ -39,7 +39,7 @@ namespace Spiral
 		MESH, TASK,
 	};
 
-	class SPIRAL_API shader
+	class ENGINE_API shader
 	{
 	public:
 		shader() {};

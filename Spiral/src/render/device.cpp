@@ -3,7 +3,7 @@
 #include <spiral/render/device.hpp>
 #include <spiral/render/shader_library.hpp>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	inline void calc_queue_indices(VkPhysicalDevice& physical_handle, VkSurfaceKHR& surface,
 		std::uint32_t* out_graphics_idx, std::uint32_t* out_present_idx, std::uint32_t* out_compute_idx, std::uint32_t* out_transfer_idx,

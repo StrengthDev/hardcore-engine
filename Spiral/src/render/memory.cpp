@@ -24,7 +24,7 @@ const VkMemoryPropertyFlags upload_heap = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | 
 const VkMemoryPropertyFlags download_heap = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
 
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	class mem_ref_internal : protected memory_reference
 	{
@@ -407,7 +407,7 @@ namespace Spiral
 		std::uint32_t selected_slot_idx = std::numeric_limits<std::uint32_t>::max();
 		alloc_slot<vertex_buffer, main_heap>(pools, &n_pools, &selected_pool_idx, &selected_slot_idx, size);
 		memory_pool& selected_pool = pools[selected_pool_idx];
-		Spiral::submit_upload(selected_pool, selected_slot_idx, device_in[owner->current_frame], owner->current_frame, data, size);
+		ENGINE_NAMESPACE::submit_upload(selected_pool, selected_slot_idx, device_in[owner->current_frame], owner->current_frame, data, size);
 		return mem_ref_internal(selected_pool_idx, selected_pool.slots[selected_slot_idx].offset, size);
 	}
 

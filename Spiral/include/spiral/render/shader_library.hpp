@@ -2,12 +2,12 @@
 
 #include "shader.hpp"
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	namespace shader_library
 	{
-		SPIRAL_API const shader& add(shader&& s);
-		SPIRAL_API const shader& get(const char* name);
-		SPIRAL_API bool has(const char* name);
+		ENGINE_API const shader& add(shader&& s);
+		ENGINE_API const shader& get(const char* name);
+		ENGINE_API bool has(const char* name);
 	};
 }

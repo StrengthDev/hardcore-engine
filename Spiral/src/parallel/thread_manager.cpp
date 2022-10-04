@@ -3,7 +3,7 @@
 #include <spiral/parallel/thread_manager.hpp>
 #include <spiral/parallel/task.hpp>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	namespace parallel
 	{

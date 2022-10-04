@@ -2,7 +2,7 @@
 
 #include <spiral/core/layer.hpp>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	Layer::Layer()
 	{

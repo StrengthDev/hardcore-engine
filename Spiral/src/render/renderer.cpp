@@ -7,7 +7,7 @@
 #include <spiral/core/static_client.hpp>
 #include <spiral/core/window_internal.hpp>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	namespace renderer
 	{

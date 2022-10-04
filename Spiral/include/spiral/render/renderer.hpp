@@ -1,9 +1,8 @@
 #pragma once
 
-#include "mesh.hpp"
-#include "shader.hpp"
+#include <spiral/core/core.hpp>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	
 }

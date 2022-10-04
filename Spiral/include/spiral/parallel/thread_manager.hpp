@@ -8,7 +8,7 @@
 
 #include <spiral/core/core.hpp>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	namespace parallel
 	{

@@ -7,7 +7,7 @@
 #include <Windows.h>
 #endif // _MSC_VER
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	namespace log
 	{
@@ -182,38 +182,41 @@ namespace Spiral
 		{
 			void trace(const char* message)
 			{
-				if (Spiral::log::log_mask_flags & Spiral::log::TRACE_BIT)
-					Spiral::log::log(message, 0, 0, Spiral::log::WHITE);
+				if (ENGINE_NAMESPACE::log::log_mask_flags & ENGINE_NAMESPACE::log::TRACE_BIT)
+					ENGINE_NAMESPACE::log::log(message, 0, 0, ENGINE_NAMESPACE::log::WHITE);
 			}
 
 			void debug(const char* message)
 			{
-				if (Spiral::log::log_mask_flags & Spiral::log::DEBUG_BIT)
-					Spiral::log::log(message, 0, 1, Spiral::log::CYAN);
+				if (ENGINE_NAMESPACE::log::log_mask_flags & ENGINE_NAMESPACE::log::DEBUG_BIT)
+					ENGINE_NAMESPACE::log::log(message, 0, 1, ENGINE_NAMESPACE::log::CYAN);
 			}
 
 			void info(const char* message)
 			{
-				if (Spiral::log::log_mask_flags & Spiral::log::INFO_BIT)
-					Spiral::log::log(message, 0, 2, Spiral::log::GREEN);
+				if (ENGINE_NAMESPACE::log::log_mask_flags & ENGINE_NAMESPACE::log::INFO_BIT)
+					ENGINE_NAMESPACE::log::log(message, 0, 2, ENGINE_NAMESPACE::log::GREEN);
 			}
 
 			void warn(const char* message)
 			{
-				if (Spiral::log::log_mask_flags & Spiral::log::WARN_BIT)
-					Spiral::log::log(message, 0, 3, Spiral::log::YELLOW, Spiral::log::BOLD, Spiral::log::DEFAULT_FONT);
+				if (ENGINE_NAMESPACE::log::log_mask_flags & ENGINE_NAMESPACE::log::WARN_BIT)
+					ENGINE_NAMESPACE::log::log(message, 0, 3, ENGINE_NAMESPACE::log::YELLOW, ENGINE_NAMESPACE::log::BOLD, 
+						ENGINE_NAMESPACE::log::DEFAULT_FONT);
 			}
 
 			void error(const char* message)
 			{
-				if (Spiral::log::log_mask_flags & Spiral::log::ERROR_BIT)
-					Spiral::log::log(message, 0, 4, Spiral::log::RED, Spiral::log::BOLD, Spiral::log::DEFAULT_FONT);
+				if (ENGINE_NAMESPACE::log::log_mask_flags & ENGINE_NAMESPACE::log::ERROR_BIT)
+					ENGINE_NAMESPACE::log::log(message, 0, 4, ENGINE_NAMESPACE::log::RED, ENGINE_NAMESPACE::log::BOLD, 
+						ENGINE_NAMESPACE::log::DEFAULT_FONT);
 			}
 
 			void crit(const char* message)
 			{
-				if (Spiral::log::log_mask_flags & Spiral::log::CRIT_BIT)
-					Spiral::log::log(message, 0, 5, Spiral::log::BRIGHT_MAGENTA, Spiral::log::BOLD, Spiral::log::DEFAULT_FONT);
+				if (ENGINE_NAMESPACE::log::log_mask_flags & ENGINE_NAMESPACE::log::CRIT_BIT)
+					ENGINE_NAMESPACE::log::log(message, 0, 5, ENGINE_NAMESPACE::log::BRIGHT_MAGENTA, 
+						ENGINE_NAMESPACE::log::BOLD, ENGINE_NAMESPACE::log::DEFAULT_FONT);
 			}
 		}
 	}

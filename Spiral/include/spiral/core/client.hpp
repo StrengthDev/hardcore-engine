@@ -5,9 +5,9 @@
 #include "time.hpp"
 #include "static_client.hpp"
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
-	class SPIRAL_API client
+	class ENGINE_API client
 	{
 	public:
 		client() = delete;
@@ -72,14 +72,14 @@ namespace Spiral
 		static client* instance; //There will be only one Client class instance during runtime
 		static program_id engine_id;
 
-		friend Layer* Spiral::push_layer(Layer* layer);
-		friend void Spiral::pop_layer();
-		friend Layer* Spiral::push_overlay(Layer* layer);
-		friend void Spiral::pop_overlay();
-		friend void Spiral::clear_layers();
-		friend void Spiral::shutdown();
-		friend time_t Spiral::delta_time();
-		friend duration Spiral::elapsed_time();
+		friend Layer* ENGINE_NAMESPACE::push_layer(Layer* layer);
+		friend void ENGINE_NAMESPACE::pop_layer();
+		friend Layer* ENGINE_NAMESPACE::push_overlay(Layer* layer);
+		friend void ENGINE_NAMESPACE::pop_overlay();
+		friend void ENGINE_NAMESPACE::clear_layers();
+		friend void ENGINE_NAMESPACE::shutdown();
+		friend time_t ENGINE_NAMESPACE::delta_time();
+		friend duration ENGINE_NAMESPACE::elapsed_time();
 	};
 
 	//Should be defined in client

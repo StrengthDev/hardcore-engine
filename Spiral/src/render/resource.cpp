@@ -3,7 +3,7 @@
 #include <spiral/render/resource.hpp>
 #include <spiral/render/renderer_internal.hpp>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	void resource::destroy()
 	{

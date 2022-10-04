@@ -3,7 +3,7 @@
 #include <spiral/render/device.hpp>
 #include <spiral/render/graphics_pipeline.hpp>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	class data_layout_internal : data_layout
 	{

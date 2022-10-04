@@ -3,7 +3,7 @@
 #include <spiral/render/instance.hpp>
 #include <spiral/render/renderer_internal.hpp>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	instance::instance(const data_layout& layout) : layout(layout)
 	{

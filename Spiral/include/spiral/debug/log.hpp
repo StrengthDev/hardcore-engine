@@ -6,7 +6,7 @@
 
 #include <spiral/core/core.hpp>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	namespace log
 	{
@@ -29,8 +29,8 @@ namespace Spiral
 			EXPLICIT_TYPE_BIT =	BIT(2)
 		};
 
-		SPIRAL_API void set_log_mask_flags(flag_t flags);
-		SPIRAL_API void set_log_format_flags(flag_t flags);
+		ENGINE_API void set_log_mask_flags(flag_t flags);
+		ENGINE_API void set_log_format_flags(flag_t flags);
 
 		template<std::size_t N, typename Type, typename... Types>
 		inline void args_to_strings(std::array<std::string, N>& arr, Type arg, Types... args)
@@ -103,27 +103,27 @@ namespace Spiral
 			}
 		}
 
-		SPIRAL_API void trace(const char* message);
+		ENGINE_API void trace(const char* message);
 		template<typename... Types>
 		inline void tracef(const std::string& format, Types... args) { trace(str_format(format, args...).c_str()); }
 
-		SPIRAL_API void debug(const char* message);
+		ENGINE_API void debug(const char* message);
 		template<typename... Types>
 		inline void debugf(const std::string& format, Types... args) { debug(str_format(format, args...).c_str()); }
 
-		SPIRAL_API void info(const char* message);
+		ENGINE_API void info(const char* message);
 		template<typename... Types>
 		inline void infof(const std::string& format, Types... args) { info(str_format(format, args...).c_str()); }
 
-		SPIRAL_API void warn(const char* message);
+		ENGINE_API void warn(const char* message);
 		template<typename... Types>
 		inline void warnf(const std::string& format, Types... args) { warn(str_format(format, args...).c_str()); }
 
-		SPIRAL_API void error(const char* message);
+		ENGINE_API void error(const char* message);
 		template<typename... Types>
 		inline void errorf(const std::string& format, Types... args) { error(str_format(format, args...).c_str()); }
 
-		SPIRAL_API void crit(const char* message);
+		ENGINE_API void crit(const char* message);
 		template<typename... Types>
 		inline void critf(const std::string& format, Types... args) { crit(str_format(format, args...).c_str()); }
 	}
@@ -144,17 +144,17 @@ namespace Spiral
 #define LOGF_ERROR(...)
 #define LOGF_CRIT(...)
 #else				
-#define LOG_TRACE(message)	{ std::stringstream str_stream; str_stream << message; Spiral::log::trace(str_stream.str().c_str()); }
-#define LOG_DEBUG(message)	{ std::stringstream str_stream; str_stream << message; Spiral::log::debug(str_stream.str().c_str()); }
-#define LOG_INFO(message)	{ std::stringstream str_stream; str_stream << message; Spiral::log::info(str_stream.str().c_str()); }
-#define LOG_WARN(message)	{ std::stringstream str_stream; str_stream << message; Spiral::log::warn(str_stream.str().c_str()); }
-#define LOG_ERROR(message)	{ std::stringstream str_stream; str_stream << message; Spiral::log::error(str_stream.str().c_str()); }
-#define LOG_CRIT(message)	{ std::stringstream str_stream; str_stream << message; Spiral::log::crit(str_stream.str().c_str()); }
+#define LOG_TRACE(message)	{ std::stringstream str_stream; str_stream << message; spiral::log::trace(str_stream.str().c_str()); }
+#define LOG_DEBUG(message)	{ std::stringstream str_stream; str_stream << message; spiral::log::debug(str_stream.str().c_str()); }
+#define LOG_INFO(message)	{ std::stringstream str_stream; str_stream << message; spiral::log::info(str_stream.str().c_str()); }
+#define LOG_WARN(message)	{ std::stringstream str_stream; str_stream << message; spiral::log::warn(str_stream.str().c_str()); }
+#define LOG_ERROR(message)	{ std::stringstream str_stream; str_stream << message; spiral::log::error(str_stream.str().c_str()); }
+#define LOG_CRIT(message)	{ std::stringstream str_stream; str_stream << message; spiral::log::crit(str_stream.str().c_str()); }
 
-#define LOGF_TRACE(...)	Spiral::log::tracef(__VA_ARGS__);
-#define LOGF_DEBUG(...)	Spiral::log::debugf(__VA_ARGS__);
-#define LOGF_INFO(...)	Spiral::log::infof(__VA_ARGS__);
-#define LOGF_WARN(...)	Spiral::log::warnf(__VA_ARGS__);
-#define LOGF_ERROR(...)	Spiral::log::errorf(__VA_ARGS__);
-#define LOGF_CRIT(...)	Spiral::log::critf(__VA_ARGS__);
+#define LOGF_TRACE(...)	spiral::log::tracef(__VA_ARGS__);
+#define LOGF_DEBUG(...)	spiral::log::debugf(__VA_ARGS__);
+#define LOGF_INFO(...)	spiral::log::infof(__VA_ARGS__);
+#define LOGF_WARN(...)	spiral::log::warnf(__VA_ARGS__);
+#define LOGF_ERROR(...)	spiral::log::errorf(__VA_ARGS__);
+#define LOGF_CRIT(...)	spiral::log::critf(__VA_ARGS__);
 #endif // NDEBUG

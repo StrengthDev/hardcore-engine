@@ -4,7 +4,7 @@
 
 #include <spiral/core/client.hpp>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	Layer* push_layer(Layer* layer)
 	{

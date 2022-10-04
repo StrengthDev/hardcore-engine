@@ -2,7 +2,7 @@
 
 #include "core.hpp"
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	namespace window
 	{
@@ -12,19 +12,19 @@ namespace Spiral
 		 * @param[out] out_width Where to store the window width value.
 		 * @param[out] out_height Where to store the window height value.
 		*/
-		SPIRAL_API void get_dimensions(int* out_width, int* out_height);
+		ENGINE_API void get_dimensions(int* out_width, int* out_height);
 
 		/**TODO
 		 * @brief 
 		 * @param title 
 		*/
-		SPIRAL_API void set_title(const char* title);
+		ENGINE_API void set_title(const char* title);
 
 		/**TODO
 		 * @brief 
 		 * @param files 
 		 * @param num 
 		*/
-		SPIRAL_API void set_icon(const char** files, unsigned int num);
+		ENGINE_API void set_icon(const char** files, unsigned int num);
 	}
 }

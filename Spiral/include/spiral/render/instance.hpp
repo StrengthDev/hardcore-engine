@@ -5,9 +5,9 @@
 #include "data_layout.hpp"
 #include "memory_reference.hpp"
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
-	class SPIRAL_API instance
+	class ENGINE_API instance
 	{
 	public:
 		const data_layout layout;
@@ -39,7 +39,7 @@ namespace Spiral
 		std::uint32_t count = 0;
 	};
 
-	class SPIRAL_API expanding_instance_vector : public virtual instance
+	class ENGINE_API expanding_instance_vector : public virtual instance
 	{
 	protected:
 		expanding_instance_vector() = default;
@@ -48,13 +48,13 @@ namespace Spiral
 		virtual void grow(std::size_t new_size) = 0;
 	};
 
-	class SPIRAL_API device_instance_array : public instance
+	class ENGINE_API device_instance_array : public instance
 	{
 	public:
 		device_instance_array(std::uint32_t count, const data_layout& layout);
 	};
 
-	class SPIRAL_API device_instance_vector : public expanding_instance_vector
+	class ENGINE_API device_instance_vector : public expanding_instance_vector
 	{
 	public:
 		device_instance_vector(std::uint32_t initial_count, const data_layout& layout);
@@ -65,7 +65,7 @@ namespace Spiral
 
 	class instance_ref;
 
-	class SPIRAL_API host_accessible_instance : public virtual instance
+	class ENGINE_API host_accessible_instance : public virtual instance
 	{
 	protected:
 		host_accessible_instance() = default;
@@ -82,7 +82,7 @@ namespace Spiral
 		friend instance_ref;
 	};
 
-	class SPIRAL_API instance_ref
+	class ENGINE_API instance_ref
 	{
 	public:
 		void set(void* data) const
@@ -105,13 +105,13 @@ namespace Spiral
 		friend host_accessible_instance;
 	};
 
-	class SPIRAL_API instance_array : public host_accessible_instance
+	class ENGINE_API instance_array : public host_accessible_instance
 	{
 	public:
 		instance_array(std::uint32_t count, const data_layout& layout);
 	};
 
-	class SPIRAL_API instance_vector : public host_accessible_instance, public expanding_instance_vector
+	class ENGINE_API instance_vector : public host_accessible_instance, public expanding_instance_vector
 	{
 	public:
 		instance_vector() = default;

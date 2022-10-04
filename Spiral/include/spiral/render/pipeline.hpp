@@ -6,7 +6,7 @@
 #include "resource.hpp"
 #include "instance.hpp"
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	enum class pipeline_t : std::uint8_t
 	{
@@ -23,7 +23,7 @@ namespace Spiral
 		PASSIVE
 	};
 
-	class SPIRAL_API pipeline
+	class ENGINE_API pipeline
 	{
 	protected:
 		pipeline() = default;
@@ -61,7 +61,7 @@ namespace Spiral
 		inline pipeline_t get_type() const noexcept { return type; }
 	};
 
-	class SPIRAL_API render_pipeline : public pipeline
+	class ENGINE_API render_pipeline : public pipeline
 	{
 	public:
 		render_pipeline() = default;

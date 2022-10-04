@@ -1,8 +1,8 @@
 #pragma once
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
-	class SPIRAL_API memory_reference
+	class ENGINE_API memory_reference
 	{
 	public:
 		memory_reference() = default;
@@ -34,7 +34,8 @@ namespace Spiral
 		}
 
 	protected:
-		memory_reference(std::uint32_t pool, std::size_t offset, std::size_t size) noexcept : pool(pool), offset(offset), size(size) {}
+		memory_reference(std::uint32_t pool, std::size_t offset, std::size_t size) noexcept
+			: pool(pool), offset(offset), size(size) {}
 
 		std::uint32_t pool = std::numeric_limits<std::uint32_t>::max();
 		std::size_t offset = std::numeric_limits<std::size_t>::max();

@@ -3,9 +3,9 @@
 #include "core.hpp"
 #include "event.hpp"
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
-	class SPIRAL_API Layer
+	class ENGINE_API Layer
 	{
 	public:
 		Layer();

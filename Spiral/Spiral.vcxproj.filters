@@ -131,9 +131,6 @@
     <ClInclude Include="include\spiral\render\buffer_layout.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\spiral\render\mesh.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="include\spiral\render\shader.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>

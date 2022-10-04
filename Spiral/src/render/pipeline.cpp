@@ -4,7 +4,7 @@
 #include <spiral/render/pipeline.hpp>
 #include <spiral/render/renderer_internal.hpp>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	pipeline::~pipeline()
 	{

@@ -2,7 +2,7 @@
 
 #include <spiral/core/core.hpp>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	const char* COMPILATION_DATE = __DATE__;
 	const char* COMPILATION_TIME = __TIME__;

@@ -5,7 +5,7 @@
 #include "resource.hpp"
 #include "instance.hpp"
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	class device;
 

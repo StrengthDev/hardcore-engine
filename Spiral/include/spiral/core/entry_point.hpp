@@ -18,7 +18,7 @@
 
 #endif // NDEBUG
 
-#include <spiral.hpp>
+#include <spiral/core/core.hpp>
 #include <spiral/core/client.hpp>
 #include <spiral/debug/log_internal.hpp>
 
@@ -42,16 +42,16 @@
 #endif // NDEBUG
 
 
-extern Spiral::client* Spiral::start();
+extern ENGINE_NAMESPACE::client* ENGINE_NAMESPACE::start();
 
 int main(int argc, char** argv)
 {
 	ENABLE_MEM_CHECKING;
-	Spiral::log::init();
-	auto client = Spiral::start();
+	ENGINE_NAMESPACE::log::init();
+	auto client = ENGINE_NAMESPACE::start();
 	client->run();
 	delete client;
-	Spiral::log::shutdown();
+	ENGINE_NAMESPACE::log::shutdown();
 	END;
 }
 

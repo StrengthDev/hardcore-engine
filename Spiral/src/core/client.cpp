@@ -7,7 +7,7 @@
 
 #include <spiral/render/renderer_internal.hpp>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	program_id client::engine_id = {
 		ENGINE_NAME,

@@ -4,7 +4,7 @@
 
 #include "result.hpp"
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	namespace parallel //TODO: scrap results, use std::future/std::promise
 	{
@@ -15,7 +15,7 @@ namespace Spiral
 			func();
 		} //TODO: use this helper function and pass it into submit function, eliminating the need to pass std::function 
 
-		SPIRAL_API void submit_immediate_task(std::function<void()> task);
+		ENGINE_API void submit_immediate_task(std::function<void()> task);
 
 		/**
 		 * @brief Submits a task for immediate parallel execution.
@@ -55,7 +55,7 @@ namespace Spiral
 			return ret;
 		}
 
-		SPIRAL_API void submit_background_task(std::function<void()> task);
+		ENGINE_API void submit_background_task(std::function<void()> task);
 
 		template<typename Type>
 		inline result<Type> background_task(func_t<Type> task)

@@ -7,9 +7,9 @@
 
 #include <utility>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
-	class SPIRAL_API resource
+	class ENGINE_API resource
 	{
 	public:
 		resource() = default;
@@ -35,7 +35,7 @@ namespace Spiral
 		memory_reference ref;
 	};
 
-	class SPIRAL_API object_resource : public resource
+	class ENGINE_API object_resource : public resource
 	{
 	public:
 		object_resource() = default;
@@ -113,7 +113,7 @@ namespace Spiral
 		std::uint32_t count;
 	};
 
-	class SPIRAL_API texture_resource : public resource
+	class ENGINE_API texture_resource : public resource
 	{
 	public:
 

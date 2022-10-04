@@ -2,7 +2,7 @@
 
 #include <spiral.hpp>
 
-class ELLayer : public Spiral::Layer
+class ELLayer : public spiral::Layer
 {
 public:
 
@@ -11,7 +11,7 @@ public:
 
 	void tick() override;
 
-	bool handleEvent(const Spiral::Event &e) override;
+	bool handleEvent(const spiral::Event &e) override;
 
 private:
 

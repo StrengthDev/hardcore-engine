@@ -2,9 +2,9 @@
 
 #include <spiral/render/shader_library.hpp>
 
-std::unordered_map<std::string, Spiral::shader> shaders;
+std::unordered_map<std::string, ENGINE_NAMESPACE::shader> shaders;
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	namespace shader_library
 	{

@@ -2,7 +2,7 @@
 
 #include <spiral/core/event.hpp>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	Event Event::windowResize(int64_t width, int64_t height)
 	{

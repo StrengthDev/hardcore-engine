@@ -11,14 +11,14 @@
 //#define USE_SYMMETRIC_BINARY_OPERATORS
 #define DURATION_COMPATIBLE_TYPES std::enable_if_t<std::is_integral<Type>::value || std::is_floating_point<Type>::value, bool> = true
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	typedef double time_t;
 
 	/**
 	 * @brief This class defines a duration of time. All related operator functions take arguments in seconds, regardless of type.
 	*/
-	class SPIRAL_API duration
+	class ENGINE_API duration
 	{ //the class doesn't need to be exported as it's header only, but it is being exported to hide compiler warnings
 	private:
 		typedef unsigned long long second_t;

@@ -4,7 +4,7 @@
 
 #include <chrono>
 
-class TestLayer : public Spiral::Layer
+class TestLayer : public spiral::Layer
 {
 public:
 	TestLayer();
@@ -13,13 +13,13 @@ public:
 
 	void tick() override;
 
-	bool handleEvent(const Spiral::Event &e) override;
+	bool handleEvent(const spiral::Event &e) override;
 
 private:
 	double timec;
 	int framec;
 
-	Spiral::object_resource resource;
-	Spiral::instance_vector instances;
-	Spiral::render_pipeline pipeline;
+	spiral::object_resource resource;
+	spiral::instance_vector instances;
+	spiral::render_pipeline pipeline;
 };

@@ -1,11 +1,15 @@
 #pragma once
 
+#include <memory>
+
+#define ENGINE_NAMESPACE spiral
+
 #ifdef _MSC_VER
 
 #ifdef SPIRAL_BUILD
-	#define SPIRAL_API __declspec(dllexport)
+	#define ENGINE_API __declspec(dllexport)
 #else
-	#define SPIRAL_API __declspec(dllimport)
+	#define ENGINE_API __declspec(dllimport)
 #endif // SPIRAL_BUILD
 
 #ifdef NDEBUG
@@ -17,14 +21,14 @@
 #define INTERNAL_ASSERT(exp, msg) assert((exp) && msg); if(!(exp)) __debugbreak()
 #endif // NDEBUG
 
-#define CRASH(msg, ...) DEBUG_BREAK; Spiral::crash(msg, __FILE__, __LINE__, __FUNCSIG__, __VA_ARGS__)
+#define CRASH(msg, ...) DEBUG_BREAK; ENGINE_NAMESPACE::crash(msg, __FILE__, __LINE__, __FUNCSIG__, __VA_ARGS__)
 
 #else // _MSC_VER
 
 #ifdef SPIRAL_BUILD
-#define SPIRAL_API //TODO: export for other platforms
+#define ENGINE_API //TODO: export for other platforms
 #else
-#define SPIRAL_API //TODO: import for other platforms
+#define ENGINE_API //TODO: import for other platforms
 #endif // SPIRAL_BUILD
 
 #ifdef NDEBUG
@@ -40,15 +44,13 @@
 
 #endif 
 
-#include <memory>
-
 #define BIT(x) (1 << x)
 
 #define KILOBYTES(x) x * BIT(10)
 #define MEGABYTES(x) KILOBYTES(x) * BIT(10)
 #define GIGABYTES(x) MEGABYTES(x) * BIT(10)
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	/**
 	 * @brief Allocates uninitialized memory.

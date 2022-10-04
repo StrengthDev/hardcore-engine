@@ -4,7 +4,7 @@
 #include "swapchain.hpp"
 #include "graphics_pipeline.hpp"
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	class device
 	{

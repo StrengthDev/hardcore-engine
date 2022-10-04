@@ -4,7 +4,7 @@
 
 #include <cstdint>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	enum class EventType : uint16_t
 	{

@@ -6,7 +6,7 @@
 
 #include <GLFW/glfw3.h>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	namespace window
 	{

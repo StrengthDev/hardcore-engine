@@ -5,7 +5,7 @@
 #include <spiral/core/client.hpp>
 #include <spiral/core/window.hpp>
 
-namespace Spiral
+namespace ENGINE_NAMESPACE
 {
 	swapchain::~swapchain()
 	{
