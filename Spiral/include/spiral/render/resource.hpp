@@ -110,7 +110,7 @@ namespace ENGINE_NAMESPACE
 		const index_format index_type = index_format::NONE;
 
 	private:
-		std::uint32_t count;
+		std::uint32_t count = 0;
 	};
 
 	class ENGINE_API texture_resource : public resource

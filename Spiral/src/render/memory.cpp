@@ -14,8 +14,13 @@ const uint32_t initial_pool_slot_size = 16;
 const VkBufferUsageFlags vertex_buffer = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 const VkBufferUsageFlags index_buffer = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
 const VkBufferUsageFlags storage_buffer = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-const VkBufferUsageFlags dynamic_buffer = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+const VkBufferUsageFlags uniform_buffer = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+const VkBufferUsageFlags d_vertex_buffer = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+const VkBufferUsageFlags d_index_buffer = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+const VkBufferUsageFlags d_storage_buffer = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+const VkBufferUsageFlags d_uniform_buffer = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 const VkBufferUsageFlags upload_buffer = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+const VkBufferUsageFlags compute_staging = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 const VkBufferUsageFlags download_buffer = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 const VkMemoryPropertyFlags main_heap = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
@@ -38,32 +43,152 @@ namespace ENGINE_NAMESPACE
 		friend device_memory;
 	};
 
-	class instance_internal : protected instance
+	class instance_internal : protected device_data
 	{
 		friend device_memory;
 	};
 
-	inline void init_pool_data(memory_pool& pool)
+	memory_pool::memory_pool(VkDevice& handle)
 	{
-		std::uint32_t i;
-		pool.n_slots = initial_pool_slot_size;
-		pool.slots = t_malloc<memory_slot>(initial_pool_slot_size);
-		pool.slots[0].in_use = false;
-		pool.slots[0].offset = 0;
-		pool.slots[0].size = buffer_pool_size;
-		pool.largest_free_slot = 0;
+		n_slots = initial_pool_slot_size;
+		slots = t_malloc<memory_slot>(initial_pool_slot_size);
+		slots[0].in_use = false;
+		slots[0].offset = 0;
+		slots[0].size = buffer_pool_size;
+		largest_free_slot = 0;
 
-		for (i = 1; i < pool.n_slots; i++)
+		for (std::uint32_t i = 1; i < n_slots; i++)
 		{
-			pool.slots[i].in_use = false;
-			pool.slots[i].offset = buffer_pool_size;
-			pool.slots[i].size = 0;
+			slots[i].in_use = false;
+			slots[i].offset = buffer_pool_size;
+			slots[i].size = 0;
+		}
+	}
+
+	memory_pool::~memory_pool()
+	{
+		INTERNAL_ASSERT(memory == VK_NULL_HANDLE, "Memory pool not freed");
+	}
+
+	void memory_pool::free(VkDevice& handle)
+	{
+		if (memory != VK_NULL_HANDLE)
+		{
+			vkDestroyBuffer(handle, buffer, nullptr);
+			vkFreeMemory(handle, memory, nullptr);
+			std::free(slots);
+			memory = VK_NULL_HANDLE;
+		}
+	}
+
+	bool memory_pool::search(const VkDeviceSize size, std::uint32_t* out_slot_idx)
+	{
+		//largest free slot is unknown, must check everything, look for smallest possible fit
+		//if possible, update largest free slot to save some performance
+		if (slots[largest_free_slot].in_use)
+		{
+			VkDeviceSize largest_fit = 0;
+			std::uint32_t largest_idx = 0;
+			VkDeviceSize smallest_fit = std::numeric_limits<VkDeviceSize>::max();
+			std::uint32_t smallest_idx = std::numeric_limits<std::uint32_t>::max();
+			for (std::uint32_t slot_idx = 0; slot_idx < n_slots; slot_idx++)
+			{
+				if (!slots[slot_idx].in_use)
+				{
+					if (largest_fit < slots[slot_idx].size)
+					{
+						largest_fit = slots[slot_idx].size;
+						largest_idx = slot_idx;
+					}
+					if (size <= slots[slot_idx].size && smallest_fit > slots[slot_idx].size)
+					{
+						smallest_fit = slots[slot_idx].size;
+						smallest_idx = slot_idx;
+					}
+				}
+			}
+			if (size <= smallest_fit)
+			{
+				*out_slot_idx = smallest_idx;
+				if (!(largest_idx == smallest_idx))
+					largest_free_slot = largest_idx;
+				return true;
+			}
+			else
+			{
+				largest_free_slot = largest_idx;
+				return false;
+			}
 		}
 
-		pool.pending_copies = t_malloc<VkBufferCopy>(initial_pool_slot_size * max_frames_in_flight);
-		pool.pending_copy_capacity = initial_pool_slot_size;
-		for (i = 0; i < max_frames_in_flight; i++)
-			pool.pending_copy_counts[i] = 0;
+		//largest free slot is known, so if it is large enough, assign a slot in this pool, otherwise move on to next pool
+		else
+		{
+			if (slots[largest_free_slot].size < size)
+				return false;
+
+			VkDeviceSize smallest_fit = std::numeric_limits<VkDeviceSize>::max();
+			std::uint32_t smallest_idx = std::numeric_limits<std::uint32_t>::max();
+			for (std::uint32_t slot_idx = 0; slot_idx < n_slots; slot_idx++)
+			{
+				if (!slots[slot_idx].in_use && size <= slots[slot_idx].size && smallest_fit > slots[slot_idx].size)
+				{
+					smallest_fit = slots[slot_idx].size;
+					smallest_idx = slot_idx;
+				}
+			}
+			*out_slot_idx = smallest_idx;
+			return true;
+		}
+		return false;
+	}
+
+	void memory_pool::fill_slot(const std::uint32_t slot_idx, const VkDeviceSize size)
+	{
+		INTERNAL_ASSERT(slot_idx < n_slots, "Slot index out of bounds");
+		INTERNAL_ASSERT(slot_idx == 0 ? true : slots[slot_idx - 1].in_use, "Slot before a selected slot must be in use.");
+
+		if (size < slots[slot_idx].size)
+		{
+			const std::uint32_t old_size = n_slots;
+			bool selected_last = slot_idx == (n_slots - 1);
+
+			//resize needed
+			if (selected_last || (slots[slot_idx + 1].in_use && slots[n_slots - 1].in_use))
+			{
+				n_slots += initial_pool_slot_size; //TODO check if this is the best way to increment
+				slots = t_realloc<memory_slot>(slots, n_slots);
+				for (std::uint32_t i = old_size; i < n_slots; i++)
+				{
+					slots[i].in_use = false;
+					slots[i].offset = slots[old_size - 1].offset + slots[old_size - 1].size;
+					slots[i].size = 0;
+				}
+			}
+
+			INTERNAL_ASSERT(slots[slot_idx + 1].in_use || !slots[slot_idx + 1].size,
+				"Slot after the selected slot must be either empty or in use");
+
+			//shift remaining slots one position and add new slot with the remaining unused memory
+			if (!selected_last)
+			{
+				std::uint32_t last_in_use = 0;
+				for (std::uint32_t i = old_size; i != std::numeric_limits<std::uint32_t>::max(); i--)
+				{
+					if (slots[i].in_use)
+					{
+						last_in_use = i;
+						break;
+					}
+				}
+				std::memmove(&slots[slot_idx + 2], &slots[slot_idx + 1], sizeof(memory_slot) * (last_in_use - slot_idx));
+			}
+		}
+
+		slots[slot_idx + 1].offset -= slots[slot_idx].size - size;
+		slots[slot_idx + 1].size += slots[slot_idx].size - size;
+		slots[slot_idx].in_use = true;
+		slots[slot_idx].size = size;
 	}
 
 	void device_memory::init(device& owner)
@@ -91,11 +216,7 @@ namespace ENGINE_NAMESPACE
 		pool_info.queueFamilyIndex = owner.transfer_idx;
 		pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-		if (vkCreateCommandPool(owner.handle, &pool_info, nullptr, &cmd_pool) != VK_SUCCESS)
-		{
-			//do stuff
-			DEBUG_BREAK;
-		}
+		VK_CRASH_CHECK(vkCreateCommandPool(owner.handle, &pool_info, nullptr, &cmd_pool), "Failed to create command pool");
 		
 		VkCommandBufferAllocateInfo cmd_buffer_info = {};
 		cmd_buffer_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -103,19 +224,7 @@ namespace ENGINE_NAMESPACE
 		cmd_buffer_info.commandPool = cmd_pool;
 		cmd_buffer_info.commandBufferCount = max_frames_in_flight;
 
-		if (vkAllocateCommandBuffers(owner.handle, &cmd_buffer_info, cmd_buffers) != VK_SUCCESS)
-		{
-			//do stuff
-			DEBUG_BREAK;
-		}
-
-		n_pools = 1;
-		pools = t_malloc<memory_pool>(1);
-		init_pool_data(pools[0]);
-
-		alloc_buffer(pools[0].memory, pools[0].buffer, buffer_pool_size, 
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, 
-			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		VK_CRASH_CHECK(vkAllocateCommandBuffers(owner.handle, &cmd_buffer_info, cmd_buffers), "Failed to allocate command buffers");
 
 		for (std::uint32_t i = 0; i < max_frames_in_flight; i++)
 		{
@@ -126,23 +235,17 @@ namespace ENGINE_NAMESPACE
 			VkSemaphoreCreateInfo semaphore_info = {};
 			semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-			if (vkCreateSemaphore(owner.handle, &semaphore_info, nullptr, &device_in[i].semaphore) != VK_SUCCESS
-				|| vkCreateSemaphore(owner.handle, &semaphore_info, nullptr, &device_out[i].semaphore) != VK_SUCCESS)
-			{
-				//do stuff
-				DEBUG_BREAK;
-			}
+			VK_CRASH_CHECK(vkCreateSemaphore(owner.handle, &semaphore_info, nullptr, &device_in[i].semaphore),
+				"Failed to create semaphore");
+			VK_CRASH_CHECK(vkCreateSemaphore(owner.handle, &semaphore_info, nullptr, &device_out[i].semaphore),
+				"Failed to create semaphore");
 
 			VkFenceCreateInfo fence_info = {};
 			fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 			fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-			if (vkCreateFence(owner.handle, &fence_info, nullptr, &device_in[i].fence) != VK_SUCCESS
-				|| vkCreateFence(owner.handle, &fence_info, nullptr, &device_out[i].fence) != VK_SUCCESS)
-			{
-				//do stuff
-				DEBUG_BREAK;
-			}
+			VK_CRASH_CHECK(vkCreateFence(owner.handle, &fence_info, nullptr, &device_in[i].fence), "Failed to create fence");
+			VK_CRASH_CHECK(vkCreateFence(owner.handle, &fence_info, nullptr, &device_out[i].fence), "Failed to create fence");
 
 			device_in[i].offset = 0;
 		}
@@ -150,16 +253,10 @@ namespace ENGINE_NAMESPACE
 
 	void device_memory::terminate()
 	{
-		std::uint32_t i;
-		for (i = 0; i < n_pools; i++)
-		{
-			std::free(pools[i].slots);
-			std::free(pools[i].pending_copies);
-			vkDestroyBuffer(owner->handle, pools[i].buffer, nullptr);
-			vkFreeMemory(owner->handle, pools[i].memory, nullptr);
-		}
+		for (memory_pool& pool : vertex_pools) pool.free(owner->handle);
+
 		unmap_ranges(owner->current_frame);
-		for (i = 0; i < max_frames_in_flight; i++)
+		for (std::uint32_t i = 0; i < max_frames_in_flight; i++)
 		{
 			vkDestroyBuffer(owner->handle, device_in[i].buffer, nullptr);
 			vkFreeMemory(owner->handle, device_in[i].device, nullptr);
@@ -171,48 +268,60 @@ namespace ENGINE_NAMESPACE
 			vkDestroySemaphore(owner->handle, device_out[i].semaphore, nullptr);
 			vkDestroyFence(owner->handle, device_out[i].fence, nullptr);
 		}
-		std::free(pools);
+
 		vkDestroyCommandPool(owner->handle, cmd_pool, nullptr);
+	}
+
+	inline VkBuffer& get_transfer_buffer(transfer_memory& memory, std::uint32_t idx)
+	{
+		//TODO: extract correct buffer from chain
+		return memory.buffer;
+	}
+
+	inline void clear_transfer_memory(transfer_memory& memory)
+	{
+		//TODO: free chain, probably needs to be a member function
+		memory.offset = 0;
 	}
 
 	void device_memory::flush_in(const std::uint8_t current_frame)
 	{
 		transfer_memory& memory = device_in[current_frame];
-			//TODO: if not host coherent...
+		//TODO: if not host coherent...
 
-			vkResetCommandBuffer(cmd_buffers[current_frame], 0);
+		vkResetCommandBuffer(cmd_buffers[current_frame], 0);
 
-			VkCommandBufferBeginInfo begin_info = {};
-			begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-			begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		VkCommandBufferBeginInfo begin_info = {};
+		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-			vkBeginCommandBuffer(cmd_buffers[current_frame], &begin_info);
+		vkBeginCommandBuffer(cmd_buffers[current_frame], &begin_info);
 
-		if (memory.offset)
+		if (memory.offset) //TODO: cancel command buffer when offset is 0, make this function return bool to indicate if it is necessary to wait for the semaphore
 		{
-			for (std::uint32_t pool_idx = 0; pool_idx < n_pools; pool_idx++)
+			for (auto copy_details : vp_pending_copies[current_frame])
 			{
-				memory_pool& pool = pools[pool_idx];
-				LOGF_INTERNAL_INFO("Copying data over to {0} slot(s) in memory pool {1}", pool.pending_copy_counts[current_frame], pool_idx);
-				vkCmdCopyBuffer(cmd_buffers[current_frame], memory.buffer, pool.buffer, pool.pending_copy_counts[current_frame], 
-					&pool.pending_copies[pool.pending_copy_capacity * current_frame]);
-				pool.pending_copy_counts[current_frame] = 0;
+				vkCmdCopyBuffer(cmd_buffers[current_frame], get_transfer_buffer(memory, copy_details.first.first),
+					vertex_pools[copy_details.first.second].get_buffer(), static_cast<std::uint32_t>(copy_details.second.size()),
+					copy_details.second.data());
 			}
+
+			clear_transfer_memory(memory);
 		}
 
-			vkEndCommandBuffer(cmd_buffers[current_frame]);
+		vkEndCommandBuffer(cmd_buffers[current_frame]);
 
-			VkSubmitInfo submit_info = {};
-			submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-			submit_info.commandBufferCount = 1;
-			submit_info.pCommandBuffers = &cmd_buffers[current_frame];
-			submit_info.signalSemaphoreCount = 1;
-			submit_info.pSignalSemaphores = &memory.semaphore;
+		VkSubmitInfo submit_info = {};
+		submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+		submit_info.commandBufferCount = 1;
+		submit_info.pCommandBuffers = &cmd_buffers[current_frame];
+		submit_info.signalSemaphoreCount = 1;
+		submit_info.pSignalSemaphores = &memory.semaphore;
 
-			vkResetFences(owner->handle, 1, &memory.fence);
-			vkQueueSubmit(owner->transfer_queue, 1, &submit_info, memory.fence);
+		vkResetFences(owner->handle, 1, &memory.fence);
+		vkQueueSubmit(owner->transfer_queue, 1, &submit_info, memory.fence);
 
-			memory.offset = 0;
+		memory.offset = 0;
 	}
 
 	void device_memory::map_ranges(const std::uint8_t current_frame)
@@ -230,185 +339,21 @@ namespace ENGINE_NAMESPACE
 		vkWaitForFences(owner->handle, 1, &device_in[current_frame].fence, VK_TRUE, std::numeric_limits<std::uint64_t>::max());
 	}
 
-	inline void search_pools(memory_pool* pools, const std::uint32_t n_pools, const VkDeviceSize size,
-		std::uint32_t& out_pool_idx, std::uint32_t& out_slot_idx)
-	{
-		std::uint32_t selected_pool_idx = std::numeric_limits<std::uint32_t>::max();
-		std::uint32_t selected_slot_idx = std::numeric_limits<std::uint32_t>::max();
-		for (std::uint32_t pool_idx = 0; pool_idx < n_pools; pool_idx++)
-		{
-			memory_pool& pool = pools[pool_idx];
-			if (pool.slots[pool.largest_free_slot].in_use)
-			{
-				VkDeviceSize largest_fit = 0;
-				std::uint32_t largest_idx = 0;
-				VkDeviceSize smallest_fit = std::numeric_limits<VkDeviceSize>::max();
-				std::uint32_t smallest_idx = std::numeric_limits<std::uint32_t>::max();
-				for (std::uint32_t slot_idx = 0; slot_idx < pool.n_slots; slot_idx++)
-				{
-					if (!pool.slots[slot_idx].in_use)
-					{
-						if (largest_fit < pool.slots[slot_idx].size)
-						{
-							largest_fit = pool.slots[slot_idx].size;
-							largest_idx = slot_idx;
-						}
-						if (size <= pool.slots[slot_idx].size && smallest_fit > pool.slots[slot_idx].size)
-						{
-							smallest_fit = pool.slots[slot_idx].size;
-							smallest_idx = slot_idx;
-						}
-					}
-				}
-				if (size <= smallest_fit)
-				{
-					selected_pool_idx = pool_idx;
-					selected_slot_idx = smallest_idx;
-					if (!(largest_idx == smallest_idx))
-						pool.largest_free_slot = largest_idx;
-					break;
-				}
-				else
-				{
-					pool.largest_free_slot = largest_idx;
-					continue;
-				}
-			}
-			else
-			{
-				if (pool.slots[pool.largest_free_slot].size < size)
-					continue;
-
-				VkDeviceSize smallest_fit = std::numeric_limits<VkDeviceSize>::max();
-				std::uint32_t smallest_idx = std::numeric_limits<std::uint32_t>::max();
-				for (std::uint32_t slot_idx = 0; slot_idx < pool.n_slots; slot_idx++)
-				{
-					if (!pool.slots[slot_idx].in_use && size <= pool.slots[slot_idx].size && smallest_fit > pool.slots[slot_idx].size)
-					{
-						smallest_fit = pool.slots[slot_idx].size;
-						smallest_idx = slot_idx;
-					}
-				}
-				selected_pool_idx = pool_idx;
-				selected_slot_idx = smallest_idx;
-				break;
-			}
-		}
-		out_pool_idx = selected_pool_idx;
-		out_slot_idx = selected_slot_idx;
-	}
-
-	inline void fill_slot(memory_pool& pool, const std::uint32_t slot_idx, const VkDeviceSize size)
-	{
-		if (size < pool.slots[slot_idx].size)
-		{
-			const std::uint32_t old_size = pool.n_slots;
-			bool selected_last;
-			if (selected_last = (slot_idx == (pool.n_slots - 1)) ||
-				(pool.slots[slot_idx + 1].in_use && pool.slots[pool.n_slots - 1].in_use))
-			{
-				pool.n_slots += initial_pool_slot_size; //check if this is the best way to increment
-				pool.slots = t_realloc<memory_slot>(pool.slots, pool.n_slots);
-				for (std::uint32_t i = old_size; i < pool.n_slots; i++)
-				{
-					pool.slots[i].in_use = false;
-					pool.slots[i].offset = pool.slots[old_size - 1].offset + pool.slots[old_size - 1].size;
-					pool.slots[i].size = 0;
-				}
-			}
-			if (!selected_last)
-			{
-				std::uint32_t last_in_use = 0;
-				for (std::uint32_t i = old_size; i != std::numeric_limits<std::uint32_t>::max(); i--)
-				{
-					if (pool.slots[i].in_use)
-					{
-						last_in_use = i;
-						break;
-					}
-				}
-				std::memmove(&pool.slots[slot_idx + 2], &pool.slots[slot_idx + 1],
-					sizeof(memory_slot) * (last_in_use - slot_idx));
-			}
-		}
-
-		pool.slots[slot_idx + 1].offset -= pool.slots[slot_idx].size - size;
-		pool.slots[slot_idx + 1].size += pool.slots[slot_idx].size - size;
-		pool.slots[slot_idx].in_use = true;
-		pool.slots[slot_idx].size = size;
-	}
-
-	inline void submit_upload(memory_pool& pool, std::uint32_t slot_idx, transfer_memory& memory, 
-		const std::uint16_t current_frame, const void* data, const VkDeviceSize size)
-	{
-		if (memory.offset + size > buffer_pool_size)
-		{
-			//flush_in(current_frame); //TODO: deal with not having enough transfer memory better
-			//vkWaitForFences(owner->handle, 1, &memory.fence, VK_TRUE, std::numeric_limits<std::uint64_t>::max());
-		}
-		else if (pool.pending_copy_capacity <= pool.pending_copy_counts[current_frame])
-		{
-			const std::uint32_t old_cap = pool.pending_copy_capacity;
-			pool.pending_copy_capacity += initial_pool_slot_size;
-			pool.pending_copies = t_realloc<VkBufferCopy>(pool.pending_copies,
-				static_cast<std::uint64_t>(pool.pending_copy_capacity) * max_frames_in_flight);
-			for (std::uint32_t i = max_frames_in_flight - 1; i > 0; i--)
-			{
-				std::memmove(&pool.pending_copies[pool.pending_copy_capacity * i],
-					&pool.pending_copies[old_cap * i], sizeof(VkBufferCopy) * pool.pending_copy_counts[i]);
-			}
-		}
-
-		VkBufferCopy& info = pool.pending_copies[pool.pending_copy_capacity * current_frame + pool.pending_copy_counts[current_frame]];
-		info.srcOffset = memory.offset;
-		info.dstOffset = pool.slots[slot_idx].offset;
-		info.size = size;
-
-		std::memcpy(reinterpret_cast<char*>(memory.host) + memory.offset, data, size);
-
-		memory.offset += size;
-		pool.pending_copy_counts[current_frame]++;
-	}
-	//TODO: change refs to pointers
-	template<VkBufferUsageFlags BFlags, VkMemoryPropertyFlags MFlags>
-	inline void device_memory::alloc_slot(memory_pool* pools, std::uint32_t* out_n_pools,
-		std::uint32_t* out_pool_idx, std::uint32_t* out_slot_idx, VkDeviceSize size)
-	{
-		std::uint32_t selected_pool_idx = std::numeric_limits<std::uint32_t>::max();
-		std::uint32_t selected_slot_idx = std::numeric_limits<std::uint32_t>::max();
-		search_pools(pools, *out_n_pools, size, selected_pool_idx, selected_slot_idx);
-		if (selected_pool_idx == std::numeric_limits<std::uint32_t>::max())
-		{
-			selected_pool_idx = *out_n_pools;
-			selected_slot_idx = 0;
-			(*out_n_pools)++;
-			pools = t_realloc<memory_pool>(pools, *out_n_pools);
-			init_pool_data(pools[selected_pool_idx]);
-			alloc_buffer(pools[selected_pool_idx].memory, pools[selected_pool_idx].buffer, buffer_pool_size, BFlags, MFlags);
-		}
-
-		fill_slot(pools[selected_pool_idx], selected_slot_idx, size);
-		*out_pool_idx = selected_pool_idx;
-		*out_slot_idx = selected_slot_idx;
-		LOGF_INTERNAL_INFO("Allocated {0} bytes in slot {1} of pool {2}", size, selected_slot_idx, selected_pool_idx);
-	}
-
 	memory_reference device_memory::alloc_object(const VkDeviceSize size)
 	{
 		std::uint32_t selected_pool_idx = std::numeric_limits<std::uint32_t>::max();
 		std::uint32_t selected_slot_idx = std::numeric_limits<std::uint32_t>::max();
-		alloc_slot<vertex_buffer, main_heap>(pools, &n_pools, &selected_pool_idx, &selected_slot_idx, size);
-		return mem_ref_internal(selected_pool_idx, pools[selected_pool_idx].slots[selected_slot_idx].offset, size);
+		alloc_slot<vertex_buffer, main_heap>(vertex_pools, &selected_pool_idx, &selected_slot_idx, size);
+		return mem_ref_internal(selected_pool_idx, vertex_pools[selected_pool_idx].get_slot(selected_slot_idx).offset, size);
 	}
 
 	memory_reference device_memory::ialloc_object(const void* data, const VkDeviceSize size)
 	{
 		std::uint32_t selected_pool_idx = std::numeric_limits<std::uint32_t>::max();
 		std::uint32_t selected_slot_idx = std::numeric_limits<std::uint32_t>::max();
-		alloc_slot<vertex_buffer, main_heap>(pools, &n_pools, &selected_pool_idx, &selected_slot_idx, size);
-		memory_pool& selected_pool = pools[selected_pool_idx];
-		ENGINE_NAMESPACE::submit_upload(selected_pool, selected_slot_idx, device_in[owner->current_frame], owner->current_frame, data, size);
-		return mem_ref_internal(selected_pool_idx, selected_pool.slots[selected_slot_idx].offset, size);
+		alloc_slot<vertex_buffer, main_heap>(vertex_pools, &selected_pool_idx, &selected_slot_idx, size);
+		submit_upload<buffer_t::VERTEX>(selected_pool_idx, selected_slot_idx, data, size);
+		return mem_ref_internal(selected_pool_idx, vertex_pools[selected_pool_idx].get_slot(selected_slot_idx).offset, size);
 	}
 
 	memory_reference device_memory::alloc_dynamic_object(const VkDeviceSize size)
@@ -427,14 +372,14 @@ namespace ENGINE_NAMESPACE
 	{
 		const mem_ref_internal& ref
 			= reinterpret_cast<const mem_ref_internal&>(reinterpret_cast<const object_resource_internal&>(object).ref);
-		return { pools[ref.pool].buffer, ref.size, ref.offset };
+		return { vertex_pools[ref.pool].get_buffer(), ref.size, ref.offset };
 	}
 
-	buffer_binding_args device_memory::get_binding_args(const instance& instance)
+	buffer_binding_args device_memory::get_binding_args(const device_data& instance)
 	{
 		const mem_ref_internal& ref
 			= reinterpret_cast<const mem_ref_internal&>(reinterpret_cast<const instance_internal&>(instance).ref);
-		return { pools[ref.pool].buffer, ref.size, ref.offset }; //TODO different types
+		return { vertex_pools[ref.pool].get_buffer(), ref.size, ref.offset }; //TODO different types
 	}
 
 	uint32_t device_memory::find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties)
@@ -447,7 +392,8 @@ namespace ENGINE_NAMESPACE
 				return i;
 			}
 		}
-		LOG_INTERNAL_WARN("Failed to find exact memory type.")
+		LOG_INTERNAL_WARN("Failed to find exact memory type.");
+
 		//Relaxed search
 		for (std::uint32_t i = 0; i < mem_properties.memoryTypeCount; i++)
 		{
@@ -457,11 +403,11 @@ namespace ENGINE_NAMESPACE
 			}
 		}
 
-		//do stuff
-		//DEBUG_BREAK;
-		LOG_INTERNAL_ERROR("Failed to find suitable memory type. Type bit mask: " 
+		//not sure how to deal with this
+		CRASH("Could not find suitable memory type");
+		LOG_INTERNAL_ERROR("Failed to find suitable memory type. Type bit mask: "
 			<< std::bitset<sizeof(type_filter) * 8>(type_filter) << " Property flags: "
-			<< std::bitset<sizeof(properties) * 8>(properties))
+			<< std::bitset<sizeof(properties) * 8>(properties));
 		return std::numeric_limits<uint32_t>::max();
 	}
 
@@ -474,11 +420,7 @@ namespace ENGINE_NAMESPACE
 		buffer_info.usage = usage;
 		buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-		if (vkCreateBuffer(owner->handle, &buffer_info, nullptr, &buffer) != VK_SUCCESS)
-		{
-			//do stuff
-			DEBUG_BREAK;
-		}
+		VK_CRASH_CHECK(vkCreateBuffer(owner->handle, &buffer_info, nullptr, &buffer), "Failed to create buffer");
 
 		VkMemoryRequirements memory_requirements;
 		vkGetBufferMemoryRequirements(owner->handle, buffer, &memory_requirements);
@@ -488,11 +430,72 @@ namespace ENGINE_NAMESPACE
 		memory_info.allocationSize = memory_requirements.size;
 		memory_info.memoryTypeIndex = find_memory_type(memory_requirements.memoryTypeBits, properties);
 
-		if (vkAllocateMemory(owner->handle, &memory_info, nullptr, &memory) != VK_SUCCESS)
-		{
-			//do stuff
-			DEBUG_BREAK;
-		}
+		VK_CRASH_CHECK(vkAllocateMemory(owner->handle, &memory_info, nullptr, &memory), "Failed to allocate device memory");
+
 		vkBindBufferMemory(owner->handle, buffer, memory, 0);
+	}
+
+	inline bool search_pools(std::vector<memory_pool>& pools, const VkDeviceSize size,
+		std::uint32_t* out_pool_idx, std::uint32_t* out_slot_idx)
+	{
+		std::uint32_t selected_pool_idx = 0;
+		std::uint32_t selected_slot_idx = std::numeric_limits<std::uint32_t>::max();
+		for (memory_pool& pool : pools)
+		{
+			if (pool.search(size, &selected_slot_idx)) break;
+			selected_pool_idx++;
+		}
+		*out_pool_idx = selected_pool_idx;
+		if (selected_slot_idx == std::numeric_limits<std::uint32_t>::max())
+		{
+			*out_slot_idx = 0;
+			return false;
+		}
+		else
+		{
+			*out_slot_idx = selected_slot_idx;
+			return true;
+		}
+	}
+	
+	template<VkBufferUsageFlags BFlags, VkMemoryPropertyFlags MFlags>
+	inline void device_memory::alloc_slot(std::vector<memory_pool>& pools,
+		std::uint32_t* out_pool_idx, std::uint32_t* out_slot_idx, VkDeviceSize size)
+	{
+		std::uint32_t selected_pool_idx = 0;
+		std::uint32_t selected_slot_idx = 0;
+
+		if (!search_pools(pools, size, &selected_pool_idx, &selected_slot_idx))
+		{
+			pools.push_back(memory_pool(owner->handle));
+			alloc_buffer(pools.back().get_memory(), pools.back().get_buffer(), buffer_pool_size, BFlags, MFlags);
+		}
+
+		pools[selected_pool_idx].fill_slot(selected_slot_idx, size);
+		*out_pool_idx = selected_pool_idx;
+		*out_slot_idx = selected_slot_idx;
+		LOGF_INTERNAL_INFO("Allocated {0} bytes in slot {1} of pool {2} of type {3}", size, selected_slot_idx, selected_pool_idx, BFlags);
+	}
+
+	template<device_memory::buffer_t BType>
+	inline void device_memory::submit_upload(std::uint32_t pool_idx, std::uint32_t slot_idx, const void* data, const VkDeviceSize size)
+	{
+		transfer_memory* memory_ptr = &device_in[owner->current_frame];
+		std::uint32_t transfer_idx = 0;
+		if (memory_ptr->offset + size > buffer_pool_size)
+		{
+			//TODO: add new tranfer memory to "memory", then update "memory_ptr" and "transfer_idx"
+		}
+
+		memory_pool& pool = get_pools<BType>()[pool_idx];
+		VkBufferCopy info = {};
+		info.srcOffset = memory_ptr->offset;
+		info.dstOffset = pool.get_slot(slot_idx).offset;
+		info.size = size;
+
+		std::memcpy(reinterpret_cast<char*>(memory_ptr->host) + memory_ptr->offset, data, size);
+
+		get_pending_copies<BType>(owner->current_frame)[copy_path_t(transfer_idx, pool_idx)].push_back(info);
+		memory_ptr->offset += size;
 	}
 }

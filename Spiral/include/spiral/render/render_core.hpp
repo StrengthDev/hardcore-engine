@@ -22,4 +22,6 @@ const bool enable_validation_layers = false;
 const bool enable_validation_layers = true;
 #endif
 
+#define VK_CRASH_CHECK(func, fail_message) { VkResult result = (func); if (result != VK_SUCCESS) { CRASH(fail_message, result); } }
+
 const uint8_t max_frames_in_flight = 2;

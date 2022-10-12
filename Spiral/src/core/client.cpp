@@ -40,7 +40,8 @@ namespace ENGINE_NAMESPACE
 		running = true;
 		last_frame = std::chrono::high_resolution_clock::now();
 
-		window::init(std::bind(&client::push_event, this, std::placeholders::_1), std::bind(&client::push_window_size, this, std::placeholders::_1, std::placeholders::_2));
+		window::init(std::bind(&client::push_event, this, std::placeholders::_1), 
+			std::bind(&client::push_window_size, this, std::placeholders::_1, std::placeholders::_2));
 		window::get_dimensions(&window_width, &window_height);
 		window_size_changed = false;
 
