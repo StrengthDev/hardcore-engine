@@ -231,7 +231,7 @@
     <ClInclude Include="include\spiral\render\graphics_pipeline.hpp" />
     <ClInclude Include="include\spiral\render\instance.hpp" />
     <ClInclude Include="include\spiral\render\memory.hpp" />
-    <ClInclude Include="include\spiral\render\memory_reference.hpp" />
+    <ClInclude Include="include\spiral\render\memory_ref.hpp" />
     <ClInclude Include="include\spiral\render\pipeline.hpp" />
     <ClInclude Include="include\spiral\render\renderer.hpp" />
     <ClInclude Include="include\spiral\render\renderer_internal.hpp" />

@@ -2,7 +2,7 @@
 
 #include <spiral/core/core.hpp>
 
-#include "memory_reference.hpp"
+#include "memory_ref.hpp"
 #include "data_layout.hpp"
 
 #include <utility>
@@ -32,7 +32,7 @@ namespace ENGINE_NAMESPACE
 
 	protected:
 
-		memory_reference ref;
+		memory_ref ref;
 	};
 
 	class ENGINE_API object_resource : public resource

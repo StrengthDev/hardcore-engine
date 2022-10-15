@@ -28,7 +28,7 @@ namespace ENGINE_NAMESPACE
 		: layout(layout), index_type(index_format::NONE), count(static_cast<std::uint32_t>(vertex_data_size / layout.size()))
 	{
 		INTERNAL_ASSERT((vertex_data_size % layout.size()) == 0, "Allocated vertex memory does not align with vertex layout");
-		ref = renderer::get_device().get_memory().ialloc_object(vertex_data, vertex_data_size);
+		ref = renderer::get_device().get_memory().alloc_vertices(vertex_data, vertex_data_size);
 	}
 
 	object_resource::object_resource(const std::size_t vertex_data_size, const std::size_t index_data_size,
@@ -42,6 +42,6 @@ namespace ENGINE_NAMESPACE
 		: layout(layout), index_type(index_format::NONE), count(static_cast<std::uint32_t>(vertex_data_size / layout.size()))
 	{
 		INTERNAL_ASSERT(vertex_data_size % layout.size() == 0, "Allocated vertex memory does not align with vertex layout");
-		ref = renderer::get_device().get_memory().alloc_object(vertex_data_size);
+		ref = renderer::get_device().get_memory().alloc_vertices(vertex_data_size);
 	}
 }

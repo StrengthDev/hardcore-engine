@@ -170,7 +170,7 @@
     <ClInclude Include="include\spiral\render\pipeline.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\spiral\render\memory_reference.hpp">
+    <ClInclude Include="include\spiral\render\memory_ref.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\spiral\render\data_layout.hpp">
