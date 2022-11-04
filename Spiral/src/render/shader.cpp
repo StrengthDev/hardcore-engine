@@ -8,14 +8,8 @@
 
 namespace ENGINE_NAMESPACE
 {
-	template<std::size_t N>
-	constexpr std::size_t len(const char (&str)[N]) noexcept
-	{
-		return N;
-	}
-
 //This macro is implemented as a std function in C++20, could consider updating (TODO)
-#define ENDS_WITH(str, size, suffix) (size >= len(suffix) - 1 && !str.compare(size - (len(suffix) - 1), len(suffix) - 1, suffix))
+#define ENDS_WITH(str, size, suffix) (size >= sizeof(suffix) - 1 && !str.compare(size - (sizeof(suffix) - 1), sizeof(suffix) - 1, suffix))
 
 #define CASE(str, size, suffix, result) if (ENDS_WITH(str, size, suffix)) return result
 
@@ -45,8 +39,7 @@ namespace ENGINE_NAMESPACE
 		CASE(fn, fnl, shader_extensions::MESH, shader_t::MESH);
 		CASE(fn, fnl, shader_extensions::TASK, shader_t::TASK);
 
-		//TODO: stuff
-		DEBUG_BREAK;
+		INTERNAL_ASSERT(false, "Unknown shader type");
 		return shader_t::NONE;
 	}
 
@@ -84,8 +77,7 @@ namespace ENGINE_NAMESPACE
 		case shader_t::MESH:					return shaderc_mesh_shader;
 		case shader_t::TASK:					return shaderc_task_shader;
 		default:
-			//TODO: stuff
-			DEBUG_BREAK;
+			INTERNAL_ASSERT(false, "Invalid shader type");
 		}
 		return shaderc_glsl_infer_from_source;
 	}
@@ -149,7 +141,7 @@ namespace ENGINE_NAMESPACE
 			DEBUG_BREAK;
 			break;
 		default:
-			DEBUG_BREAK;
+			INTERNAL_ASSERT(false, "Unhandled error in shader compilation");
 		}
 
 		*out_datasize = shaderc_result_get_length(result);
@@ -181,7 +173,7 @@ namespace ENGINE_NAMESPACE
 			BASE_CASE(UInt, UINT32);
 			BASE_CASE(UInt64, UINT64);
 		default:
-			DEBUG_BREAK;
+			INTERNAL_ASSERT(false, "Invalid component type");
 		}
 
 		switch (type.vecsize)
@@ -191,20 +183,19 @@ namespace ENGINE_NAMESPACE
 		case 3: *out_t = data_layout::type::VEC3; break;
 		case 4: *out_t = data_layout::type::VEC4; break;
 		default:
-			DEBUG_BREAK;
+			INTERNAL_ASSERT(false, "Invalid vector size");
 		}
 	}
 #undef BASE_CASE
 
-	shader::shader(const char* filename, const char* entry_point, const char* name, shader_t stage)
-		: stage(stage == shader_t::NONE ? stage_from_filename(filename) : stage), 
+	shader::shader(const char* filename, const char* entry_point, const char* name, shader_t stage) :
+		stage(stage == shader_t::NONE ? stage_from_filename(filename) : stage), 
 		entry_point(create_cstr(entry_point)), name(create_cstr(name))
 	{
 		std::ifstream file(filename, std::ios::ate | std::ios::binary);
 		if (!file.is_open())
 		{
-			//TODO: stuff
-			DEBUG_BREAK;
+			CRASH("Failed to open shader file");
 		}
 
 		std::streampos pos = file.tellg();
@@ -237,70 +228,24 @@ namespace ENGINE_NAMESPACE
 			memcpy(data, file_data.data(), filesize);
 		}
 
-		spirv_cross::Compiler reflection(data, size / sizeof(std::uint32_t));
-		spirv_cross::ShaderResources resources = reflection.get_shader_resources();
-		
-		std::vector<std::vector<input_resource>> inputs_vector;
-		for (spirv_cross::Resource input : resources.stage_inputs)
-		{
-			std::uint32_t binding = reflection.get_decoration(input.id, spv::DecorationBinding);
-
-			if (static_cast<std::size_t>(binding) + 1 > inputs_vector.size())
-			{
-				for (std::size_t i = inputs_vector.size(); i < static_cast<std::size_t>(binding) + 1; i++)
-				{
-					inputs_vector.emplace_back();
-				}
-			}
-
-			auto& binding_vector = inputs_vector[binding];
-			std::uint32_t location = reflection.get_decoration(input.id, spv::DecorationLocation);
-
-			if (static_cast<std::size_t>(location) + 1 > binding_vector.size())
-			{
-				for (std::size_t i = binding_vector.size(); i < static_cast<std::size_t>(location) + 1; i++)
-				{
-					binding_vector.emplace_back();
-				}
-			}
-
-			binding_vector[location].type = reflection.get_type(input.type_id);
-		}
-
-		std::uint32_t i = 0;
-		n_inputs = static_cast<std::uint8_t>(inputs_vector.size());
-		inputs = t_malloc<data_layout>(n_inputs);
-		for (const auto& binding : inputs_vector)
-		{
-			std::uint32_t k = 0;
-			new (&inputs[i]) data_layout(static_cast<std::uint8_t>(binding.size()));
-			for (const auto& location : binding)
-			{
-				data_layout::type t;
-				data_layout::component_type ct;
-				cross_to_internal_type(location.type, &t, &ct);
-				inputs[i].set_type(k, t, ct);
-				k++;
-			}
-			i++;
-		}
+		reflect();
 	}
 
 #undef ENDS_WITH
 
-	shader::shader(const char* name, const char* entry_point, shader_t stage, const char* code)
+	shader::shader(const char* name, const char* entry_point, shader_t stage, const char* code) :
+		name(create_cstr(name)), entry_point(create_cstr(entry_point)), stage(stage)
 	{
-		//TODO
+		compile_shader(code, (std::strlen(name) + 1) / sizeof(char), entry_point, this->stage, name, &data, &size);
+		reflect();
 	}
 
 	shader::~shader()
 	{
 		if (data)
 		{
-			for (std::uint8_t i = 0; i < n_inputs; i++)
-			{
-				inputs[i].~data_layout();
-			}
+			for (std::uint8_t i = 0; i < n_inputs; i++) inputs[i].~data_layout();
+			
 			std::free(data);
 			std::free(inputs);
 			std::free(name);
@@ -309,27 +254,123 @@ namespace ENGINE_NAMESPACE
 		}
 	}
 
-	shader::shader(shader&& other) noexcept : data(std::exchange(other.data, nullptr)), size(std::exchange(other.size, 0)),
-		stage(std::exchange(other.stage, shader_t::NONE)), entry_point(std::exchange(other.entry_point, nullptr)),
-		n_inputs(std::exchange(other.n_inputs, 0)), inputs(std::exchange(other.inputs, nullptr)), 
-		name(std::exchange(other.name, nullptr))
-	{ }
-
-	shader& shader::operator=(shader&& other) noexcept
+	inline void reflect_inputs(const spirv_cross::Compiler& reflection, const spirv_cross::ShaderResources& resources,
+		std::uint8_t* out_n_inputs, data_layout** out_inputs)
 	{
-		this->~shader();
+		std::vector<std::vector<input_resource>> inputs_vector;
+		for (const spirv_cross::Resource& input : resources.stage_inputs)
+		{
+			std::uint32_t binding = reflection.get_decoration(input.id, spv::DecorationBinding);
 
-		data = std::exchange(other.data, nullptr);
-		size = std::exchange(other.size, 0);
-		stage = std::exchange(other.stage, shader_t::NONE);
-		entry_point = std::exchange(other.entry_point, nullptr);
-		n_inputs = std::exchange(other.n_inputs, 0);
-		inputs = std::exchange(other.inputs, nullptr);
-		name = std::exchange(other.name, nullptr);
-		return *this;
+			for (std::size_t i = inputs_vector.size(); i < static_cast<std::size_t>(binding) + 1; i++) inputs_vector.emplace_back();
+
+			auto& binding_vector = inputs_vector[binding];
+			std::uint32_t location = reflection.get_decoration(input.id, spv::DecorationLocation);
+
+			for (std::size_t i = binding_vector.size(); i < static_cast<std::size_t>(location) + 1; i++) binding_vector.emplace_back();
+
+			binding_vector[location].type = reflection.get_type(input.type_id);
+		}
+
+		std::uint32_t i = 0;
+		*out_n_inputs = static_cast<std::uint8_t>(inputs_vector.size());
+		*out_inputs = t_malloc<data_layout>(*out_n_inputs);
+		for (const auto& binding : inputs_vector)
+		{
+			std::uint32_t k = 0;
+			new (&(*out_inputs)[i]) data_layout(static_cast<std::uint8_t>(binding.size()));
+			for (const auto& location : binding)
+			{
+				data_layout::type t;
+				data_layout::component_type ct;
+				cross_to_internal_type(location.type, &t, &ct);
+				(*out_inputs)[i].set_type(k, t, ct);
+				k++;
+			}
+			i++;
+		}
 	}
 
-	
+	template<shader::descriptor_t Type>
+	inline void reflect_descriptors(const spirv_cross::Compiler& reflection, const spirv_cross::ShaderResources& resources,
+		std::vector<shader::descriptor_data>& descriptors)
+	{
+		const spirv_cross::SmallVector<spirv_cross::Resource>* buffers;
+		if constexpr (Type == shader::UNIFORM) buffers = &resources.uniform_buffers;
+		else if constexpr (Type == shader::STORAGE) buffers = &resources.storage_buffers;
+		//else if constexpr (Type == shader::PUSH_CONSTANT) buffers = *resources.push_constant_buffers;
+		else if constexpr (Type == shader::SAMPLER) buffers = &resources.sampled_images;
+		else if constexpr (Type == shader::TEXTURE) buffers = &resources.separate_images;
+		else if constexpr (Type == shader::IMAGE) buffers = &resources.storage_images;
+		//else if constexpr (Type == shader::SAMPLER_BUFFER) buffers = *resources.separate_images; //type.image.dim = DimBuffer
+		//else if constexpr (Type == shader::IMAGE_BUFFER) buffers = *resources.storage_images; //type.image.dim = DimBuffer
+		else if constexpr (Type == shader::SAMPLER_SHADOW) buffers = &resources.separate_samplers;
+		else static_assert(false, "Unimplemented type");
+
+		for (const spirv_cross::Resource& var : *buffers)
+		{
+			shader::descriptor_data v = {};
+			v.set = reflection.get_decoration(var.id, spv::DecorationDescriptorSet);
+			v.binding = reflection.get_decoration(var.id, spv::DecorationBinding);
+			
+			if constexpr (Type == shader::UNIFORM) v.type = shader::UNIFORM;
+			else if constexpr (Type == shader::STORAGE) v.type = shader::STORAGE;
+			else if constexpr (Type == shader::SAMPLER) v.type = shader::SAMPLER;
+			else if constexpr (Type == shader::TEXTURE)
+			{
+				if (reflection.get_type(var.base_type_id).image.dim != spv::DimBuffer) v.type = shader::TEXTURE;
+				else v.type = shader::SAMPLER_BUFFER;
+			}
+			else if constexpr (Type == shader::IMAGE)
+			{
+				if (reflection.get_type(var.base_type_id).image.dim != spv::DimBuffer) v.type = shader::IMAGE;
+				else v.type = shader::IMAGE_BUFFER;
+			}
+			else if constexpr (Type == shader::SAMPLER_SHADOW) v.type = shader::SAMPLER_SHADOW;
+			else static_assert(false, "Unimplemented type");
+
+			v.count = 1;
+			const spirv_cross::SPIRType& type = reflection.get_type(var.type_id);
+			if (!type.array.empty())
+			{
+				for (std::uint32_t i = 0; i < type.array.size(); i++)
+				{
+					if (type.array_size_literal[i]) v.count *= type.array[i];
+					//TODO handle specialisation constant defined sizes 
+				}
+			}
+
+			descriptors.push_back(v);
+		}
+	}
+
+	void shader::reflect()
+	{
+		spirv_cross::Compiler reflection(data, size / sizeof(std::uint32_t));
+		spirv_cross::ShaderResources resources = reflection.get_shader_resources();
+		
+		reflect_inputs(reflection, resources, &n_inputs, &inputs);
+		//TODO: reflect_outputs to check shader compatibility maybe, or set write mask in VkPipelineColorBlendAttachmentState
+		//TODO: reflect_subpass_inputs not sure what this is
+
+		std::vector<descriptor_data> descriptors;
+		reflect_descriptors<UNIFORM>(reflection, resources, descriptors);
+		reflect_descriptors<STORAGE>(reflection, resources, descriptors);
+		reflect_descriptors<SAMPLER>(reflection, resources, descriptors);
+		reflect_descriptors<TEXTURE>(reflection, resources, descriptors);
+		reflect_descriptors<IMAGE>(reflection, resources, descriptors);
+		reflect_descriptors<SAMPLER_SHADOW>(reflection, resources, descriptors);
+
+		if (descriptors.size())
+		{
+			this->descriptors = t_malloc<descriptor_data>(descriptors.size());
+			this->n_descriptors = static_cast<std::uint32_t>(descriptors.size());
+			std::memcpy(this->descriptors, descriptors.data(), descriptors.size() * sizeof(descriptor_data));
+		}
+
+		//TODO: reflect_push_constants
+		//TODO: reflect_specialisation_constants
+	}
 
 	VkShaderModule internal_shader::create_shader_module(const shader& shader, VkDevice& handle, 
 		VkShaderStageFlagBits* out_stage, const char** out_entry_point)
@@ -344,11 +385,7 @@ namespace ENGINE_NAMESPACE
 		create_info.pCode = cast_shader.data;
 		create_info.codeSize = cast_shader.size;
 
-		VkResult result = vkCreateShaderModule(handle, &create_info, nullptr, &module);
-		if (result != VK_SUCCESS)
-		{
-			CRASH("Failed to create shader module", result);
-		}
+		VK_CRASH_CHECK(vkCreateShaderModule(handle, &create_info, nullptr, &module), "Failed to create shader module");
 
 		*out_stage = cast_shader.get_stage();
 		*out_entry_point = create_cstr(cast_shader.entry_point);

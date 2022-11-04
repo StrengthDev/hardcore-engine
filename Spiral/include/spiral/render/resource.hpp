@@ -23,7 +23,7 @@ namespace ENGINE_NAMESPACE
 
 		resource(resource&& other) noexcept : ref(std::move(other.ref)) { }
 
-		resource& operator=(resource&& other)
+		inline resource& operator=(resource&& other) noexcept
 		{
 			destroy();
 			ref = std::move(other.ref);
@@ -93,24 +93,32 @@ namespace ENGINE_NAMESPACE
 			return object_resource(vertex_data_size, data_layout::create<Types...>());
 		}
 
-		object_resource(object_resource&& other) noexcept : resource(std::move(other)), layout(other.layout),
-			index_type(other.index_type), count(other.count)
+		object_resource(object_resource&& other) noexcept : resource(std::move(other)), 
+			layout(std::exchange(other.layout, data_layout(0))),
+			index_t(std::exchange(other.index_t, index_format::NONE)), draw_count(std::exchange(other.draw_count, 0))
 		{ }
 
-		object_resource& operator=(object_resource&& other) noexcept
+		inline object_resource& operator=(object_resource&& other) noexcept
 		{
-			this->~object_resource();
-			return *new (this) object_resource(std::move(other));
+			resource::operator=(std::move(other));
+			layout = std::exchange(other.layout, data_layout());
+			index_ref = std::exchange(other.index_ref, memory_ref());
+			index_t = std::exchange(other.index_t, index_format::NONE);
+			draw_count = std::exchange(other.draw_count, 0);
+			return *this;
 		}
 
-		inline std::uint32_t get_count() const noexcept { return count; }
+		inline const data_layout& vertex_layout() const noexcept { return layout; }
+		inline index_format index_type() const noexcept { return index_t; }
+		inline std::uint32_t count() const noexcept { return draw_count; }
 
-	public:
-		const data_layout layout;
-		const index_format index_type = index_format::NONE;
+	protected:
+		memory_ref index_ref;
 
 	private:
-		std::uint32_t count = 0;
+		data_layout layout;
+		index_format index_t = index_format::NONE;
+		std::uint32_t draw_count = 0;
 	};
 
 	class ENGINE_API texture_resource : public resource

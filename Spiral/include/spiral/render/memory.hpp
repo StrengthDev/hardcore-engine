@@ -64,7 +64,7 @@ namespace ENGINE_NAMESPACE
 
 		inline VkDeviceMemory& get_memory() noexcept { return memory; }
 		inline VkBuffer& get_buffer() noexcept { return buffer; }
-		inline VkDeviceSize get_size() noexcept { return size; }
+		inline VkDeviceSize get_size() const noexcept { return size; }
 		inline const memory_slot& get_slot(std::uint32_t idx) const { return slots[idx]; }
 
 	private:
@@ -148,8 +148,9 @@ namespace ENGINE_NAMESPACE
 		void memcpy_uniform(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset = 0);
 		void memcpy_storage(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset = 0);
 
-		buffer_binding_args get_binding_args(const object_resource& object);
-		buffer_binding_args get_binding_args(const device_data& instance);
+		buffer_binding_args get_binding_args(const object_resource& object) noexcept;
+		buffer_binding_args get_index_binding_args(const object_resource& object) noexcept;
+		buffer_binding_args get_binding_args(const device_data& instance) noexcept;
 
 		inline VkSemaphore get_device_in_semaphore(const std::uint8_t current_frame) { return device_in[current_frame].semaphore; }
 

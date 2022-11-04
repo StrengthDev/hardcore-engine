@@ -138,11 +138,7 @@ namespace ENGINE_NAMESPACE
 			createInfo.enabledLayerCount = 0;
 		}
 
-		VkResult result = vkCreateDevice(physical_handle, &createInfo, nullptr, &handle);
-		if (result != VK_SUCCESS)
-		{
-			CRASH("Failed to create logical device handle", result);
-		}
+		VK_CRASH_CHECK(vkCreateDevice(physical_handle, &createInfo, nullptr, &handle), "Failed to create logical device handle");
 
 		std::free(queue_create_infos);
 
@@ -164,14 +160,10 @@ namespace ENGINE_NAMESPACE
 		poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
 		poolInfo.queueFamilyIndex = graphics_idx;
 		poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+
 		for (std::uint32_t i = 0; i < command_parallelism; i++)
-		{
-			VkResult result = vkCreateCommandPool(handle, &poolInfo, nullptr, &(*graphics_command_pools)[i]);
-			if (result != VK_SUCCESS)
-			{
-				CRASH("Failed to create graphics command pool", result);
-			}
-		}
+			VK_CRASH_CHECK(vkCreateCommandPool(handle, &poolInfo, nullptr, &(*graphics_command_pools)[i]), 
+				"Failed to create graphics command pool");
 		
 		const std::uint32_t buffers_per_frame = command_parallelism + 1;
 		*graphics_command_buffers = t_malloc<VkCommandBuffer>(static_cast<std::size_t>(max_frames_in_flight) * buffers_per_frame);
@@ -184,11 +176,8 @@ namespace ENGINE_NAMESPACE
 			mainAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 			mainAllocInfo.commandBufferCount = 1;
 
-			VkResult result = vkAllocateCommandBuffers(handle, &mainAllocInfo, &(*graphics_command_buffers)[buffers_per_frame * f]);
-			if (result != VK_SUCCESS)
-			{
-				CRASH("Failed to create main graphics command buffers", result);
-			}
+			VK_CRASH_CHECK(vkAllocateCommandBuffers(handle, &mainAllocInfo, &(*graphics_command_buffers)[buffers_per_frame * f]), 
+				"Failed to allocate main graphics command buffer");
 
 			//Secondary buffer allocation
 			for (std::uint32_t i = 0; i < command_parallelism; i++)
@@ -198,12 +187,9 @@ namespace ENGINE_NAMESPACE
 				subAllocInfo.commandPool = (*graphics_command_pools)[i];
 				subAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
 				subAllocInfo.commandBufferCount = 1;
-			
-				result = vkAllocateCommandBuffers(handle, &subAllocInfo, &(*graphics_command_buffers)[buffers_per_frame * f + i + 1]);
-				if (result != VK_SUCCESS)
-				{
-					CRASH("Failed to create secondary graphics command buffers", result);
-				}
+				
+				VK_CRASH_CHECK(vkAllocateCommandBuffers(handle, &subAllocInfo, &(*graphics_command_buffers)[buffers_per_frame * f + i + 1]),
+					"Failed to allocate secondary graphics command buffer");
 			}
 		}
 	}
@@ -287,12 +273,11 @@ namespace ENGINE_NAMESPACE
 		fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 		for (i = 0; i < max_frames_in_flight; i++)
 		{
-			if (vkCreateSemaphore(handle, &semaphoreInfo, nullptr, &image_available_semaphores[i]) != VK_SUCCESS ||
-				vkCreateSemaphore(handle, &semaphoreInfo, nullptr, &render_finished_semaphores[i]) != VK_SUCCESS ||
-				vkCreateFence(handle, &fenceInfo, nullptr, &frame_fences[i]) != VK_SUCCESS)
-			{
-				return false; //TODO: destroy objects that might have already been created
-			}
+			VK_CRASH_CHECK(vkCreateSemaphore(handle, &semaphoreInfo, nullptr, &image_available_semaphores[i]), 
+				"Failed to create image semaphore");
+			VK_CRASH_CHECK(vkCreateSemaphore(handle, &semaphoreInfo, nullptr, &render_finished_semaphores[i]), 
+				"Failed to create render semaphore");
+			VK_CRASH_CHECK(vkCreateFence(handle, &fenceInfo, nullptr, &frame_fences[i]), "");
 		}
 
 		VkAttachmentDescription colorAttachment = {};
@@ -331,11 +316,7 @@ namespace ENGINE_NAMESPACE
 		renderPassInfo.dependencyCount = 1;
 		renderPassInfo.pDependencies = &dependency;
 
-		if (vkCreateRenderPass(handle, &renderPassInfo, nullptr, &render_pass) != VK_SUCCESS)
-		{
-			DEBUG_BREAK;
-			return false;
-		}
+		VK_CRASH_CHECK(vkCreateRenderPass(handle, &renderPassInfo, nullptr, &render_pass), "Failed to create render pass");
 
 		framebuffers = t_malloc<VkFramebuffer>(main_swapchain.n_images);
 		for (i = 0; i < main_swapchain.n_images; i++)
@@ -349,11 +330,7 @@ namespace ENGINE_NAMESPACE
 			framebufferInfo.height = main_swapchain.extent.height;
 			framebufferInfo.layers = 1;
 
-			if (vkCreateFramebuffer(handle, &framebufferInfo, nullptr, &framebuffers[i]) != VK_SUCCESS)
-			{
-				DEBUG_BREAK;
-				return false;
-			}
+			VK_CRASH_CHECK(vkCreateFramebuffer(handle, &framebufferInfo, nullptr, &framebuffers[i]), "Failed to create frame buffer");
 		}
 
 		return true;
@@ -367,11 +344,7 @@ namespace ENGINE_NAMESPACE
 	void device::record_secondary_graphics(VkCommandBuffer& buffer, std::uint32_t image_index, 
 		const std::vector<graphics_pipeline*>& graphics_pipelines)
 	{
-		if (vkResetCommandBuffer(buffer, 0) != VK_SUCCESS)
-		{
-			//do stuff
-			DEBUG_BREAK;
-		}
+		VK_CRASH_CHECK(vkResetCommandBuffer(buffer, 0), "Failed to reset secondary graphics command buffer");
 
 		VkCommandBufferInheritanceInfo inheritance_info = {};
 		inheritance_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
@@ -388,22 +361,14 @@ namespace ENGINE_NAMESPACE
 		begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT | VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
 		begin_info.pInheritanceInfo = &inheritance_info;
 
-		if (vkBeginCommandBuffer(buffer, &begin_info) != VK_SUCCESS)
-		{
-			//do stuff
-			DEBUG_BREAK;
-		}
+		VK_CRASH_CHECK(vkBeginCommandBuffer(buffer, &begin_info), "Failed to begin secondary graphics command buffer");
 
 		for (graphics_pipeline* pipeline : graphics_pipelines)
 		{
-			pipeline->record_commands(buffer);
+			pipeline->record_commands(buffer, current_frame);
 		}
 
-		if (vkEndCommandBuffer(buffer) != VK_SUCCESS)
-		{
-			//do stuff
-			DEBUG_BREAK;
-		}
+		VK_CRASH_CHECK(vkEndCommandBuffer(buffer), "Failed to end secondary graphics command buffer");
 	}
 
 	bool device::draw()
@@ -427,22 +392,14 @@ namespace ENGINE_NAMESPACE
 		
 		VkCommandBuffer& primary_buffer = graphics_command_buffers[current_frame * (command_parallelism + 1)];
 
-		if (vkResetCommandBuffer(primary_buffer, 0) != VK_SUCCESS)
-		{
-			//do stuff
-			DEBUG_BREAK;
-		}
+		VK_CRASH_CHECK(vkResetCommandBuffer(primary_buffer, 0), "Failed to reset primary graphics command buffer");
 
 		VkCommandBufferBeginInfo beginInfo = {};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT; // | VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
 		beginInfo.pInheritanceInfo = nullptr; // Optional
 
-		if (vkBeginCommandBuffer(primary_buffer, &beginInfo) != VK_SUCCESS)
-		{
-			//do stuff
-			DEBUG_BREAK;
-		}
+		VK_CRASH_CHECK(vkBeginCommandBuffer(primary_buffer, &beginInfo), "Failed to begin primary graphics command buffer");
 
 		VkRenderPassBeginInfo renderPassInfo = {};
 		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -456,10 +413,8 @@ namespace ENGINE_NAMESPACE
 		renderPassInfo.pClearValues = &clearColor;
 
 		std::vector<graphics_pipeline*>* pipeline_stacks = t_malloc<std::vector<graphics_pipeline*>>(command_parallelism);
-		for (std::uint32_t i = 0; i < command_parallelism; i++)
-		{
-			new (&pipeline_stacks[i]) std::vector<graphics_pipeline*>();
-		}
+		for (std::uint32_t i = 0; i < command_parallelism; i++) new (&pipeline_stacks[i]) std::vector<graphics_pipeline*>();
+
 		std::uint32_t index = 0;
 		for (graphics_pipeline& pipeline : graphics_pipelines)
 		{
@@ -481,11 +436,7 @@ namespace ENGINE_NAMESPACE
 		vkCmdEndRenderPass(primary_buffer);
 		//TODO: update uniform buffer with imageIndex
 
-		if (vkEndCommandBuffer(primary_buffer) != VK_SUCCESS)
-		{
-			//do stuff
-			DEBUG_BREAK;
-		}
+		VK_CRASH_CHECK(vkEndCommandBuffer(primary_buffer), "Failed to end primary graphics command buffer");
 
 		VkSemaphore pre_render[] = { image_available_semaphores[current_frame], memory.get_device_in_semaphore(current_frame) };
 
@@ -501,11 +452,7 @@ namespace ENGINE_NAMESPACE
 		submitInfo.pSignalSemaphores = &render_finished_semaphores[current_frame];
 
 		vkResetFences(handle, 1, &frame_fences[current_frame]);
-		if (vkQueueSubmit(graphics_queue, 1, &submitInfo, frame_fences[current_frame]) != VK_SUCCESS) //TODO: porbably have to change this
-		{
-			DEBUG_BREAK;
-			return false;
-		}
+		VK_CRASH_CHECK(vkQueueSubmit(graphics_queue, 1, &submitInfo, frame_fences[current_frame]), "Failed to submit render commands");
 
 		VkPresentInfoKHR presentInfo = {};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -537,8 +484,8 @@ namespace ENGINE_NAMESPACE
 	device::index_t device::add_graphics_pipeline(const shader& vertex, const shader& fragment)
 	{
 
-		const shader* shaders[] = { &vertex, &fragment };
-		graphics_pipelines.push_back(graphics_pipeline(*this, shaders, 2, vertex.get_inputs()[0], data_layout(), data_layout()));
+		const std::vector<const shader*> shaders = { &vertex, &fragment };
+		graphics_pipelines.push_back(graphics_pipeline(*this, shaders));
 		return static_cast<std::uint32_t>(graphics_pipelines.size() - 1);
 	}
 

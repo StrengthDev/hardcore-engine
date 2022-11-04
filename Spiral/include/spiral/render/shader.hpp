@@ -42,7 +42,7 @@ namespace ENGINE_NAMESPACE
 	class ENGINE_API shader
 	{
 	public:
-		shader() {};
+		shader() = default;
 		
 		shader(const char* filename, const char* entry_point, const char* name, shader_t stage = shader_t::NONE);
 		shader(const char* filename, const char* entry_point, shader_t stage = shader_t::NONE) : shader(filename, entry_point, filename, stage) {}
@@ -51,14 +51,61 @@ namespace ENGINE_NAMESPACE
 
 		~shader();
 
-		shader(shader&& other) noexcept;
-		shader& operator=(shader&& other) noexcept;
+		shader(shader&& other) noexcept : data(std::exchange(other.data, nullptr)), size(std::exchange(other.size, 0)),
+			stage(std::exchange(other.stage, shader_t::NONE)), entry_point(std::exchange(other.entry_point, nullptr)),
+			n_inputs(std::exchange(other.n_inputs, 0)), inputs(std::exchange(other.inputs, nullptr)),
+			n_descriptors(std::exchange(other.n_descriptors, 0)), descriptors(std::exchange(other.descriptors, nullptr)),
+			name(std::exchange(other.name, nullptr))
+		{ }
 
-		shader(const shader& other) = delete;
-		shader& operator=(const shader& other) = delete;
+		shader& operator=(shader&& other) noexcept
+		{
+			this->~shader();
+
+			data = std::exchange(other.data, nullptr);
+			size = std::exchange(other.size, 0);
+			stage = std::exchange(other.stage, shader_t::NONE);
+			entry_point = std::exchange(other.entry_point, nullptr);
+			n_inputs = std::exchange(other.n_inputs, 0);
+			inputs = std::exchange(other.inputs, nullptr);
+			n_descriptors = std::exchange(other.n_descriptors, 0);
+			descriptors = std::exchange(other.descriptors, nullptr);
+			name = std::exchange(other.name, nullptr);
+			return *this;
+		}
+
+		shader(const shader&) = delete;
+		shader& operator=(const shader&) = delete;
 
 		const char* get_name() const noexcept { return name; }
 		const data_layout* get_inputs() const noexcept { return inputs; }
+
+		//uniform types
+		enum descriptor_t : uint8_t
+		{
+			NONE = 0,
+			UNIFORM,
+			STORAGE,
+			//PUSH_CONSTANT,
+			SAMPLER,
+			TEXTURE,
+			IMAGE,
+			SAMPLER_BUFFER,
+			IMAGE_BUFFER,
+			SAMPLER_SHADOW,
+		};
+
+		//for shader variables, unlike shader inputs, there wont be a representation for every possible set/binding pair
+		//because a shader wont necessarily have all sets and bindings declared, some can be in a different shader in the
+		//same pipeline
+		struct descriptor_data
+		{
+			std::uint32_t set;
+			std::uint32_t binding;
+			descriptor_t type;
+			std::uint32_t count;
+			//data_layout layout;
+		};
 
 	//this is protected to help with some operations in shader_internal
 	protected:
@@ -70,8 +117,12 @@ namespace ENGINE_NAMESPACE
 		std::uint8_t n_inputs = 0;
 		data_layout* inputs = nullptr;
 
+		std::uint32_t n_descriptors = 0;
+		descriptor_data* descriptors = nullptr;
 
 	private:
 		char* name = nullptr;
+
+		void reflect();
 	};
 }

@@ -152,11 +152,8 @@ namespace ENGINE_NAMESPACE
 			{
 				instance_info.enabledLayerCount = 0;
 			}
-			VkResult result = vkCreateInstance(&instance_info, nullptr, &instance);
-			if (result != VK_SUCCESS)
-			{
-				CRASH("Failed to create Vulkan instance", result);
-			}
+
+			VK_CRASH_CHECK(vkCreateInstance(&instance_info, nullptr, &instance), "Failed to create Vulkan instance");
 		}
 
 		inline void init_devices()
@@ -167,6 +164,7 @@ namespace ENGINE_NAMESPACE
 			{
 				CRASH("No physical devices found");
 			}
+			INTERNAL_ASSERT(n_devices < devices.size(), "Too many devices found");
 			VkPhysicalDevice* physical_devices = t_malloc<VkPhysicalDevice>(n_devices);
 			vkEnumeratePhysicalDevices(instance, &n_devices, physical_devices);
 			for (std::uint32_t i = 0; i < n_devices; i++)
@@ -217,19 +215,12 @@ namespace ENGINE_NAMESPACE
 				debug_info.pfnUserCallback = debug_callback;
 				debug_info.pUserData = nullptr; // Optional, passed to the callback function
 
-				VkResult result = create_debug_utils_messenger_EXT(instance, &debug_info, nullptr, &debug_messenger);
-				if (result != VK_SUCCESS)
-				{
-					CRASH("Failed to create debug messenger", result);
-				}
+				VK_CRASH_CHECK(create_debug_utils_messenger_EXT(instance, &debug_info, nullptr, &debug_messenger), 
+					"Failed to create debug messenger");
 			}
 
 			GLFWwindow* window = window::get_handle();
-			VkResult result = glfwCreateWindowSurface(instance, window, nullptr, &surface);
-			if (result != VK_SUCCESS)
-			{
-				CRASH("Failed to create window surface", result);
-			}
+			VK_CRASH_CHECK(glfwCreateWindowSurface(instance, window, nullptr, &surface), "Failed to create window surface");
 
 			init_devices();
 		}

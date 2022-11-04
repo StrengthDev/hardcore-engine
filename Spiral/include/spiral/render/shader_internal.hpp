@@ -10,7 +10,7 @@ namespace ENGINE_NAMESPACE
 	public:
 		internal_shader() = delete;
 
-		inline const VkShaderStageFlagBits get_stage() const
+		inline VkShaderStageFlagBits get_stage() const noexcept
 		{
 			switch (stage)
 			{
@@ -29,10 +29,15 @@ namespace ENGINE_NAMESPACE
 			case shader_t::MESH:					return VK_SHADER_STAGE_MISS_BIT_NV;
 			case shader_t::TASK:					return VK_SHADER_STAGE_TASK_BIT_NV;
 			default:
-				//TODO: stuff
-				DEBUG_BREAK;
+				INTERNAL_ASSERT(false, "Invalid shader stage");
 			}
 			return VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM;
+		}
+
+		inline descriptor_data* get_descriptors(std::uint32_t* out_n_descriptors) const noexcept
+		{
+			*out_n_descriptors = n_descriptors;
+			return descriptors;
 		}
 
 		static VkShaderModule create_shader_module(const shader& shader, VkDevice& handle, 

@@ -107,17 +107,17 @@ namespace ENGINE_NAMESPACE
 
 	memory_pool::~memory_pool()
 	{
-		INTERNAL_ASSERT(memory == VK_NULL_HANDLE, "Memory pool not freed");
+		INTERNAL_ASSERT(!slots, "Memory pool not freed");
 	}
 
 	void memory_pool::free(VkDevice& handle)
 	{
-		if (memory != VK_NULL_HANDLE)
+		if (slots)
 		{
 			vkDestroyBuffer(handle, buffer, nullptr);
 			vkFreeMemory(handle, memory, nullptr);
 			std::free(slots);
-			memory = VK_NULL_HANDLE;
+			slots = nullptr;
 		}
 	}
 
@@ -298,6 +298,14 @@ namespace ENGINE_NAMESPACE
 
 	void device_memory::terminate()
 	{
+		for (std::uint8_t i = 0; i < max_frames_in_flight; i++)
+		{
+			vp_pending_copies[i].clear();
+			ip_pending_copies[i].clear();
+			up_pending_copies[i].clear();
+			sp_pending_copies[i].clear();
+		}
+
 		for (memory_pool& pool : vertex_pools) pool.free(owner->handle);
 		for (memory_pool& pool : index_pools) pool.free(owner->handle);
 		for (memory_pool& pool : uniform_pools) pool.free(owner->handle);
@@ -506,21 +514,28 @@ namespace ENGINE_NAMESPACE
 	void device_memory::memcpy_storage(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset)
 	{ this->memcpy<STORAGE>(ref, data, size, offset); }
 
-	buffer_binding_args device_memory::get_binding_args(const object_resource& object)
+	buffer_binding_args device_memory::get_binding_args(const object_resource& object) noexcept
 	{
 		const mem_ref_internal& ref
 			= reinterpret_cast<const mem_ref_internal&>(reinterpret_cast<const object_resource_internal&>(object).ref);
 		return { vertex_pools[ref.pool].get_buffer(), ref.size, ref.offset };
 	}
 
-	buffer_binding_args device_memory::get_binding_args(const device_data& instance)
+	buffer_binding_args device_memory::get_index_binding_args(const object_resource& object) noexcept
+	{
+		const mem_ref_internal& ref
+			= reinterpret_cast<const mem_ref_internal&>(reinterpret_cast<const object_resource_internal&>(object).index_ref);
+		return { vertex_pools[ref.pool].get_buffer(), ref.size, ref.offset };
+	}
+
+	buffer_binding_args device_memory::get_binding_args(const device_data& instance) noexcept
 	{
 		const mem_ref_internal& ref
 			= reinterpret_cast<const mem_ref_internal&>(reinterpret_cast<const instance_internal&>(instance).ref);
 		return { vertex_pools[ref.pool].get_buffer(), ref.size, ref.offset }; //TODO different types
 	}
 
-	uint32_t device_memory::find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties)
+	std::uint32_t device_memory::find_memory_type(std::uint32_t type_filter, VkMemoryPropertyFlags properties)
 	{
 		//Exact type search
 		for (std::uint32_t i = 0; i < mem_properties.memoryTypeCount; i++)
