@@ -54,6 +54,13 @@ namespace ENGINE_NAMESPACE
 			values = t_malloc<value>(reserve);
 		}
 
+		~data_layout() 
+		{
+			n_values = 0;
+			std::free(values);
+			values = nullptr;
+		}
+
 		inline void set_type(std::uint8_t index, type t, component_type ct) noexcept
 		{
 			INTERNAL_ASSERT(index < n_values, "Index out of bounds");
@@ -140,12 +147,6 @@ namespace ENGINE_NAMESPACE
 			std::free(values);
 			values = std::exchange(other.values, nullptr);
 			return *this;
-		}
-
-		~data_layout() 
-		{
-			n_values = 0;
-			std::free(values);
 		}
 
 		inline bool operator==(const data_layout& rhs) const noexcept

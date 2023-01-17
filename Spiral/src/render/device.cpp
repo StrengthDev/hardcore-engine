@@ -373,9 +373,13 @@ namespace ENGINE_NAMESPACE
 
 	bool device::draw()
 	{
+		const std::uint8_t next_frame = (current_frame + 1) % max_frames_in_flight;
+		const std::uint8_t previous_frame = (current_frame - 1 + max_frames_in_flight) % max_frames_in_flight;
+
 		memory.unmap_ranges(current_frame);
-		memory.flush_in(current_frame);
 		vkWaitForFences(handle, 1, &frame_fences[current_frame], VK_TRUE, UINT64_MAX);
+		for (auto& pipeline : graphics_pipelines) pipeline.update_descriptor_sets(previous_frame, current_frame, next_frame); //TODO consider parallelizing this
+		memory.flush_in(current_frame);
 
 		std::uint32_t imageIndex;
 		VkResult result = vkAcquireNextImageKHR(handle, main_swapchain.handle, UINT64_MAX, image_available_semaphores[current_frame], VK_NULL_HANDLE, &imageIndex);
@@ -434,20 +438,19 @@ namespace ENGINE_NAMESPACE
 		vkCmdExecuteCommands(primary_buffer, command_parallelism, &graphics_command_buffers[(command_parallelism + 1) * current_frame + 1]);
 
 		vkCmdEndRenderPass(primary_buffer);
-		//TODO: update uniform buffer with imageIndex
 
 		VK_CRASH_CHECK(vkEndCommandBuffer(primary_buffer), "Failed to end primary graphics command buffer");
 
-		VkSemaphore pre_render[] = { image_available_semaphores[current_frame], memory.get_device_in_semaphore(current_frame) };
+		VkSemaphore pre_render_semaphores[] = { image_available_semaphores[current_frame], memory.get_device_in_semaphore(current_frame) };
 
 		VkSubmitInfo submitInfo = {};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT };
 		submitInfo.waitSemaphoreCount = 2;
-		submitInfo.pWaitSemaphores = pre_render;//&image_available_semaphores[current_frame];
+		submitInfo.pWaitSemaphores = pre_render_semaphores;
 		submitInfo.pWaitDstStageMask = waitStages;
 		submitInfo.commandBufferCount = 1;
-		submitInfo.pCommandBuffers = &primary_buffer;//&graphics_pipelines.commandBuffers[imageIndex];
+		submitInfo.pCommandBuffers = &primary_buffer;
 		submitInfo.signalSemaphoreCount = 1;
 		submitInfo.pSignalSemaphores = &render_finished_semaphores[current_frame];
 
@@ -475,7 +478,7 @@ namespace ENGINE_NAMESPACE
 			DEBUG_BREAK;
 			return false;
 		}
-		current_frame = (current_frame + 1) % max_frames_in_flight;
+		current_frame = next_frame;
 		memory.synchronize(current_frame); //wait for the next frame's data transfers to finish, so nothing can be overwritten by the client
 		memory.map_ranges(current_frame);
 		return true;

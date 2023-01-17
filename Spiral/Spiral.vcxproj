@@ -194,7 +194,6 @@
     <ClCompile Include="src\debug\log.cpp" />
     <ClCompile Include="src\render\device.cpp" />
     <ClCompile Include="src\render\graphics_pipeline.cpp" />
-    <ClCompile Include="src\render\instance.cpp" />
     <ClCompile Include="src\render\memory.cpp" />
     <ClCompile Include="src\render\pipeline.cpp" />
     <ClCompile Include="src\render\renderer.cpp" />
@@ -211,6 +210,7 @@
     <ClInclude Include="include\spiral\core\client.hpp" />
     <ClInclude Include="include\spiral\core\core.hpp" />
     <ClInclude Include="include\spiral\core\entry_point.hpp" />
+    <ClInclude Include="include\spiral\core\exception.hpp" />
     <ClInclude Include="include\spiral\core\static_client.hpp" />
     <ClInclude Include="include\spiral\core\time.hpp" />
     <ClInclude Include="include\spiral\core\window_internal.hpp" />
@@ -229,7 +229,6 @@
     <ClInclude Include="include\spiral\render\data_layout.hpp" />
     <ClInclude Include="include\spiral\render\device.hpp" />
     <ClInclude Include="include\spiral\render\graphics_pipeline.hpp" />
-    <ClInclude Include="include\spiral\render\instance.hpp" />
     <ClInclude Include="include\spiral\render\memory.hpp" />
     <ClInclude Include="include\spiral\render\memory_ref.hpp" />
     <ClInclude Include="include\spiral\render\pipeline.hpp" />

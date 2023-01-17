@@ -18,8 +18,8 @@ public:
 private:
 	double timec;
 	int framec;
-
-	spiral::object_resource resource;
-	spiral::instance_vector instances;
+	std::uint32_t color = 0;
+	spiral::mesh resource;
+	spiral::dynamic_storage_vector instances;
 	spiral::render_pipeline pipeline;
 };

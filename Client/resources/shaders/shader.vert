@@ -22,7 +22,16 @@ layout(location = 0) in vec3 inPosition;
 
 layout(location = 0) out vec3 fragColor;
 
-void main() {
+layout(std430, set = 0, binding = 0) readonly buffer typename
+{
+    uint data[];
+} storage;
+
+void main()
+{
     gl_Position = vec4(inPosition, 1.0);
-    fragColor = vec3(0.2, 0.2, 0.5);
+    if(storage.data[0] == 0)
+        fragColor = vec3(0.2, 0.2, 0.5);
+    else
+        fragColor = vec3(1.0, 0.0, 0.0);
 }

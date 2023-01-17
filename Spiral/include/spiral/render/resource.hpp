@@ -12,34 +12,55 @@ namespace ENGINE_NAMESPACE
 	class ENGINE_API resource
 	{
 	public:
-		resource() = default;
-		virtual ~resource() { destroy(); }
+		~resource();
 
-		void destroy();
 		inline bool valid() const { return ref.valid(); }
 
 		resource(const resource&) = delete;
 		resource& operator=(const resource&) = delete;
 
-		resource(resource&& other) noexcept : ref(std::move(other.ref)) { }
+		resource(resource&& other) noexcept : ref(std::move(other.ref)), element_layout(std::move(other.element_layout)), 
+			n_elements(std::exchange(other.n_elements, 0)) 
+		{ }
 
 		inline resource& operator=(resource&& other) noexcept
 		{
-			destroy();
+			this->~resource();
 			ref = std::move(other.ref);
+			element_layout = std::move(other.element_layout);
+			n_elements = std::exchange(other.n_elements, 0);
 			return *this;
 		}
 
+		inline const data_layout& layout() const noexcept { return element_layout; }
+		inline std::uint32_t count() const noexcept { return n_elements; }
+		inline std::size_t size() const noexcept { return element_layout.size() * n_elements; }
+ 
 	protected:
+		resource() = default;
+
+		resource(memory_ref&& ref, const data_layout& layout, std::uint32_t count) noexcept :
+			ref(std::move(ref)), element_layout(layout), n_elements(count)
+		{ }
+
+		void init(memory_ref&& ref, const data_layout& layout, std::uint32_t count) noexcept
+		{
+			this->ref = std::move(ref);
+			this->element_layout = layout;
+			this->n_elements = count;
+		}
 
 		memory_ref ref;
+		data_layout element_layout;
+		std::uint32_t n_elements = 0;
+
+	private:
+		friend struct std::hash<resource>;
 	};
 
-	class ENGINE_API object_resource : public resource
+	class ENGINE_API mesh : public resource
 	{
 	public:
-		object_resource() = default;
-
 		/**
 		 * @brief 
 		*/
@@ -51,74 +72,250 @@ namespace ENGINE_NAMESPACE
 			UINT32,
 		};
 
-		object_resource(const void* data, const std::size_t size, const std::size_t offset, const bool vertex_data_first,
-			const index_format index_type, const data_layout& layout);
-		object_resource(const void* vertex_data, const std::size_t vertex_data_size, const void* index_data,
-			const std::size_t index_data_size, const index_format index_type, const data_layout& layout);
-		object_resource(const void* vertex_data, const std::size_t vertex_data_size, const data_layout& layout);
+		mesh() = default;
 
-		object_resource(const std::size_t vertex_data_size, const std::size_t index_data_size,
-			const index_format index_type, const data_layout& layout);
-		object_resource(const std::size_t vertex_data_size, const data_layout& layout);
+		mesh(const void* data, std::size_t size, std::size_t offset, bool vertex_data_first,
+			index_format index_type, const data_layout& layout);
+		mesh(const void* vertex_data, std::size_t vertex_data_size, const void* index_data,
+			std::size_t index_data_size, index_format index_type, const data_layout& layout);
+		mesh(const void* vertex_data, std::size_t vertex_data_size, const data_layout& layout);
+
+		mesh(std::size_t vertex_data_size, std::size_t index_data_size,
+			index_format index_type, const data_layout& layout);
+		mesh(std::size_t vertex_data_size, const data_layout& layout);
 
 		template<typename... Types>
-		static inline object_resource create(void* data, std::size_t size, std::size_t offset, bool vertex_data_first, index_format index_type)
+		static inline mesh create(const void* data, std::size_t size, std::size_t offset, bool vertex_data_first, 
+			index_format index_type)
 		{
-			return object_resource(data, size, offset, vertex_data_first, index_type, data_layout::create<Types...>());
+			return mesh(data, size, offset, vertex_data_first, index_type, data_layout::create<Types...>());
 		}
 
 		template<typename... Types>
-		static inline object_resource create(const void* vertex_data, const std::size_t vertex_data_size,
-			const void* index_data, const std::size_t index_data_size, const index_format index_type)
+		static inline mesh create(const void* vertex_data, std::size_t vertex_data_size,
+			const void* index_data, std::size_t index_data_size, index_format index_type)
 		{
-			return object_resource(vertex_data, vertex_data_size, index_data, index_data_size, index_type, data_layout::create<Types...>());
+			return mesh(vertex_data, vertex_data_size, index_data, index_data_size, index_type, data_layout::create<Types...>());
 		}
 
 		template<typename... Types>
-		static inline object_resource create(const void* vertex_data, const std::size_t vertex_data_size)
+		static inline mesh create(const void* vertex_data, std::size_t vertex_data_size)
 		{
-			return object_resource(vertex_data, vertex_data_size, data_layout::create<Types...>());
+			return mesh(vertex_data, vertex_data_size, data_layout::create<Types...>());
 		}
 
 		template<typename... Types>
-		static inline object_resource create(const std::size_t vertex_data_size, const std::size_t index_data_size,
-			const index_format index_type)
+		static inline mesh create(std::size_t vertex_data_size, std::size_t index_data_size, index_format index_type)
 		{
-			return object_resource(vertex_data_size, index_data_size, index_type, data_layout::create<Types...>());
+			return mesh(vertex_data_size, index_data_size, index_type, data_layout::create<Types...>());
 		}
 
 		template<typename... Types>
-		static inline object_resource create(const std::size_t vertex_data_size)
+		static inline mesh create(std::size_t vertex_data_size)
 		{
-			return object_resource(vertex_data_size, data_layout::create<Types...>());
+			return mesh(vertex_data_size, data_layout::create<Types...>());
 		}
 
-		object_resource(object_resource&& other) noexcept : resource(std::move(other)), 
-			layout(std::exchange(other.layout, data_layout(0))),
-			index_t(std::exchange(other.index_t, index_format::NONE)), draw_count(std::exchange(other.draw_count, 0))
+		mesh(mesh&& other) noexcept : resource(std::move(other)), index_ref(std::move(other.index_ref)),
+			index_t(std::exchange(other.index_t, index_format::NONE)), n_indexes(std::exchange(other.n_indexes, 0))
 		{ }
 
-		inline object_resource& operator=(object_resource&& other) noexcept
+		inline mesh& operator=(mesh&& other) noexcept
 		{
 			resource::operator=(std::move(other));
-			layout = std::exchange(other.layout, data_layout());
-			index_ref = std::exchange(other.index_ref, memory_ref());
+			index_ref = std::move(other.index_ref);
 			index_t = std::exchange(other.index_t, index_format::NONE);
-			draw_count = std::exchange(other.draw_count, 0);
+			n_indexes = std::exchange(other.n_indexes, 0);
 			return *this;
 		}
 
-		inline const data_layout& vertex_layout() const noexcept { return layout; }
 		inline index_format index_type() const noexcept { return index_t; }
-		inline std::uint32_t count() const noexcept { return draw_count; }
+		inline std::uint32_t index_count() const noexcept { return n_indexes; }
+		inline std::uint32_t draw_count() const noexcept { return index_t == index_format::NONE ? n_elements : n_indexes; }
+		inline std::size_t index_size() const noexcept { return static_cast<std::size_t>(n_indexes) * index_size(index_t); }
 
 	protected:
 		memory_ref index_ref;
 
 	private:
-		data_layout layout;
 		index_format index_t = index_format::NONE;
-		std::uint32_t draw_count = 0;
+		std::uint32_t n_indexes = 0;
+
+		static inline std::uint32_t index_size(index_format format) noexcept
+		{
+			switch (format)
+			{
+			case index_format::NONE:	return 0;
+			case index_format::UINT8:	return 1;
+			case index_format::UINT16:	return 2;
+			case index_format::UINT32:	return 4;
+			default:
+				INTERNAL_ASSERT(false, "Invalid vertex type");
+				break;
+			}
+			return std::numeric_limits<std::uint32_t>::max();
+		}
+	};
+
+	class ENGINE_API unmapped_resource : public virtual resource
+	{
+	protected:
+		unmapped_resource() = default;
+		unmapped_resource(memory_ref&& ref, const data_layout& layout, std::uint32_t count) :
+			resource(std::move(ref), layout, count)
+		{ }
+
+	public:
+		void update(void* data, std::size_t size, std::size_t offset);
+	};
+
+	class ENGINE_API resource_ref;
+
+	class ENGINE_API mapped_resource : public virtual resource
+	{
+	protected:
+		mapped_resource() = default;
+		mapped_resource(memory_ref&& ref, const data_layout& layout, std::uint32_t count) : 
+			resource(std::move(ref), layout, count)
+		{ }
+
+		inline mapped_resource& operator=(mapped_resource&& other) noexcept
+		{
+			resource::operator=(std::move(other));
+			data_ptr = std::exchange(other.data_ptr, nullptr);
+			offset = std::exchange(other.offset, 0);
+			return *this;
+		}
+
+		inline mapped_resource& move_no_base(mapped_resource&& other) noexcept
+		{
+			data_ptr = std::exchange(other.data_ptr, nullptr);
+			offset = std::exchange(other.offset, 0);
+			return *this;
+		}
+
+	public:
+		inline resource_ref operator[](std::size_t index) noexcept;
+
+	protected:
+		virtual void update_map() = 0;
+
+		void** data_ptr = nullptr;
+		std::size_t offset = 0;
+
+		friend class ::ENGINE_NAMESPACE::resource_ref;
+	};
+
+	class ENGINE_API resource_ref
+	{
+	public:
+		inline void set(void* data) noexcept
+		{
+			std::memcpy(reinterpret_cast<std::byte*>(*ref->data_ptr) + ref->layout().size() * index, data, ref->layout().size());
+		}
+
+		inline void set_field(std::size_t field_idx, void* data)
+		{
+
+		}
+
+	private:
+		resource_ref() = delete;
+		resource_ref(mapped_resource& ref, std::size_t index) noexcept : ref(&ref), index(index)
+		{ }
+
+		mapped_resource* ref;
+		std::size_t index;
+
+		friend class ::ENGINE_NAMESPACE::mapped_resource;
+	};
+
+	inline resource_ref mapped_resource::operator[](std::size_t index) noexcept
+	{
+		return resource_ref(*this, index);
+	}
+
+	class ENGINE_API resizable_resource : public virtual resource
+	{
+	protected:
+		resizable_resource() = default;
+		resizable_resource(memory_ref&& ref, const data_layout& layout, std::uint32_t count);
+
+		inline resizable_resource& operator=(resizable_resource&& other) noexcept
+		{
+			resource::operator=(std::move(other));
+			return *this;
+		}
+
+		virtual void resize(std::uint32_t new_size) = 0;
+	};
+
+	class ENGINE_API uniform final : public mapped_resource
+	{
+	public:
+		uniform() = default;
+		uniform(const data_layout& layout, std::uint32_t count = 1);
+
+	protected:
+		void update_map() override;
+	};
+
+	class ENGINE_API unmapped_uniform final : public unmapped_resource
+	{
+	public:
+		unmapped_uniform() = default;
+		unmapped_uniform(const data_layout& layout, std::uint32_t count = 1);
+	};
+
+	class ENGINE_API storage_array final : public unmapped_resource
+	{
+	public:
+		storage_array() = default;
+		storage_array(const data_layout& layout, std::uint32_t count);
+	};
+
+	class ENGINE_API dynamic_storage_array final : public mapped_resource
+	{
+	public:
+		dynamic_storage_array() = default;
+		dynamic_storage_array(const data_layout& layout, std::uint32_t count);
+
+	protected:
+		void update_map() override;
+	};
+
+	class ENGINE_API storage_vector final : public unmapped_resource, public resizable_resource
+	{
+	public:
+		storage_vector() = default;
+		storage_vector(const data_layout& layout, std::uint32_t count);
+
+		inline storage_vector& operator=(storage_vector&& other) noexcept
+		{
+			resource::operator=(std::move(other));
+			return *this;
+		}
+
+		void resize(std::uint32_t new_count) override;
+	};
+
+	class ENGINE_API dynamic_storage_vector final : public mapped_resource, public resizable_resource
+	{
+	public:
+		dynamic_storage_vector() = default;
+		dynamic_storage_vector(const data_layout& layout, std::uint32_t count);
+
+		inline dynamic_storage_vector& operator=(dynamic_storage_vector&& other) noexcept
+		{
+			resource::operator=(std::move(other));
+			move_no_base(std::move(other));
+			return *this;
+		}
+
+		void resize(std::uint32_t new_count) override;
+
+	protected:
+		void update_map() override;
 	};
 
 	class ENGINE_API texture_resource : public resource
@@ -133,3 +330,12 @@ namespace ENGINE_NAMESPACE
 
 	};
 }
+
+template<>
+struct std::hash<ENGINE_NAMESPACE::resource>
+{
+	inline std::size_t operator()(const ENGINE_NAMESPACE::resource& key) const noexcept
+	{
+		return key.ref.hash();
+	}
+};

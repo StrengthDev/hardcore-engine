@@ -16,7 +16,7 @@ namespace ENGINE_NAMESPACE
 			size(std::exchange(ref.size, 0)) 
 		{}
 
-		memory_ref& operator=(memory_ref&& ref) noexcept
+		inline memory_ref& operator=(memory_ref&& ref) noexcept
 		{
 			pool_type = std::exchange(ref.pool_type, 0);
 			pool = std::exchange(ref.pool, std::numeric_limits<std::uint32_t>::max());
@@ -28,6 +28,11 @@ namespace ENGINE_NAMESPACE
 		memory_ref(const memory_ref&) = delete;
 		memory_ref& operator=(const memory_ref&) = delete;
 
+		inline bool operator==(memory_ref& ref) const noexcept
+		{
+			return pool_type == ref.pool_type && pool == ref.pool && offset == ref.offset && size == ref.size;
+		}
+
 		inline bool valid() const noexcept { return offset != std::numeric_limits<std::size_t>::max() && size != 0; }
 
 		inline void invalidate() noexcept
@@ -36,6 +41,11 @@ namespace ENGINE_NAMESPACE
 			pool = std::numeric_limits<std::uint32_t>::max();
 			offset = std::numeric_limits<std::size_t>::max();
 			size = 0;
+		}
+
+		inline std::size_t hash() const noexcept 
+		{
+			return (offset << 42) | (size << 20) | (static_cast<std::size_t>(pool) << 4) | pool_type;
 		}
 
 	protected:

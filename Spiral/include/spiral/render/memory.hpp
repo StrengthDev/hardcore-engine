@@ -3,7 +3,6 @@
 #include "render_core.hpp"
 #include "memory_ref.hpp"
 #include "resource.hpp"
-#include "instance.hpp"
 
 namespace ENGINE_NAMESPACE
 {
@@ -80,13 +79,14 @@ namespace ENGINE_NAMESPACE
 	{
 	public:
 		dynamic_memory_pool() = default;
-		dynamic_memory_pool(VkDevice& handle, VkDeviceSize size) : host_ptr(nullptr) {}
+		dynamic_memory_pool(VkDevice& handle, VkDeviceSize size) : memory_pool(handle, size), host_ptr(nullptr) {}
 		~dynamic_memory_pool();
 
 		dynamic_memory_pool(dynamic_memory_pool&& other) noexcept :
 			memory_pool(std::move(other)),
 			host_ptr(std::exchange(other.host_ptr, nullptr))
 		{ }
+
 		inline dynamic_memory_pool& operator=(dynamic_memory_pool&& other) noexcept
 		{
 			this->~dynamic_memory_pool();
@@ -100,8 +100,9 @@ namespace ENGINE_NAMESPACE
 	struct buffer_binding_args
 	{
 		VkBuffer buffer;
-		VkDeviceSize size;
+		VkDeviceSize frame_offset;
 		VkDeviceSize offset;
+		VkDeviceSize size;
 	};
 
 	class device_memory
@@ -123,8 +124,8 @@ namespace ENGINE_NAMESPACE
 
 		memory_ref alloc_vertices(const VkDeviceSize size);
 		memory_ref alloc_vertices(const void* data, const VkDeviceSize size);
-		memory_ref alloc_indices(const VkDeviceSize size);
-		memory_ref alloc_indices(const void* data, const VkDeviceSize size);
+		memory_ref alloc_indexes(const VkDeviceSize size);
+		memory_ref alloc_indexes(const void* data, const VkDeviceSize size);
 		memory_ref alloc_uniform(const VkDeviceSize size);
 		memory_ref alloc_uniform(const void* data, const VkDeviceSize size);
 		memory_ref alloc_storage(const VkDeviceSize size);
@@ -132,8 +133,8 @@ namespace ENGINE_NAMESPACE
 
 		memory_ref alloc_dynamic_vertices(const VkDeviceSize size);
 		memory_ref alloc_dynamic_vertices(const void* data, const VkDeviceSize size);
-		memory_ref alloc_dynamic_indices(const VkDeviceSize size);
-		memory_ref alloc_dynamic_indices(const void* data, const VkDeviceSize size);
+		memory_ref alloc_dynamic_indexes(const VkDeviceSize size);
+		memory_ref alloc_dynamic_indexes(const void* data, const VkDeviceSize size);
 		memory_ref alloc_dynamic_uniform(const VkDeviceSize size);
 		memory_ref alloc_dynamic_uniform(const void* data, const VkDeviceSize size);
 		memory_ref alloc_dynamic_storage(const VkDeviceSize size);
@@ -144,13 +145,23 @@ namespace ENGINE_NAMESPACE
 		void submit_upload(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset);
 
 		void memcpy_vertices(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset = 0);
-		void memcpy_indices(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset = 0);
+		void memcpy_indexes(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset = 0);
 		void memcpy_uniform(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset = 0);
 		void memcpy_storage(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset = 0);
 
-		buffer_binding_args get_binding_args(const object_resource& object) noexcept;
-		buffer_binding_args get_index_binding_args(const object_resource& object) noexcept;
-		buffer_binding_args get_binding_args(const device_data& instance) noexcept;
+		void get_vertex_map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept;
+		void get_index_map(const memory_ref & ref, void*** out_map_ptr, std::size_t * out_offset) noexcept;
+		void get_uniform_map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept;
+		void get_storage_map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept;
+
+		buffer_binding_args get_binding_args(const mesh& object) noexcept;
+		buffer_binding_args get_index_binding_args(const mesh& object) noexcept;
+		buffer_binding_args get_binding_args(const uniform& uniform) noexcept;
+		buffer_binding_args get_binding_args(const unmapped_uniform& uniform) noexcept;
+		buffer_binding_args get_binding_args(const storage_array& array) noexcept;
+		buffer_binding_args get_binding_args(const dynamic_storage_array& array) noexcept;
+		buffer_binding_args get_binding_args(const storage_vector& vector) noexcept;
+		buffer_binding_args get_binding_args(const dynamic_storage_vector& vector) noexcept;
 
 		inline VkSemaphore get_device_in_semaphore(const std::uint8_t current_frame) { return device_in[current_frame].semaphore; }
 
@@ -165,11 +176,9 @@ namespace ENGINE_NAMESPACE
 
 	private:
 		
-		//there are some template functions used by other member functions, 
-		//they are private so it's not a problem that they aren't defined in the header
-		
 		typedef std::pair<std::uint32_t, std::uint32_t> copy_path_t;
 
+		//not part of the engine API, so it's unnecessary to implement the std version of hash
 		struct hash
 		{
 			inline std::size_t operator()(const copy_path_t& key) const noexcept
@@ -179,6 +188,9 @@ namespace ENGINE_NAMESPACE
 		};
 
 		typedef std::unordered_map<copy_path_t, std::vector<VkBufferCopy>, hash> pending_copies_t;
+		
+		//there are some template functions used by other member functions, 
+		//they are private so it's not a problem that they aren't defined in the header
 
 		template<buffer_t BType>
 		inline std::vector<memory_pool>& get_pools() { static_assert(false, "Unimplemented buffer type"); }
@@ -237,6 +249,14 @@ namespace ENGINE_NAMESPACE
 
 		template<buffer_t BType, VkMemoryPropertyFlags MFlags>
 		memory_ref alloc(const void* data, const VkDeviceSize size);
+
+		template<buffer_t BType>
+		void get_map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept;
+
+		template<buffer_t BType>
+		buffer_binding_args get_binding_args(const resource&) noexcept;
+		template<buffer_t BType>
+		buffer_binding_args get_dynamic_binding_args(const resource&) noexcept;
 
 		device* owner = nullptr;
 

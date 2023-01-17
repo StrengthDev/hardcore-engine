@@ -4,7 +4,6 @@
 
 #include "shader.hpp"
 #include "resource.hpp"
-#include "instance.hpp"
 
 namespace ENGINE_NAMESPACE
 {
@@ -21,6 +20,45 @@ namespace ENGINE_NAMESPACE
 		DISABLED = 0,
 		ACTIVE,
 		PASSIVE
+	};
+
+	class render_pipeline;
+
+	template<pipeline_t PipelineType>
+	class ENGINE_API volatile_pipeline_task_ref final
+	{
+	public:
+		volatile_pipeline_task_ref() = delete;
+
+		//volatile_pipeline_task_ref(const volatile_pipeline_task_ref&) = delete;
+		//volatile_pipeline_task_ref(volatile_pipeline_task_ref&&) = delete;
+		//volatile_pipeline_task_ref& operator=(const volatile_pipeline_task_ref&) = delete;
+		//volatile_pipeline_task_ref& operator=(volatile_pipeline_task_ref&&) = delete;
+
+		volatile_pipeline_task_ref<PipelineType>& set_instances(std::uint32_t num);
+
+		volatile_pipeline_task_ref<PipelineType>& set_descriptor(std::uint32_t descriptor_idx, const uniform& buffer);
+		volatile_pipeline_task_ref<PipelineType>& set_descriptor(std::uint32_t descriptor_idx, const unmapped_uniform& buffer);
+		volatile_pipeline_task_ref<PipelineType>& set_descriptor(std::uint32_t descriptor_idx, const storage_array& buffer);
+		volatile_pipeline_task_ref<PipelineType>& set_descriptor(std::uint32_t descriptor_idx, const dynamic_storage_array& buffer);
+		volatile_pipeline_task_ref<PipelineType>& set_descriptor(std::uint32_t descriptor_idx, const storage_vector& buffer);
+		volatile_pipeline_task_ref<PipelineType>& set_descriptor(std::uint32_t descriptor_idx, const dynamic_storage_vector& buffer);
+
+	private:
+		volatile_pipeline_task_ref(void* pipeline_p, std::size_t task_id) noexcept : 
+			pipeline_p(pipeline_p), task_id(task_id)
+		{
+			static_assert(PipelineType != pipeline_t::NONE, "Invalid pipeline type");
+		}
+
+		template<typename Resource,
+			std::enable_if_t<std::is_base_of<resource, Resource>::value && std::is_final<Resource>::value, bool> = true>
+		volatile_pipeline_task_ref<PipelineType>& t_set_descriptor(std::uint32_t descriptor_idx, const Resource& buffer);
+
+		void* pipeline_p;
+		std::size_t task_id;
+
+		friend class ::ENGINE_NAMESPACE::render_pipeline;
 	};
 
 	class ENGINE_API pipeline
@@ -48,7 +86,7 @@ namespace ENGINE_NAMESPACE
 
 		~pipeline();
 
-		std::uint32_t id = std::numeric_limits<std::uint32_t>::max();
+		std::uint32_t id = std::numeric_limits<std::uint32_t>::max(); //TODO tchange to key
 		pipeline_s status = pipeline_s::DISABLED;
 		pipeline_t type = pipeline_t::NONE;
 
@@ -63,11 +101,22 @@ namespace ENGINE_NAMESPACE
 
 	class ENGINE_API render_pipeline : public pipeline
 	{
+	private:
+		typedef volatile_pipeline_task_ref<pipeline_t::RENDER> vptr_t;
+
 	public:
 		render_pipeline() = default;
 		render_pipeline(const shader& vertex, const shader& fragment);
 
-		void link(const object_resource& object);
-		void link(const object_resource& object, const instance& instance);
+		vptr_t add(const mesh& object);
+
+		vptr_t set_instances(const mesh& object, std::uint32_t num);
+
+		vptr_t set_descriptor(const mesh& object, std::uint32_t descriptor_idx, const uniform& buffer);
+		vptr_t set_descriptor(const mesh& object, std::uint32_t descriptor_idx, const unmapped_uniform& buffer);
+		vptr_t set_descriptor(const mesh& object, std::uint32_t descriptor_idx, const storage_array& buffer);
+		vptr_t set_descriptor(const mesh& object, std::uint32_t descriptor_idx, const dynamic_storage_array& buffer);
+		vptr_t set_descriptor(const mesh& object, std::uint32_t descriptor_idx, const storage_vector& buffer);
+		vptr_t set_descriptor(const mesh& object, std::uint32_t descriptor_idx, const dynamic_storage_vector& buffer);
 	};
 }
