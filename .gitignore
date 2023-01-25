@@ -9,6 +9,8 @@
 *.png
 Floorplan/
 bin/
-binINT/
+build/
+install/
 obj/
 .env.cmake
+CMakeSettings.json
