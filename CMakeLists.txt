@@ -67,12 +67,8 @@ function(add_shader TARGET SHADER)
     set(SHADER_PATH ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/${SHADER})
     set(OUTPUT_PATH $<TARGET_FILE_DIR:${TARGET}>/resources/shaders/${SHADER}.spv)
 
-    # Add a custom command to compile GLSL to SPIR-V.
     get_filename_component(OUTPUT_DIR ${OUTPUT_PATH} DIRECTORY)
-	set(TARGET_SHADER_PATH ${TARGET}_SHADER_PATH)
-	if(NOT TARGET ${TARGET_SHADER_PATH})
-		add_custom_target(${TARGET_SHADER_PATH} ALL COMMAND ${CMAKE_COMMAND} -E make_directory ${OUTPUT_DIR})
-	endif()
+	add_custom_command(TARGET ${TARGET} POST_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory ${OUTPUT_DIR})
 
     #add_custom_command(POST_BUILD
     #       OUTPUT ${OUTPUT_PATH}
@@ -97,3 +93,6 @@ add_subdirectory(hardcore)
 
 project(client VERSION 0.1 LANGUAGES CXX DESCRIPTION "Engine test client")
 add_subdirectory(client)
+
+project(demo VERSION 0.1 LANGUAGES CXX DESCRIPTION "Project containing several demo programs using the engine")
+add_subdirectory(demo)

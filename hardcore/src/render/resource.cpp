@@ -90,7 +90,7 @@ namespace ENGINE_NAMESPACE
 	}
 
 	uniform::uniform(const data_layout& layout, std::uint32_t count) :
-		mapped_resource(renderer::get_device().get_memory().alloc_dynamic_uniform(layout.size() * count), layout, count)
+		resource(renderer::get_device().get_memory().alloc_dynamic_uniform(layout.size() * count), layout, count)
 	{
 		update_map();
 	}
@@ -101,19 +101,19 @@ namespace ENGINE_NAMESPACE
 	}
 
 	unmapped_uniform::unmapped_uniform(const data_layout& layout, std::uint32_t count) :
-		unmapped_resource(renderer::get_device().get_memory().alloc_uniform(layout.size() * count), layout, count)
+		resource(renderer::get_device().get_memory().alloc_uniform(layout.size() * count), layout, count)
 	{
 
 	}
 
 	storage_array::storage_array(const data_layout& layout, std::uint32_t count) :
-		unmapped_resource(renderer::get_device().get_memory().alloc_storage(layout.size()* count), layout, count)
+		resource(renderer::get_device().get_memory().alloc_storage(layout.size() * count), layout, count)
 	{
 
 	}
 
 	dynamic_storage_array::dynamic_storage_array(const data_layout& layout, std::uint32_t count) :
-		mapped_resource(renderer::get_device().get_memory().alloc_dynamic_storage(layout.size()* count), layout, count)
+		resource(renderer::get_device().get_memory().alloc_dynamic_storage(layout.size() * count), layout, count)
 	{
 		update_map();
 	}
@@ -124,7 +124,7 @@ namespace ENGINE_NAMESPACE
 	}
 
 	storage_vector::storage_vector(const data_layout& layout, std::uint32_t count) :
-		resource(renderer::get_device().get_memory().alloc_storage(layout.size()* count), layout, count)
+		resource(renderer::get_device().get_memory().alloc_storage(layout.size() * count), layout, count)
 	{
 
 	}
@@ -135,7 +135,7 @@ namespace ENGINE_NAMESPACE
 	}
 
 	dynamic_storage_vector::dynamic_storage_vector(const data_layout& layout, std::uint32_t count) :
-		resource(renderer::get_device().get_memory().alloc_dynamic_storage(layout.size()* count), layout, count)
+		resource(renderer::get_device().get_memory().alloc_dynamic_storage(layout.size() * count), layout, count)
 	{
 		update_map();
 	}

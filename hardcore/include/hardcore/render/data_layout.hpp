@@ -96,13 +96,13 @@ namespace ENGINE_NAMESPACE
 
 #endif // using glm
 */
-		template<typename Type, typename... Types, std::uint8_t Index = 0>
+		template<std::uint8_t Index, typename Type, typename... Types>
 		inline void set_types_s()
 		{
 			set_type_s<Type>(Index);
 			if constexpr (sizeof...(Types))
 			{
-				set_types_s<Types..., Index + 1>();
+				set_types_s<Index + 1, Types...>();
 			}
 		}
 
@@ -113,7 +113,7 @@ namespace ENGINE_NAMESPACE
 			static_assert(CHAR_BIT * sizeof(double) == 64, "Double type must have 64 bit length.");
 
 			data_layout layout(sizeof...(Types));
-			layout.set_types_s<Types...>();
+			layout.set_types_s<0, Types...>();
 			return layout;
 		}
 

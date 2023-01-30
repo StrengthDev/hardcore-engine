@@ -161,9 +161,6 @@ namespace ENGINE_NAMESPACE
 	{
 	protected:
 		unmapped_resource() = default;
-		unmapped_resource(memory_ref&& ref, const data_layout& layout, std::uint32_t count) :
-			resource(std::move(ref), layout, count)
-		{ }
 
 	public:
 		void update(void* data, std::size_t size, std::size_t offset);
@@ -175,9 +172,6 @@ namespace ENGINE_NAMESPACE
 	{
 	protected:
 		mapped_resource() = default;
-		mapped_resource(memory_ref&& ref, const data_layout& layout, std::uint32_t count) : 
-			resource(std::move(ref), layout, count)
-		{ }
 
 		inline mapped_resource& operator=(mapped_resource&& other) noexcept
 		{
@@ -255,6 +249,12 @@ namespace ENGINE_NAMESPACE
 	public:
 		uniform() = default;
 		uniform(const data_layout& layout, std::uint32_t count = 1);
+
+		//inline uniform& operator=(uniform&& other) noexcept
+		//{
+		//	mapped_resource::operator=(std::move(other));
+		//	return *this;
+		//}
 
 	protected:
 		void update_map() override;
