@@ -121,6 +121,7 @@ namespace ENGINE_NAMESPACE
 	{
 		if (slots)
 		{
+			LOGF_INTERNAL_DEBUG("({0}, {1}, {2}, {3})", size, slots, n_slots, largest_free_slot);
 			vkDestroyBuffer(handle, buffer, nullptr);
 			vkFreeMemory(handle, memory, nullptr);
 			std::free(slots);

@@ -60,5 +60,11 @@ namespace ENGINE_NAMESPACE
 			parallel::logger_wait();
 			END;
 		}
+
+		void exception_crash(const std::exception& e)
+		{
+			LOG_INTERNAL_CRIT(e.what());
+			ENGINE_NAMESPACE::log::flush();
+		}
 	}
 }
