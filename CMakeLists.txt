@@ -53,39 +53,33 @@ if(CMAKE_BUILD_TYPE MATCHES "Release")
 	add_compile_definitions(NDEBUG)
 elseif(CMAKE_BUILD_TYPE MATCHES "Debug")
 	if(MSVC)
-		#add_compile_definitions(_DEBUG)
 		list(APPEND PLATFORM_COMPILE_OPTIONS "/ZI")
 		list(APPEND PLATFORM_LINK_OPTIONS "/INCREMENTAL")
 	endif()
 else()
 endif()
 
-#find_program(SPV_COMPILER glslc)
-find_program(SPV_COMPILER glslangValidator)
+find_program(SPV_COMPILER glslangValidator REQUIRED)
 function(add_shader TARGET SHADER)
-
-    set(SHADER_PATH ${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/${SHADER})
-    set(OUTPUT_PATH $<TARGET_FILE_DIR:${TARGET}>/resources/shaders/${SHADER}.spv)
-
+	get_target_property(OUTPUT_DIRECTORY ${TARGET} RUNTIME_OUTPUT_DIRECTORY)
+    set(SHADER_PATH "${CMAKE_CURRENT_SOURCE_DIR}/resources/shaders/${SHADER}")
+    set(OUTPUT_PATH "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/resources/shaders/${SHADER}.spv")
+	
     get_filename_component(OUTPUT_DIR ${OUTPUT_PATH} DIRECTORY)
 	add_custom_command(TARGET ${TARGET} POST_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory ${OUTPUT_DIR})
 
-    #add_custom_command(POST_BUILD
-    #       OUTPUT ${OUTPUT_PATH}
-    #       #COMMAND ${SPV_COMPILER} -o ${OUTPUT_PATH} ${SHADER_PATH}
-    #       COMMAND ${SPV_COMPILER} -V ${OUTPUT_PATH} -o ${SHADER_PATH}
-    #       DEPENDS ${SHADER_PATH}
-    #       IMPLICIT_DEPENDS CXX ${SHADER_PATH}
-    #       VERBATIM)
+    get_filename_component(SHADER_NAME ${SHADER_PATH} NAME)
+	set(SHADER_TARGET_NAME "${TARGET}_${SHADER_NAME}")
+	add_custom_target(${SHADER_TARGET_NAME} DEPENDS ${OUTPUT_PATH})
+	add_dependencies(${TARGET} ${SHADER_TARGET_NAME})
 
-	add_custom_command(TARGET ${TARGET} POST_BUILD
-	COMMAND ${SPV_COMPILER} -V ${SHADER_PATH} -o ${OUTPUT_PATH}
-	COMMAND_EXPAND_LISTS
+	add_custom_command(
+		#TARGET ${TARGET} POST_BUILD
+		COMMAND ${SPV_COMPILER} -V ${SHADER_PATH} -o ${OUTPUT_PATH}
+		MAIN_DEPENDENCY ${SHADER_PATH}
+		OUTPUT ${OUTPUT_PATH}
+		COMMAND_EXPAND_LISTS
 	)
-
-    # Make sure our build depends on this output.
-    set_source_files_properties(${OUTPUT_PATH} PROPERTIES GENERATED TRUE)
-    #target_sources(${TARGET} PRIVATE ${OUTPUT_PATH})
 endfunction(add_shader)
 
 project(hardcore VERSION 0.1 LANGUAGES CXX DESCRIPTION "Hardcore engine project")
