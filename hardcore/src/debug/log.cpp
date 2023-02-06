@@ -3,6 +3,8 @@
 #include <debug/log_internal.hpp>
 #include <debug/ansi_utility.hpp>
 
+#include <parallel/concurrent_queue.hpp>
+
 #ifdef _MSC_VER
 #include <Windows.h>
 #endif // _MSC_VER
@@ -11,6 +13,54 @@ namespace ENGINE_NAMESPACE
 {
 	namespace log
 	{
+		class log_entry
+		{
+		public:
+			inline log_entry(std::string message, std::string time, std::uint8_t caller_idx, std::uint8_t type_idx, 
+				setting_t arg) : 
+				message(message), time(time), caller_idx(caller_idx), type_idx(type_idx), multi_args(false), arg0(arg)
+			{}
+
+			inline log_entry(std::string message, std::string time, std::uint8_t caller_idx, std::uint8_t type_idx, 
+				setting_t arg0, setting_t arg1, setting_t arg2) : 
+				message(message), time(time), caller_idx(caller_idx), type_idx(type_idx),
+				multi_args(true), arg0(arg0), arg1(arg1), arg2(arg2)
+			{}
+
+			std::string message;
+			std::string time;
+
+			std::uint8_t caller_idx;
+			std::uint8_t type_idx;
+
+			bool multi_args;
+			setting_t arg0;
+			setting_t arg1 = 0;
+			setting_t arg2 = 0;
+		};
+
+		parallel::concurrent_queue<log_entry> queue;
+
+		const char* log_type_strings[] = {
+			"(-TRACE--) ",
+			"(-DEBUG--) ",
+			"(--INFO--) ",
+			"(WARNING-) ",
+			"(-ERROR--) ",
+			"(CRITICAL) "
+		};
+
+		const char* caller_strings[] = {
+			"ENGINE:  ",
+			"CLIENT:  "
+		};
+
+		std::atomic<flag_t> log_mask_flags = TRACE_BIT ^ 0xff;// 0xff;
+		std::atomic<flag_t> log_format_flags = CALLER_BIT;// 0xff;
+
+		std::atomic<flag_t> log_file_mask_flags = 0xff;
+		std::atomic<flag_t> log_file_format_flags = 0xff;
+
 #ifdef _MSC_VER
 		static HANDLE out_handle;
 		static DWORD default_out_mode;
@@ -43,6 +93,8 @@ namespace ENGINE_NAMESPACE
 
 		void shutdown()
 		{
+			queue.close();
+
 #ifndef NDEBUG
 			std::cout << ANSI_RESET;
 
@@ -51,6 +103,30 @@ namespace ENGINE_NAMESPACE
 				CRASH("Failed to reset output mode.", GetLastError());
 			}
 #endif // !NDEBUG
+		}
+
+		void run()
+		{
+			try
+			{
+				while (true)
+				{
+					log_entry entry = queue.pop();
+					if (entry.multi_args)
+						std::cout << ANSI_SETTINGS(entry.arg0, entry.arg1, entry.arg2);
+					else
+						std::cout << ANSI_SETTING(entry.arg0);
+					std::cout
+						<< entry.time
+						<< (log_format_flags & EXPLICIT_TYPE_BIT ? log_type_strings[entry.type_idx] : "")
+						<< (log_format_flags & CALLER_BIT ? caller_strings[entry.caller_idx] : "")
+						<< entry.message
+						<< ANSI_RESET << std::endl;
+				}
+			}
+			catch (const exception::closed_queue&)
+			{
+			}
 		}
 
 		inline std::tm local_time(std::time_t* time)
@@ -71,28 +147,6 @@ namespace ENGINE_NAMESPACE
 		}
 #endif // _MSC_VER
 
-		const char* empty_string = "";
-
-		const char* log_type_strings[] = {
-			"(-TRACE--) ",
-			"(-DEBUG--) ",
-			"(--INFO--) ",
-			"(WARNING-) ",
-			"(-ERROR--) ",
-			"(CRITICAL) "
-		};
-
-		const char* caller_strings[] = {
-			"ENGINE:  ",
-			"CLIENT:  "
-		};
-
-		flag_t log_mask_flags = TRACE_BIT ^ 0xff;// 0xff;
-		flag_t log_format_flags = CALLER_BIT;// 0xff;
-
-		flag_t log_file_mask_flags = 0xff;
-		flag_t log_file_format_flags = 0xff;
-
 		void set_log_mask_flags(flag_t flags)
 		{
 			log_mask_flags = flags;
@@ -104,39 +158,28 @@ namespace ENGINE_NAMESPACE
 		}
 		//TODO: logging into a file
 
-		inline void timestamp(std::ostream& stream)
+		inline std::string timestamp()
 		{
 			const unsigned int buffer_size = 12;
-			char time_s[buffer_size];
+			char buf[buffer_size];
 			std::time_t t = std::time(0);
 			std::tm local_t = local_time(&t);
-			strftime(time_s, buffer_size, "[%X] ", &local_t);
-			stream << time_s;
+			strftime(buf, buffer_size, "[%X] ", &local_t);
+			return std::string(buf);
 		}
 
-		inline void print_log(const char* message, const unsigned int caller_idx, const unsigned int type_idx)
+		inline void log(const char* message, std::uint8_t caller_idx, std::uint8_t type_idx, setting_t arg)
 		{
-			if (log_format_flags & TIMESTAMP_BIT)
-				timestamp(std::cout);
-
-			std::cout
-				<< (log_format_flags & EXPLICIT_TYPE_BIT ? log_type_strings[type_idx] : empty_string)
-				<< (log_format_flags & CALLER_BIT ? caller_strings[caller_idx] : empty_string)
-				<< message;
+			log_entry entry(message, log_format_flags & TIMESTAMP_BIT ? timestamp() : "", caller_idx, type_idx, arg);
+			queue.push(std::move(entry));
 		}
 
-		inline void log(const char* message, const unsigned int caller_idx, const unsigned int type_idx, const setting_t arg)
+		inline void log(const char* message, std::uint8_t caller_idx, std::uint8_t type_idx, 
+			setting_t arg0, setting_t arg1, setting_t arg2)
 		{
-			std::cout << ANSI_SETTING(arg);
-			print_log(message, caller_idx, type_idx);
-			std::cout << ANSI_RESET << std::endl;
-		}
-
-		inline void log(const char* message, const unsigned int caller_idx, const unsigned int type_idx, const setting_t arg_0, const setting_t arg_1, const setting_t arg_2)
-		{
-			std::cout << ANSI_SETTINGS(arg_0, arg_1, arg_2);
-			print_log(message, caller_idx, type_idx);
-			std::cout << ANSI_RESET << std::endl;
+			log_entry entry(message, log_format_flags & TIMESTAMP_BIT ? timestamp() : "", caller_idx, type_idx, 
+				arg0, arg1, arg2);
+			queue.push(std::move(entry));
 		}
 		
 		void trace(const char* message)

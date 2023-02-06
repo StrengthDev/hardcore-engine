@@ -8,8 +8,9 @@ namespace ENGINE_NAMESPACE
 {
 	namespace log
 	{
-		ENGINE_API void init();
-		ENGINE_API void shutdown();
+		void init();
+		void shutdown();
+		void run();
 	}
 
 	namespace internal

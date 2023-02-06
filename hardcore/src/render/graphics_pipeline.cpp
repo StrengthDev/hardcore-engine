@@ -872,11 +872,15 @@ namespace ENGINE_NAMESPACE
 
 			auto descriptor_write = generate_descriptor_write(current_frame);
 			vkUpdateDescriptorSets(owner->handle, descriptor_write.size(), descriptor_write.data(), 0, nullptr);
+
+			LOG_INTERNAL_TRACE("Updated dirty descriptor set (" << descriptor_write.size() << " sets)")
 		}
 		else if (frame_descriptors[current_frame].outdated)
 		{
 			auto descriptor_write = generate_descriptor_write(current_frame);
 			vkUpdateDescriptorSets(owner->handle, descriptor_write.size(), descriptor_write.data(), 0, nullptr);
+
+			LOG_INTERNAL_TRACE("Updated outdated descriptor set (" << descriptor_write.size() << " sets)")
 		}
 
 		frame_descriptors[current_frame].dirty = false;
