@@ -8,5 +8,6 @@ namespace ENGINE_NAMESPACE
 	{
 		ENGINE_API void init();
 		ENGINE_API void terminate();
+		ENGINE_API void exception_crash(const std::exception& e);
 	}
 }

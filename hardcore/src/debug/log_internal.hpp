@@ -11,6 +11,7 @@ namespace ENGINE_NAMESPACE
 		void init();
 		void shutdown();
 		void run();
+		void flush();
 	}
 
 	namespace internal

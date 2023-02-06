@@ -112,6 +112,11 @@ namespace ENGINE_NAMESPACE
 				T item(std::move(items[first_item_idx]));
 				first_item_idx = (first_item_idx + 1) % item_capacity;
 				n_items--;
+				if (!n_items)
+				{
+					std::unique_lock<std::mutex> lock(empty_mutex);
+					empty_signal.notify_all();
+				}
 				return item;
 			}
 
@@ -127,7 +132,11 @@ namespace ENGINE_NAMESPACE
 					out_item = std::move(items[first_item_idx]);
 					first_item_idx = (first_item_idx + 1) % item_capacity;
 					n_items--;
-
+					if (!n_items)
+					{
+						std::unique_lock<std::mutex> lock(empty_mutex);
+						empty_signal.notify_all();
+					}
 					access.unlock();
 					return true;
 				}
@@ -153,10 +162,18 @@ namespace ENGINE_NAMESPACE
 				signal.notify_all();
 			}
 
+			inline void wait_until_empty()
+			{
+				std::unique_lock<std::mutex> lock(empty_mutex);
+				empty_signal.wait(lock);
+			}
 
 		private:
 			std::condition_variable signal;
 			std::mutex access;
+
+			std::condition_variable empty_signal;
+			std::mutex empty_mutex;
 
 			index_t item_capacity = BIT(4);
 			T* items = nullptr;

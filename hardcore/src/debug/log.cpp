@@ -67,6 +67,9 @@ namespace ENGINE_NAMESPACE
 
 		void init()
 		{
+			std::ios_base::sync_with_stdio(false);
+			std::setvbuf(stdout, nullptr, _IOFBF, KILOBYTES(4));
+
 #ifndef NDEBUG
 			DWORD out_mode = 0;
 			out_handle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -94,6 +97,7 @@ namespace ENGINE_NAMESPACE
 		void shutdown()
 		{
 			queue.close();
+			std::ios_base::sync_with_stdio(true);
 
 #ifndef NDEBUG
 			std::cout << ANSI_RESET;
@@ -112,21 +116,30 @@ namespace ENGINE_NAMESPACE
 				while (true)
 				{
 					log_entry entry = queue.pop();
+
+					std::stringstream stream;
 					if (entry.multi_args)
-						std::cout << ANSI_SETTINGS(entry.arg0, entry.arg1, entry.arg2);
+						stream << ANSI_SETTINGS(entry.arg0, entry.arg1, entry.arg2);
 					else
-						std::cout << ANSI_SETTING(entry.arg0);
-					std::cout
+						stream << ANSI_SETTING(entry.arg0);
+					stream
 						<< entry.time
 						<< (log_format_flags & EXPLICIT_TYPE_BIT ? log_type_strings[entry.type_idx] : "")
 						<< (log_format_flags & CALLER_BIT ? caller_strings[entry.caller_idx] : "")
 						<< entry.message
-						<< ANSI_RESET << std::endl;
+						<< ANSI_RESET << '\n';
+
+					std::cout << stream.str();
+					std::cout.flush();
 				}
 			}
 			catch (const exception::closed_queue&)
-			{
-			}
+			{}
+		}
+
+		void flush()
+		{
+			queue.wait_until_empty();
 		}
 
 		inline std::tm local_time(std::time_t* time)
