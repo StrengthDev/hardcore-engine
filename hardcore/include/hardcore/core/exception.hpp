@@ -20,5 +20,14 @@ namespace ENGINE_NAMESPACE
 			type_mismatch(const std::string& message) : std::logic_error(message)
 			{ }
 		};
+
+		class closed_queue : std::logic_error
+		{
+		public:
+			closed_queue(const char* message) : std::logic_error(message)
+			{}
+			closed_queue(const std::string& message) : std::logic_error(message)
+			{}
+		};
 	}
 }

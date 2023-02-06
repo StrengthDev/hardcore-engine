@@ -19,6 +19,7 @@
 
 #include <core/entry_point_internal.hpp>
 
+#include <parallel/thread_manager.hpp>
 #include <debug/log_internal.hpp>
 
 #ifdef NDEBUG
@@ -48,12 +49,15 @@ namespace ENGINE_NAMESPACE
 		void init()
 		{
 			ENABLE_MEM_CHECKING;
+			parallel::launch_threads();
 			ENGINE_NAMESPACE::log::init();
 		}
 
 		void terminate()
 		{
+			parallel::terminate_threads();
 			ENGINE_NAMESPACE::log::shutdown();
+			parallel::logger_wait();
 			END;
 		}
 	}

@@ -3,7 +3,6 @@
 #include <core/client.hpp>
 #include <core/window.hpp>
 #include <core/window_internal.hpp>
-#include <parallel/thread_manager.hpp>
 
 #include <render/renderer_internal.hpp>
 #include <debug/log_internal.hpp>
@@ -56,19 +55,18 @@ namespace ENGINE_NAMESPACE
 		event_end = 0;
 		
 		renderer::init(engine_id, client_id);
-		parallel::launch_threads();
 	}
 
 	client::~client()
 	{
-		renderer::terminate();
 		const index_t total = n_layers + n_overlays;
 		index_t i;
 		for (i = 1; i < total + 1; i++)
 		{
 			delete layer_stack[total - i];
 		}
-		parallel::terminate_threads();
+		renderer::terminate();
+		window::terminate();
 		std::free(layer_stack);
 		std::free(push_layer_buffer);
 		std::free(push_overlay_buffer);

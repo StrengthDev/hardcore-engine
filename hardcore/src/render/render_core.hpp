@@ -7,6 +7,7 @@
 #include <vulkan/vulkan.h>
 
 #include <core/core.hpp>
+#include <debug/log_internal.hpp>
 
 const std::array<const char*, 1> validation_layers = {
 	"VK_LAYER_KHRONOS_validation"
@@ -22,6 +23,14 @@ const bool enable_validation_layers = false;
 const bool enable_validation_layers = true;
 #endif
 
-#define VK_CRASH_CHECK(func, fail_message) { VkResult result = (func); if (result != VK_SUCCESS) { CRASH(fail_message, result); } }
+#define VK_CRASH_CHECK(func, fail_message) 						\
+{ 																\
+	VkResult result = (func); 									\
+	if (result != VK_SUCCESS) 									\
+	{															\
+		LOG_INTERNAL_CRIT("Critical VULKAN error: " << result);	\
+		CRASH(fail_message, result);							\
+	}															\
+}
 
 const uint8_t max_frames_in_flight = 2;

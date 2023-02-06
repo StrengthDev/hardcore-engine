@@ -2,6 +2,7 @@
 
 #include <parallel/thread_manager.hpp>
 #include <parallel/task.hpp>
+#include <parallel/concurrent_queue.hpp>
 
 #include <debug/log_internal.hpp>
 
@@ -20,24 +21,28 @@ namespace ENGINE_NAMESPACE
 		std::atomic_flag run_master;
 		std::condition_variable task_signal;
 		std::mutex task_signal_access;
-		task_queue immediate_tasks;
-		task_queue background_tasks;
+
+		typedef std::function<void()> task_t;
+		typedef concurrent_queue<task_t> task_queue_t;
+
+		task_queue_t immediate_tasks;
+		task_queue_t background_tasks;
 
 		typedef std::uint32_t thread_idx_t;
 
 		thread_idx_t n_immediate_workers = 1;
 		std::thread* immediate_workers;
-		task_queue* immediate_queues;
+		task_queue_t* immediate_queues;
 
 		thread_idx_t n_background_workers = 1;
 		std::thread* background_workers;
-		task_queue* background_queues;
+		task_queue_t* background_queues;
 
 		void master()
 		{
 			LOG_INTERNAL_INFO("Lauched master thread (ID: " << std::this_thread::get_id() << ")");
 
-			task_queue::task_t task;
+			task_t task;
 			while (run_master.test_and_set())
 			{
 				if (immediate_tasks.try_pop(task))
@@ -65,10 +70,13 @@ namespace ENGINE_NAMESPACE
 				background_queues[i].close();
 			}
 
+			immediate_tasks.close();
+			background_tasks.close();
+
 			LOG_INTERNAL_INFO("Master thread exiting (ID: " << std::this_thread::get_id() << ")");
 		}
 
-		void worker(task_queue& queue)
+		void worker(task_queue_t& queue)
 		{
 			LOG_INTERNAL_INFO("Lauched worker thread (ID: " << std::this_thread::get_id() << ")");
 			
@@ -76,14 +84,14 @@ namespace ENGINE_NAMESPACE
 			{
 				while (true)
 				{
-					task_queue::task_t task = queue.pop();
+					task_t task = queue.pop();
 					task();
 				}
 			}
-			catch (const closed_queue&)
+			catch (const exception::closed_queue&)
 			{ }
 
-			queue.~task_queue();
+			queue.~concurrent_queue();
 
 			LOG_INTERNAL_INFO("Worker thread exiting (ID: " << std::this_thread::get_id() << ")");
 		}
@@ -104,20 +112,22 @@ namespace ENGINE_NAMESPACE
 			run_master.test_and_set();
 			task_master = std::thread(master);
 
+			logger = std::thread(log::run);
+
 			thread_idx_t i;
 			immediate_workers = t_malloc<std::thread>(n_immediate_workers);
-			immediate_queues = t_malloc<task_queue>(n_immediate_workers);
+			immediate_queues = t_malloc<task_queue_t>(n_immediate_workers);
 			for (i = 0; i < n_immediate_workers; i++)
 			{
-				new (&immediate_queues[i]) task_queue();
+				new (&immediate_queues[i]) task_queue_t();
 				new (&immediate_workers[i]) std::thread(worker, std::ref(immediate_queues[i]));
 			}
 
 			background_workers = t_malloc<std::thread>(n_background_workers);
-			background_queues = t_malloc<task_queue>(n_background_workers);
+			background_queues = t_malloc<task_queue_t>(n_background_workers);
 			for (i = 0; i < n_background_workers; i++)
 			{
-				new (&background_queues[i]) task_queue();
+				new (&background_queues[i]) task_queue_t();
 				new (&background_workers[i]) std::thread(worker, std::ref(background_queues[i]));
 			}
 		}
@@ -145,6 +155,11 @@ namespace ENGINE_NAMESPACE
 			std::free(immediate_queues);
 			std::free(background_workers);
 			std::free(background_queues);
+		}
+
+		void logger_wait()
+		{
+			logger.join();
 		}
 
 		void submit_immediate_task(std::function<void()> task)
