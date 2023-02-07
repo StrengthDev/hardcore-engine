@@ -14,8 +14,7 @@ namespace ENGINE_NAMESPACE
 	{
 		VkInstance instance;
 		VkSurfaceKHR surface;
-		std::array<device, 8> devices;
-		std::uint32_t n_devices;
+		std::vector<device> devices;
 		std::uint32_t present_device_idx;
 
 		VkDebugUtilsMessengerEXT debug_messenger;
@@ -159,20 +158,17 @@ namespace ENGINE_NAMESPACE
 
 		inline void init_devices()
 		{
-			n_devices = 0;
+			std::uint32_t n_devices = 0;
 			vkEnumeratePhysicalDevices(instance, &n_devices, nullptr);
 			if (n_devices == 0)
 			{
 				CRASH("No physical devices found");
 			}
-			INTERNAL_ASSERT(n_devices < devices.size(), "Too many devices found");
 			VkPhysicalDevice* physical_devices = t_malloc<VkPhysicalDevice>(n_devices);
 			vkEnumeratePhysicalDevices(instance, &n_devices, physical_devices);
+			devices.reserve(n_devices);
 			for (std::uint32_t i = 0; i < n_devices; i++)
-			{
-				devices[i].~device();
-				new (&devices[i]) device(std::move(physical_devices[i]), surface);
-			}
+				devices.push_back(device(std::move(physical_devices[i]), surface));
 			std::free(physical_devices);
 		
 			present_device_idx = 0;
@@ -228,11 +224,7 @@ namespace ENGINE_NAMESPACE
 
 		void terminate()
 		{
-			//Devices must be destroyed before the instance
-			for (std::uint32_t i = 0; i < n_devices; i++)
-			{
-				devices[i].~device();
-			}
+			devices.clear();
 
 			if (enable_validation_layers)
 			{

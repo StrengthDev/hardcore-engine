@@ -239,7 +239,7 @@ namespace ENGINE_NAMESPACE
 			}
 			has_swapchain = false;
 		}
-		//Memory::terminate();
+		
 		if (handle != VK_NULL_HANDLE)
 		{
 			vkDeviceWaitIdle(handle);

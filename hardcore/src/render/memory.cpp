@@ -121,7 +121,6 @@ namespace ENGINE_NAMESPACE
 	{
 		if (slots)
 		{
-			LOGF_INTERNAL_DEBUG("({0}, {1}, {2}, {3})", size, slots, n_slots, largest_free_slot);
 			vkDestroyBuffer(handle, buffer, nullptr);
 			vkFreeMemory(handle, memory, nullptr);
 			std::free(slots);
@@ -218,10 +217,10 @@ namespace ENGINE_NAMESPACE
 				"Slot after the selected slot must be either empty or in use");
 
 			//shift remaining slots one position and add new slot with the remaining unused memory
-			if (!selected_last)
+			if (slots[slot_idx + 1].in_use)
 			{
 				std::uint32_t last_in_use = 0;
-				for (std::uint32_t i = old_size; i != std::numeric_limits<std::uint32_t>::max(); i--)
+				for (std::uint32_t i = old_size - 1; i != std::numeric_limits<std::uint32_t>::max(); i--)
 				{
 					if (slots[i].in_use)
 					{
@@ -231,10 +230,12 @@ namespace ENGINE_NAMESPACE
 				}
 				std::memmove(&slots[slot_idx + 2], &slots[slot_idx + 1], sizeof(memory_slot) * (last_in_use - slot_idx));
 			}
+
+			slots[slot_idx + 1].in_use = false;
+			slots[slot_idx + 1].offset = slots[slot_idx].offset + size;
+			slots[slot_idx + 1].size = slots[slot_idx].size - size;
 		}
 
-		slots[slot_idx + 1].offset -= slots[slot_idx].size - size;
-		slots[slot_idx + 1].size += slots[slot_idx].size - size;
 		slots[slot_idx].in_use = true;
 		slots[slot_idx].size = size;
 	}
@@ -277,7 +278,7 @@ namespace ENGINE_NAMESPACE
 		cmd_buffer_info.commandPool = cmd_pool;
 		cmd_buffer_info.commandBufferCount = max_frames_in_flight;
 
-		VK_CRASH_CHECK(vkAllocateCommandBuffers(owner.handle, &cmd_buffer_info, cmd_buffers), "Failed to allocate command buffers");
+		VK_CRASH_CHECK(vkAllocateCommandBuffers(owner.handle, &cmd_buffer_info, cmd_buffers.data()), "Failed to allocate command buffers");
 
 		for (std::uint32_t i = 0; i < max_frames_in_flight; i++)
 		{
@@ -316,13 +317,21 @@ namespace ENGINE_NAMESPACE
 
 		unmap_ranges(owner->current_frame);
 		for (memory_pool& pool : vertex_pools) pool.free(owner->handle);
+		vertex_pools.clear();
 		for (memory_pool& pool : index_pools) pool.free(owner->handle);
+		index_pools.clear();
 		for (memory_pool& pool : uniform_pools) pool.free(owner->handle);
+		uniform_pools.clear();
 		for (memory_pool& pool : storage_pools) pool.free(owner->handle);
+		storage_pools.clear();
 		for (memory_pool& pool : d_vertex_pools) pool.free(owner->handle);
+		d_vertex_pools.clear();
 		for (memory_pool& pool : d_index_pools) pool.free(owner->handle);
+		d_index_pools.clear();
 		for (memory_pool& pool : d_uniform_pools) pool.free(owner->handle);
+		d_uniform_pools.clear();
 		for (memory_pool& pool : d_storage_pools) pool.free(owner->handle);
+		d_storage_pools.clear();
 
 		for (std::uint32_t i = 0; i < max_frames_in_flight; i++)
 		{
@@ -332,7 +341,7 @@ namespace ENGINE_NAMESPACE
 			vkDestroyFence(owner->handle, device_in[i].fence, nullptr);
 
 			//vkDestroyBuffer(owner->handle, device_out[i].buffer, nullptr);
-			vkFreeMemory(owner->handle, device_out[i].device, nullptr);
+			//vkFreeMemory(owner->handle, device_out[i].device, nullptr);
 			vkDestroySemaphore(owner->handle, device_out[i].semaphore, nullptr);
 			vkDestroyFence(owner->handle, device_out[i].fence, nullptr);
 		}

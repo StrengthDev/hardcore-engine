@@ -25,7 +25,7 @@
 #ifdef NDEBUG
 
 #ifdef _MSC_VER
-#pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup") //TODO: adapt to be platform independent
+//#pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup") //TODO: adapt to be platform independent
 #define ENABLE_MEM_CHECKING
 #else
 #endif // _MSC_VER
@@ -56,6 +56,7 @@ namespace ENGINE_NAMESPACE
 		void terminate()
 		{
 			parallel::terminate_threads();
+			ENGINE_NAMESPACE::log::flush();
 			ENGINE_NAMESPACE::log::shutdown();
 			parallel::logger_wait();
 			END;
@@ -64,7 +65,6 @@ namespace ENGINE_NAMESPACE
 		void exception_crash(const std::exception& e)
 		{
 			LOG_INTERNAL_CRIT(e.what());
-			ENGINE_NAMESPACE::log::flush();
 		}
 	}
 }
