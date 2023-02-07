@@ -111,6 +111,22 @@ namespace ENGINE_NAMESPACE
 		void init(device& owner);
 		void terminate();
 
+		device_memory() = default;
+
+		device_memory(device_memory&& other) noexcept :
+			owner(std::exchange(other.owner, nullptr)),
+			mem_granularity(std::exchange(other.mem_granularity, 0)),
+			mem_properties(std::exchange(other.mem_properties, {})),
+			cmd_pool(std::exchange(other.cmd_pool, VK_NULL_HANDLE)), cmd_buffers(std::move(other.cmd_buffers)),
+			device_in(std::move(other.device_in)), device_out(std::move(other.device_out)),
+			vertex_pools(std::move(other.vertex_pools)), index_pools(std::move(other.index_pools)),
+			uniform_pools(std::move(other.uniform_pools)), storage_pools(std::move(other.storage_pools)),
+			d_vertex_pools(std::move(other.d_vertex_pools)), d_index_pools(std::move(other.d_index_pools)),
+			d_uniform_pools(std::move(other.d_uniform_pools)), d_storage_pools(std::move(other.d_storage_pools)),
+			vp_pending_copies(std::move(other.vp_pending_copies)), ip_pending_copies(std::move(other.ip_pending_copies)),
+			up_pending_copies(std::move(other.up_pending_copies)), sp_pending_copies(std::move(other.sp_pending_copies))
+		{}
+
 		//void update_largest_slots();
 		//void tick(); could maybe replace the above function and performa all updates and cleanup
 
@@ -259,17 +275,19 @@ namespace ENGINE_NAMESPACE
 		buffer_binding_args get_binding_args(const resource&) noexcept;
 		template<buffer_t BType>
 		buffer_binding_args get_dynamic_binding_args(const resource&) noexcept;
+		
+		inline void set_owner(device& new_owner) noexcept { owner = &new_owner; }
 
 		device* owner = nullptr;
 
-		VkDeviceSize mem_granularity; //from physical device properties
-		VkPhysicalDeviceMemoryProperties mem_properties;
+		VkDeviceSize mem_granularity = 0; //from physical device properties
+		VkPhysicalDeviceMemoryProperties mem_properties = {};
 
-		VkCommandPool cmd_pool;
-		VkCommandBuffer cmd_buffers[max_frames_in_flight];
+		VkCommandPool cmd_pool = VK_NULL_HANDLE;
+		std::array<VkCommandBuffer, max_frames_in_flight> cmd_buffers;
 
-		transfer_memory device_in[max_frames_in_flight]; //TODO: move all transfer memories to a single buffer and change offset depending on frame
-		transfer_memory device_out[max_frames_in_flight];
+		std::array<transfer_memory, max_frames_in_flight> device_in; //TODO: move all transfer memories to a single buffer and change offset depending on frame
+		std::array<transfer_memory, max_frames_in_flight> device_out;
 
 		std::vector<memory_pool> vertex_pools;
 		std::vector<memory_pool> index_pools;
@@ -280,11 +298,11 @@ namespace ENGINE_NAMESPACE
 		std::vector<dynamic_memory_pool> d_uniform_pools;
 		std::vector<dynamic_memory_pool> d_storage_pools;
 
-		pending_copies_t vp_pending_copies[max_frames_in_flight];
-		pending_copies_t ip_pending_copies[max_frames_in_flight];
-		pending_copies_t up_pending_copies[max_frames_in_flight];
-		pending_copies_t sp_pending_copies[max_frames_in_flight];
+		std::array<pending_copies_t, max_frames_in_flight> vp_pending_copies;
+		std::array<pending_copies_t, max_frames_in_flight> ip_pending_copies;
+		std::array<pending_copies_t, max_frames_in_flight> up_pending_copies;
+		std::array<pending_copies_t, max_frames_in_flight> sp_pending_copies;
 
-		
+		friend class device;
 	};
 }

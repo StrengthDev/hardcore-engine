@@ -35,6 +35,7 @@ namespace ENGINE_NAMESPACE
 				std::exchange(other.descriptor_pool_sizes[1], nullptr) },
 			descriptor_sets(std::exchange(other.descriptor_sets, nullptr)),
 			object_descriptor_set_capacity(std::exchange(other.object_descriptor_set_capacity, 0)),
+			frame_descriptors(std::move(other.frame_descriptors)),
 			frame_descriptor_count(std::exchange(other.frame_descriptor_count, 0)),
 			n_object_bindings(std::exchange(other.n_object_bindings, 0)),
 			object_binding_types(std::exchange(other.object_binding_types, nullptr)),
@@ -42,10 +43,7 @@ namespace ENGINE_NAMESPACE
 			object_refs(std::move(other.object_refs)),
 			objects(std::move(other.objects)),
 			cached_object_bindings(std::move(other.cached_object_bindings))
-		{
-			for (std::uint8_t i = 0; i < max_frames_in_flight; i++)
-				frame_descriptors[i] = std::exchange(other.frame_descriptors[i], {});
-		}
+		{}
 
 		inline graphics_pipeline& operator=(graphics_pipeline&& other) noexcept
 		{
@@ -61,8 +59,7 @@ namespace ENGINE_NAMESPACE
 			descriptor_pool_sizes[1] = std::exchange(other.descriptor_pool_sizes[1], nullptr);
 			descriptor_sets = std::exchange(other.descriptor_sets, nullptr);
 			object_descriptor_set_capacity = std::exchange(other.object_descriptor_set_capacity, 0);
-			for (std::uint8_t i = 0; i < max_frames_in_flight; i++)
-				frame_descriptors[i] = std::exchange(other.frame_descriptors[i], {});
+			frame_descriptors = std::move(other.frame_descriptors);
 			frame_descriptor_count = std::exchange(other.frame_descriptor_count, 0);
 			n_object_bindings = std::exchange(other.n_object_bindings, 0);
 			object_binding_types = std::exchange(other.object_binding_types, nullptr);
@@ -143,7 +140,7 @@ namespace ENGINE_NAMESPACE
 		VkShaderStageFlags push_flags = 0;
 
 		//object descriptors => set 0 ; pipeline descriptors => set 1
-		std::uint32_t n_descriptor_pool_sizes[2] = { 0, 0 };
+		std::uint32_t n_descriptor_pool_sizes[2] = { 0, 0 }; //TODO change
 		VkDescriptorPoolSize* descriptor_pool_sizes[2] = { nullptr, nullptr };
 
 		VkDescriptorSet* descriptor_sets = nullptr;
@@ -157,7 +154,7 @@ namespace ENGINE_NAMESPACE
 			bool outdated = false; //no changes this frame, but in previous frame
 		};
 
-		frame_descriptor_data frame_descriptors[max_frames_in_flight];
+		std::array<frame_descriptor_data, max_frames_in_flight> frame_descriptors;
 
 		std::uint32_t frame_descriptor_count = 0;
 
