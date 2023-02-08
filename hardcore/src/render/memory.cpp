@@ -95,6 +95,19 @@ namespace ENGINE_NAMESPACE
 		friend device_memory;
 	};
 
+	inline VkDeviceSize alignment_pad(VkDeviceSize offset, VkDeviceSize alignment)
+	{
+		if (alignment)
+			return (alignment - (offset % alignment)) % alignment;
+		else
+			return 0;
+	}
+
+	inline VkDeviceSize aligned_offset(VkDeviceSize offset, VkDeviceSize alignment)
+	{
+		return offset + alignment_pad(offset, alignment);
+	}
+
 	memory_pool::memory_pool(VkDevice& handle, VkDeviceSize size) : size(size)
 	{
 		n_slots = initial_pool_slot_size;
@@ -128,7 +141,8 @@ namespace ENGINE_NAMESPACE
 		}
 	}
 
-	bool memory_pool::search(const VkDeviceSize size, std::uint32_t* out_slot_idx)
+	bool memory_pool::search(VkDeviceSize size, VkDeviceSize alignment, 
+		std::uint32_t* out_slot_idx, VkDeviceSize* out_size_needed)
 	{
 		//largest free slot is unknown, must check everything, look for smallest possible fit
 		//if possible, update largest free slot to save some performance
@@ -147,16 +161,19 @@ namespace ENGINE_NAMESPACE
 						largest_fit = slots[slot_idx].size;
 						largest_idx = slot_idx;
 					}
-					if (size <= slots[slot_idx].size && smallest_fit > slots[slot_idx].size)
+					if ((size + alignment_pad(slots[slot_idx].offset, alignment)) <= slots[slot_idx].size 
+						&& smallest_fit > slots[slot_idx].size)
 					{
 						smallest_fit = slots[slot_idx].size;
 						smallest_idx = slot_idx;
 					}
 				}
 			}
-			if (size <= smallest_fit)
+			VkDeviceSize size_needed = (size + alignment_pad(slots[smallest_idx].offset, alignment));
+			if (size_needed <= smallest_fit)
 			{
 				*out_slot_idx = smallest_idx;
+				*out_size_needed = size_needed;
 				if (!(largest_idx == smallest_idx))
 					largest_free_slot = largest_idx;
 				return true;
@@ -178,19 +195,25 @@ namespace ENGINE_NAMESPACE
 			std::uint32_t smallest_idx = std::numeric_limits<std::uint32_t>::max();
 			for (std::uint32_t slot_idx = 0; slot_idx < n_slots; slot_idx++)
 			{
-				if (!slots[slot_idx].in_use && size <= slots[slot_idx].size && smallest_fit > slots[slot_idx].size)
+				if (!slots[slot_idx].in_use 
+					&& (size + alignment_pad(slots[slot_idx].offset, alignment)) <= slots[slot_idx].size 
+					&& smallest_fit > slots[slot_idx].size)
 				{
 					smallest_fit = slots[slot_idx].size;
 					smallest_idx = slot_idx;
 				}
 			}
+
+			if (smallest_fit == std::numeric_limits<VkDeviceSize>::max()) return false;
+
 			*out_slot_idx = smallest_idx;
+			*out_size_needed = size + alignment_pad(slots[smallest_idx].offset, alignment);
 			return true;
 		}
 		return false;
 	}
 
-	void memory_pool::fill_slot(const std::uint32_t slot_idx, const VkDeviceSize size)
+	void memory_pool::fill_slot(std::uint32_t slot_idx, VkDeviceSize size)
 	{
 		INTERNAL_ASSERT(slot_idx < n_slots, "Slot index out of bounds");
 		INTERNAL_ASSERT(slot_idx == 0 ? true : slots[slot_idx - 1].in_use, "Slot before a selected slot must be in use.");
@@ -220,7 +243,7 @@ namespace ENGINE_NAMESPACE
 			if (slots[slot_idx + 1].in_use)
 			{
 				std::uint32_t last_in_use = 0;
-				for (std::uint32_t i = old_size - 1; i != std::numeric_limits<std::uint32_t>::max(); i--)
+				for (std::uint32_t i = old_size - 1; i > slot_idx; i--)
 				{
 					if (slots[i].in_use)
 					{
@@ -248,8 +271,6 @@ namespace ENGINE_NAMESPACE
 	void device_memory::init(device& owner)
 	{
 		this->owner = &owner;
-
-		mem_granularity = owner.properties.limits.nonCoherentAtomSize;
 
 		vkGetPhysicalDeviceMemoryProperties(owner.physical_handle, &mem_properties);
 
@@ -556,6 +577,13 @@ namespace ENGINE_NAMESPACE
 	buffer_binding_args device_memory::get_binding_args(const dynamic_storage_vector& vector) noexcept
 	{ return get_dynamic_binding_args<STORAGE>(vector); }
 
+	template<device_memory::buffer_t BType> inline VkDeviceSize device_memory::offset_alignment() const noexcept 
+	{ return 0; }
+	template<> inline VkDeviceSize device_memory::offset_alignment<device_memory::UNIFORM>() const noexcept
+	{ return owner->properties.limits.minUniformBufferOffsetAlignment; }
+	template<> inline VkDeviceSize device_memory::offset_alignment<device_memory::STORAGE>() const noexcept
+	{ return owner->properties.limits.minStorageBufferOffsetAlignment; }
+
 	std::uint32_t device_memory::find_memory_type(std::uint32_t type_filter, VkMemoryPropertyFlags properties)
 	{
 		//Exact type search
@@ -610,22 +638,24 @@ namespace ENGINE_NAMESPACE
 	}
 
 	template<typename Pool>
-	inline bool search_pools(std::vector<Pool>& pools, const VkDeviceSize size,
-		std::uint32_t* out_pool_idx, std::uint32_t* out_slot_idx)
+	inline bool search_pools(std::vector<Pool>& pools, const VkDeviceSize size, VkDeviceSize alignment,
+		std::uint32_t* out_pool_idx, std::uint32_t* out_slot_idx, VkDeviceSize* out_size_needed)
 	{
-		static_assert(std::is_same<Pool, memory_pool>::value || std::is_same<Pool, dynamic_memory_pool>::value, "Invalid pool type");
+		static_assert(std::is_same<Pool, memory_pool>::value || std::is_same<Pool, dynamic_memory_pool>::value, 
+			"Invalid pool type");
 
 		std::uint32_t selected_pool_idx = 0;
 		std::uint32_t selected_slot_idx = std::numeric_limits<std::uint32_t>::max();
 		for (memory_pool& pool : pools)
 		{
-			if (pool.search(size, &selected_slot_idx)) break;
+			if (pool.search(size, alignment, &selected_slot_idx, out_size_needed)) break;
 			selected_pool_idx++;
 		}
 		*out_pool_idx = selected_pool_idx;
 		if (selected_slot_idx == std::numeric_limits<std::uint32_t>::max())
 		{
 			*out_slot_idx = 0;
+			*out_size_needed = size;
 			return false;
 		}
 		else
@@ -639,6 +669,7 @@ namespace ENGINE_NAMESPACE
 	inline void device_memory::alloc_slot(std::uint32_t* out_pool_idx, std::uint32_t* out_slot_idx, VkDeviceSize size)
 	{
 		using pool_t = typename heap<MFlags>::pool_t;
+		const VkDeviceSize alignment = offset_alignment<BType>();
 		std::vector<pool_t>* pools;
 		VkDeviceSize pool_size;
 		if constexpr (std::is_same<pool_t, memory_pool>::value)
@@ -654,8 +685,9 @@ namespace ENGINE_NAMESPACE
 
 		std::uint32_t selected_pool_idx = 0;
 		std::uint32_t selected_slot_idx = 0;
+		VkDeviceSize size_needed = 0;
 
-		if (!search_pools(*pools, size, &selected_pool_idx, &selected_slot_idx))
+		if (!search_pools(*pools, size, alignment, &selected_pool_idx, &selected_slot_idx, &size_needed))
 		{
 			if (pool_size < size)
 			{
@@ -672,14 +704,20 @@ namespace ENGINE_NAMESPACE
 				pools->push_back(dynamic_memory_pool(owner->handle, pool_size));
 				alloc_buffer(pools->back().get_memory(), pools->back().get_buffer(), pool_size * max_frames_in_flight,
 					buffer<BType>::dynamic_usage, MFlags);
+				pool_t& pool = (*pools)[selected_pool_idx];
+				vkMapMemory(owner->handle, pool.get_memory(), pool.get_size() * owner->current_frame, pool.get_size(), 
+					0, &pool.host_ptr);
 			}
 		}
 
-		(*pools)[selected_pool_idx].fill_slot(selected_slot_idx, size);
+		(*pools)[selected_pool_idx].fill_slot(selected_slot_idx, size_needed);
 		*out_pool_idx = selected_pool_idx;
 		*out_slot_idx = selected_slot_idx;
-		LOGF_INTERNAL_INFO("Allocated {0} bytes in slot {1} of pool {2} of type {3}", size, selected_slot_idx, selected_pool_idx, 
-			buffer<BType>::debug_name);
+		LOGF_INTERNAL_INFO("Allocated {0} bytes in slot {1} (offset {2}->{3}) of pool {4} {5}", 
+			size, selected_slot_idx, 
+			(*pools)[selected_pool_idx].get_slot(selected_slot_idx).offset,
+			aligned_offset((*pools)[selected_pool_idx].get_slot(selected_slot_idx).offset, alignment),
+			buffer<BType>::debug_name, selected_pool_idx);
 	}
 
 	//TODO change or add version that takes memory ref as argument
@@ -732,7 +770,6 @@ namespace ENGINE_NAMESPACE
 		else
 		{
 			dynamic_memory_pool& pool = get_dynamic_pools<BType>()[selected_pool_idx];
-			vkMapMemory(owner->handle, pool.get_memory(), pool.get_size() * owner->current_frame, pool.get_size(), 0, &pool.host_ptr);
 			return mem_ref_internal(BType, selected_pool_idx, pool.get_slot(selected_slot_idx).offset, size);
 		}
 	}
@@ -755,7 +792,6 @@ namespace ENGINE_NAMESPACE
 		else
 		{
 			dynamic_memory_pool& pool = get_dynamic_pools<BType>()[selected_pool_idx];
-			vkMapMemory(owner->handle, pool.get_memory(), pool.get_size() * owner->current_frame, pool.get_size(), 0, &pool.host_ptr);
 			mem_ref_internal ref(BType, selected_pool_idx, pool.get_slot(selected_slot_idx).offset, size);
 			this->memcpy<BType>(ref, data, size, 0);
 			return std::move(ref);
@@ -766,7 +802,7 @@ namespace ENGINE_NAMESPACE
 	void device_memory::get_map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept
 	{
 		const mem_ref_internal& int_ref = reinterpret_cast<const mem_ref_internal&>(ref);
-		*out_offset = int_ref.offset;
+		*out_offset = aligned_offset(int_ref.offset, offset_alignment<BType>());
 		*out_map_ptr = &get_dynamic_pools<BType>()[int_ref.pool].host_ptr;
 	}
 
@@ -784,8 +820,8 @@ namespace ENGINE_NAMESPACE
 		const mem_ref_internal& ref
 			= reinterpret_cast<const mem_ref_internal&>(reinterpret_cast<const resource_internal&>(resource).ref);
 		INTERNAL_ASSERT(ref.valid(), "Invalid memory reference");
-		//memory_pool& pool = get_pools<BType>()[ref.pool];
-		return { get_pools<BType>()[ref.pool].get_buffer(), 0, ref.offset, ref.size };
+		return { get_pools<BType>()[ref.pool].get_buffer(), 0, aligned_offset(ref.offset, offset_alignment<BType>()), 
+			ref.size };
 	}
 
 	template<device_memory::buffer_t BType>
@@ -795,6 +831,6 @@ namespace ENGINE_NAMESPACE
 			= reinterpret_cast<const mem_ref_internal&>(reinterpret_cast<const resource_internal&>(resource).ref);
 		INTERNAL_ASSERT(ref.valid(), "Invalid memory reference");
 		dynamic_memory_pool& pool = get_dynamic_pools<BType>()[ref.pool];
-		return { pool.get_buffer(), pool.get_size(), ref.offset, ref.size };
+		return { pool.get_buffer(), pool.get_size(), aligned_offset(ref.offset, offset_alignment<BType>()), ref.size };
 	}
 }

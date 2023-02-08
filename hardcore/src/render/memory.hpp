@@ -35,8 +35,9 @@ namespace ENGINE_NAMESPACE
 
 		void free(VkDevice& handle);
 
-		bool search(const VkDeviceSize size, std::uint32_t* out_slot_idx);
-		void fill_slot(const std::uint32_t slot_idx, const VkDeviceSize size);
+		bool search(VkDeviceSize size, VkDeviceSize alignment, 
+			std::uint32_t* out_slot_idx, VkDeviceSize* out_size_needed);
+		void fill_slot(std::uint32_t slot_idx, VkDeviceSize size);
 
 		memory_pool(const memory_pool&) = delete;
 		memory_pool& operator=(const memory_pool&) = delete;
@@ -115,7 +116,6 @@ namespace ENGINE_NAMESPACE
 
 		device_memory(device_memory&& other) noexcept :
 			owner(std::exchange(other.owner, nullptr)),
-			mem_granularity(std::exchange(other.mem_granularity, 0)),
 			mem_properties(std::exchange(other.mem_properties, {})),
 			cmd_pool(std::exchange(other.cmd_pool, VK_NULL_HANDLE)), cmd_buffers(std::move(other.cmd_buffers)),
 			device_in(std::move(other.device_in)), device_out(std::move(other.device_out)),
@@ -248,6 +248,10 @@ namespace ENGINE_NAMESPACE
 		inline pending_copies_t& get_pending_copies<STORAGE>(std::uint8_t current_frame) noexcept
 		{ return sp_pending_copies[current_frame]; }
 
+		template<buffer_t BType> inline VkDeviceSize offset_alignment() const noexcept;
+		//template<> inline VkDeviceSize offset_alignment<UNIFORM>() const noexcept;
+		//template<> inline VkDeviceSize offset_alignment<STORAGE>() const noexcept;
+
 		std::uint32_t find_memory_type(std::uint32_t type_filter, VkMemoryPropertyFlags properties);
 
 		void alloc_buffer(VkDeviceMemory& memory, VkBuffer& buffer, VkDeviceSize size, 
@@ -280,7 +284,6 @@ namespace ENGINE_NAMESPACE
 
 		device* owner = nullptr;
 
-		VkDeviceSize mem_granularity = 0; //from physical device properties
 		VkPhysicalDeviceMemoryProperties mem_properties = {};
 
 		VkCommandPool cmd_pool = VK_NULL_HANDLE;
