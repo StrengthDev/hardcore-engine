@@ -205,7 +205,8 @@ namespace ENGINE_NAMESPACE
 	public:
 		inline void set(void* data) noexcept
 		{
-			std::memcpy(reinterpret_cast<std::byte*>(*ref->data_ptr) + ref->layout().size() * index, data, ref->layout().size());
+			std::memcpy(reinterpret_cast<std::byte*>(*ref->data_ptr) + ref->offset + ref->layout().size() * index, data, 
+				ref->layout().size());
 		}
 
 		inline void set_field(std::size_t field_idx, void* data)

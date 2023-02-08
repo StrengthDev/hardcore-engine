@@ -889,6 +889,9 @@ namespace ENGINE_NAMESPACE
 
 	std::size_t graphics_pipeline::add(const mesh& mesh)
 	{
+		std::size_t key = std::hash<resource>{}(mesh);
+		INTERNAL_ASSERT(!object_refs.count(key), "Object already attached to pipeline");
+
 		frame_descriptors[owner->current_frame].dirty = true;
 		std::size_t idx = objects.size();
 		auto obj = objects.add();
@@ -899,7 +902,7 @@ namespace ENGINE_NAMESPACE
 		if (props.index_t != VK_INDEX_TYPE_NONE_KHR)
 			props.index_binding = owner->get_memory().get_index_binding_args(mesh);
 		props.instances = 1;
-		props.ref_key = std::hash<resource>{}(mesh);
+		props.ref_key = key;
 		object_refs[props.ref_key] = idx;
 		return idx;
 	}

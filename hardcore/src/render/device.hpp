@@ -111,6 +111,7 @@ namespace ENGINE_NAMESPACE
 		inline void reset_ownerships()
 		{
 			memory.set_owner(*this);
+			//TODO add other objects using owner
 		}
 
 		//TODO: remove friends, use inline acessors
