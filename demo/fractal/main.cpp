@@ -7,6 +7,7 @@ class fractal_demo : public hc::client
 public:
 	fractal_demo() : client("FractalDemo", 0, 0, 0)
 	{
+		hc::log::set_log_mask_flags(0xff);
 		hc::window::set_title("fractal demo");
 		push_layer(new fractal_layer());
 	}
