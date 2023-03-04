@@ -37,7 +37,7 @@ bool ELLayer::handleEvent(const hc::Event& e)
 	case hc::EventType::MouseButtonReleased:
 		LOGF_INFO("[EVENT] Mouse button released (Button: {0})", e.x.i);
 		LOG_DEBUG("Main thread: " << std::this_thread::get_id());
-		hc::parallel::immediate_task<void>([]()
+		hc::parallel::immediate_async<void>([]()
 			{
 				LOG_DEBUG("Worker thread: " << std::this_thread::get_id());
 			});
