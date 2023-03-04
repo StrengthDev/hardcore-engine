@@ -23,7 +23,8 @@ namespace ENGINE_NAMESPACE
 	};
 
 	class render_pipeline;
-
+	//TODO change implementation, tasks should be represented by an actual class instead of just a reference like everything else
+	//meaning freed in the class destructor
 	template<pipeline_t PipelineType>
 	class ENGINE_API volatile_pipeline_task_ref final
 	{

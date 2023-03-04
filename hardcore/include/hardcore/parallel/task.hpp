@@ -1,83 +1,81 @@
 #pragma once
 
 #include <functional>
-
-#include "result.hpp"
+#include <future>
 
 namespace ENGINE_NAMESPACE
 {
-	namespace parallel //TODO: scrap results, use std::future/std::promise
+	namespace parallel
 	{
-		template<typename Func>
-		void execute(void* func_ptr)
-		{
-			Func& func = *static_cast<Func*>(func_ptr);
-			func();
-		} //TODO: use this helper function and pass it into submit function, eliminating the need to pass std::function 
+		template<typename Ret>
+		using func_t = std::function<Ret()>;
 
-		ENGINE_API void submit_immediate_task(std::function<void()> task);
+		namespace internal
+		{
+			template<typename Type>
+			inline void call_and_set(const func_t<Type>& func, std::promise<Type>& promise)
+			{
+				promise.set_value(func());
+			}
+
+			template<>
+			inline void call_and_set<void>(const func_t<void>& func, std::promise<void>& promise)
+			{
+				func();
+				promise.set_value();
+			}
+
+			template<typename Type>
+			void execute(void* func_ptr, void* promise_ptr)
+			{
+				func_t<Type>* func = static_cast<func_t<Type>*>(func_ptr);
+				std::promise<Type>* promise = static_cast<std::promise<Type>*>(promise_ptr);
+				try
+				{
+					call_and_set<Type>(*func, *promise);
+				}
+				catch (const std::exception&)
+				{
+					//set_exception may also throw, but that should not be caught here
+					//only exceptions thrown during the task execution should be caught
+					promise->set_exception(std::current_exception());
+				}
+				delete func;
+				delete promise;
+			}
+
+			ENGINE_API void submit_immediate_task(void(*aux)(void*, void*), void* func_ptr, void* promise_ptr);
+			ENGINE_API void submit_background_task(void(*aux)(void*, void*), void* func_ptr, void* promise_ptr);
+		}
 
 		/**
 		 * @brief Submits a task for immediate parallel execution.
 		 * @tparam Type Return type of the task.
 		 * @param task Function to be executed in parallel by another thread.
-		 * @return result object which will contain the result of the function once it has been executed.
+		 * @return std::future object which will contain the result of the function once it has been executed.
 		*/
 		template<typename Type>
-		inline result<Type> immediate_task(func_t<Type> task)
+		inline std::future<Type> immediate_async(func_t<Type> task)
 		{
-			result<Type> ret;
-			void* sc = ret.shared_container; //compiler was complaining "sc" was undeclared when it was of type result<Type>::container*, idk
-			submit_immediate_task([task, sc]()
-				{
-					result<Type>::set(*reinterpret_cast<result<Type>::container*>(sc), task());
-					result<Type>::try_destroy_container(reinterpret_cast<result<Type>::container*>(sc));
-				});
-			return ret;
+			std::promise<Type>* promise = new std::promise<Type>();
+			func_t<Type>* func = new func_t<Type>(std::move(task));
+			internal::submit_immediate_task(internal::execute<Type>, func, promise);
+			return promise->get_future();
 		}
 
 		/**
-		 * @brief Submits a task for immediate parallel execution.
+		 * @brief Submits a task for parallel execution in the background.
+		 * @tparam Type Return type of the task.
 		 * @param task Function to be executed in parallel by another thread.
-		 * @return something todo
+		 * @return std::future object which will contain the result of the function once it has been executed.
 		*/
-		template<>
-		inline result<void> immediate_task<void>(func_t<void> task)
-		{
-			result<void> ret;
-			void* sc = ret.shared_container;
-			submit_immediate_task([task, sc]()
-				{
-					task();
-					result<void>::set(*reinterpret_cast<result<void>::container*>(sc));
-					result<void>::try_destroy_container(reinterpret_cast<result<void>::container*>(sc));
-				});
-			return ret;
-		}
-
-		ENGINE_API void submit_background_task(std::function<void()> task);
-
 		template<typename Type>
-		inline result<Type> background_task(func_t<Type> task)
+		inline std::future<Type> background_async(func_t<Type> task)
 		{
-			result<Type> ret;
-			submit_background_task([task, &ret]()
-				{
-					ret.set(task());
-				});
-			return ret;
-		}
-
-		template<>
-		inline result<void> background_task<void>(func_t<void> task)
-		{
-			result<void> ret;
-			submit_background_task([task, &ret]()
-				{
-					task();
-					ret.set();
-				});
-			return ret;
+			std::promise<Type>* promise = new std::promise<Type>();
+			func_t<Type>* func = new func_t<Type>(std::move(task));
+			internal::submit_background_task(internal::execute<Type>, func, promise);
+			return promise->get_future();
 		}
 	}
 }

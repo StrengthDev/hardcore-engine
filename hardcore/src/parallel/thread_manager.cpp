@@ -22,8 +22,14 @@ namespace ENGINE_NAMESPACE
 		std::condition_variable task_signal;
 		std::mutex task_signal_access;
 
-		typedef std::function<void()> task_t;
-		typedef concurrent_queue<task_t> task_queue_t;
+		struct task
+		{
+			void(*aux)(void*, void*);
+			void* func_ptr;
+			void* promise_ptr;
+		};
+		
+		typedef concurrent_queue<task> task_queue_t;
 
 		task_queue_t immediate_tasks;
 		task_queue_t background_tasks;
@@ -42,14 +48,14 @@ namespace ENGINE_NAMESPACE
 		{
 			LOG_INTERNAL_INFO("Lauched master thread (ID: " << std::this_thread::get_id() << ")");
 
-			task_t task;
+			task t;
 			while (run_master.test_and_set())
 			{
-				if (immediate_tasks.try_pop(task))
+				if (immediate_tasks.try_pop(t))
 				{
-					immediate_queues[0].push(std::move(task));
+					immediate_queues[0].push(std::move(t));
 				}
-				if (background_tasks.try_pop(task))
+				if (background_tasks.try_pop(t))
 				{
 
 				}
@@ -84,8 +90,8 @@ namespace ENGINE_NAMESPACE
 			{
 				while (true)
 				{
-					task_t task = queue.pop();
-					task();
+					task t = queue.pop();
+					t.aux(t.func_ptr, t.promise_ptr);
 				}
 			}
 			catch (const exception::closed_queue&)
@@ -162,18 +168,21 @@ namespace ENGINE_NAMESPACE
 			logger.join();
 		}
 
-		void submit_immediate_task(std::function<void()> task)
+		namespace internal
 		{
-			std::lock_guard<std::mutex> lock(task_signal_access);
-			immediate_tasks.push(std::move(task));
-			task_signal.notify_all();
-		}
+			void submit_immediate_task(void(*aux)(void*, void*), void* func_ptr, void* promise_ptr)
+			{
+				std::lock_guard<std::mutex> lock(task_signal_access);
+				immediate_tasks.push({ aux, func_ptr, promise_ptr });
+				task_signal.notify_all();
+			}
 
-		void submit_background_task(std::function<void()> task)
-		{
-			std::lock_guard<std::mutex> lock(task_signal_access);
-			background_tasks.push(std::move(task));
-			task_signal.notify_all();
+			void submit_background_task(void(*aux)(void*, void*), void* func_ptr, void* promise_ptr)
+			{
+				std::lock_guard<std::mutex> lock(task_signal_access);
+				background_tasks.push({ aux, func_ptr, promise_ptr });
+				task_signal.notify_all();
+			}
 		}
 	}
 }
