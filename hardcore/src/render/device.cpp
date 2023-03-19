@@ -219,18 +219,28 @@ namespace ENGINE_NAMESPACE
 
 	device::~device()
 	{
+		while (!old_framebuffers.empty())
+		{
+			old_framebuffer_set& old = old_framebuffers.front();
+			if (old.deletion_frame == current_frame)
+			{
+				for (std::size_t i = 0; i < old.n_framebuffers; i++)
+					vkDestroyFramebuffer(handle, old.framebuffers[i], nullptr);
+				std::free(old.framebuffers);
+				old_framebuffers.pop();
+			}
+		}
+
 		if (has_swapchain)
 		{
 			vkDeviceWaitIdle(handle);
 			//Pipelines must be destroyed before anything else
 			graphics_pipelines.clear();
-			for (std::size_t i = 0; i < main_swapchain.n_images; i++)
-			{
+			for (std::size_t i = 0; i < main_swapchain.size(); i++)
 				vkDestroyFramebuffer(handle, framebuffers[i], nullptr);
-			}
 			std::free(framebuffers);
 			vkDestroyRenderPass(handle, render_pass, nullptr);
-			main_swapchain.terminate();
+			main_swapchain.terminate(handle);
 			for (std::size_t i = 0; i < max_frames_in_flight; i++)
 			{
 				vkDestroySemaphore(handle, render_finished_semaphores[i], nullptr);
@@ -261,45 +271,44 @@ namespace ENGINE_NAMESPACE
 		return 0; //TODO
 	}
 
-	bool device::create_swapchain()
+	void device::create_swapchain()
 	{
-		main_swapchain.init(*this);
+		main_swapchain.init(physical_handle, handle, *surface, graphics_idx, present_idx);
 		has_swapchain = true;
 
-		size_t i;
-		VkSemaphoreCreateInfo semaphoreInfo = {};
-		semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+		VkSemaphoreCreateInfo semaphore_info = {};
+		semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-		VkFenceCreateInfo fenceInfo = {};
-		fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-		fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-		for (i = 0; i < max_frames_in_flight; i++)
+		VkFenceCreateInfo fence_info = {};
+		fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+		fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+		for (std::size_t i = 0; i < max_frames_in_flight; i++)
 		{
-			VK_CRASH_CHECK(vkCreateSemaphore(handle, &semaphoreInfo, nullptr, &image_available_semaphores[i]), 
+			VK_CRASH_CHECK(vkCreateSemaphore(handle, &semaphore_info, nullptr, &image_available_semaphores[i]), 
 				"Failed to create image semaphore");
-			VK_CRASH_CHECK(vkCreateSemaphore(handle, &semaphoreInfo, nullptr, &render_finished_semaphores[i]), 
+			VK_CRASH_CHECK(vkCreateSemaphore(handle, &semaphore_info, nullptr, &render_finished_semaphores[i]), 
 				"Failed to create render semaphore");
-			VK_CRASH_CHECK(vkCreateFence(handle, &fenceInfo, nullptr, &frame_fences[i]), "");
+			VK_CRASH_CHECK(vkCreateFence(handle, &fence_info, nullptr, &frame_fences[i]), "");
 		}
 
-		VkAttachmentDescription colorAttachment = {};
-		colorAttachment.format = main_swapchain.image_format;
-		colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;	//multisampling
-		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;	//define pixel layout of VkImages in memory
+		VkAttachmentDescription attachment = {};
+		attachment.format = main_swapchain.image_format();
+		attachment.samples = VK_SAMPLE_COUNT_1_BIT;	//multisampling
+		attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;	//define pixel layout of VkImages in memory
 
-		VkAttachmentReference colorAttachmentRef = {};
-		colorAttachmentRef.attachment = 0;
-		colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		VkAttachmentReference attachment_ref = {};
+		attachment_ref.attachment = 0;
+		attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 		VkSubpassDescription subpass = {};
 		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		subpass.colorAttachmentCount = 1;
-		subpass.pColorAttachments = &colorAttachmentRef;
+		subpass.pColorAttachments = &attachment_ref;
 
 		VkSubpassDependency dependency = {};
 		dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -309,38 +318,61 @@ namespace ENGINE_NAMESPACE
 		dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 		dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-		VkRenderPassCreateInfo renderPassInfo = {};
-		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		renderPassInfo.attachmentCount = 1;
-		renderPassInfo.pAttachments = &colorAttachment;
-		renderPassInfo.subpassCount = 1;
-		renderPassInfo.pSubpasses = &subpass;
-		renderPassInfo.dependencyCount = 1;
-		renderPassInfo.pDependencies = &dependency;
+		VkRenderPassCreateInfo render_pass_info = {};
+		render_pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+		render_pass_info.attachmentCount = 1;
+		render_pass_info.pAttachments = &attachment;
+		render_pass_info.subpassCount = 1;
+		render_pass_info.pSubpasses = &subpass;
+		render_pass_info.dependencyCount = 1;
+		render_pass_info.pDependencies = &dependency;
 
-		VK_CRASH_CHECK(vkCreateRenderPass(handle, &renderPassInfo, nullptr, &render_pass), "Failed to create render pass");
+		VK_CRASH_CHECK(vkCreateRenderPass(handle, &render_pass_info, nullptr, &render_pass), 
+			"Failed to create render pass");
 
-		framebuffers = t_malloc<VkFramebuffer>(main_swapchain.n_images);
-		for (i = 0; i < main_swapchain.n_images; i++)
+		framebuffers = t_malloc<VkFramebuffer>(main_swapchain.size());
+		for (std::size_t i = 0; i < main_swapchain.size(); i++)
 		{
-			VkFramebufferCreateInfo framebufferInfo = {};
-			framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-			framebufferInfo.renderPass = render_pass;
-			framebufferInfo.attachmentCount = 1;
-			framebufferInfo.pAttachments = &main_swapchain.image_views[i];
-			framebufferInfo.width = main_swapchain.extent.width;
-			framebufferInfo.height = main_swapchain.extent.height;
-			framebufferInfo.layers = 1;
+			VkFramebufferCreateInfo framebuffer_info = {};
+			framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+			framebuffer_info.renderPass = render_pass;
+			framebuffer_info.attachmentCount = 1;
+			framebuffer_info.pAttachments = &main_swapchain.views()[i];
+			framebuffer_info.width = main_swapchain.extent().width;
+			framebuffer_info.height = main_swapchain.extent().height;
+			framebuffer_info.layers = 1;
 
-			VK_CRASH_CHECK(vkCreateFramebuffer(handle, &framebufferInfo, nullptr, &framebuffers[i]), "Failed to create frame buffer");
+			VK_CRASH_CHECK(vkCreateFramebuffer(handle, &framebuffer_info, nullptr, &framebuffers[i]), 
+				"Failed to create framebuffer");
 		}
-
-		return true;
 	}
 
-	bool device::recreate_swapchain()
+	void device::recreate_swapchain()
 	{
-		return true;
+		old_framebuffer_set old = {};
+		old.framebuffers = framebuffers;
+		old.n_framebuffers = main_swapchain.size();
+		old.deletion_frame = current_frame;
+
+		old_framebuffers.push(std::move(old));
+
+		main_swapchain.recreate(physical_handle, handle, *surface, current_frame);
+
+		framebuffers = t_malloc<VkFramebuffer>(main_swapchain.size());
+		for (std::size_t i = 0; i < main_swapchain.size(); i++)
+		{
+			VkFramebufferCreateInfo framebuffer_info = {};
+			framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+			framebuffer_info.renderPass = render_pass;
+			framebuffer_info.attachmentCount = 1;
+			framebuffer_info.pAttachments = &main_swapchain.views()[i];
+			framebuffer_info.width = main_swapchain.extent().width;
+			framebuffer_info.height = main_swapchain.extent().height;
+			framebuffer_info.layers = 1;
+
+			VK_CRASH_CHECK(vkCreateFramebuffer(handle, &framebuffer_info, nullptr, &framebuffers[i]), 
+				"Failed to create framebuffer");
+		}
 	}
 
 	void device::record_secondary_graphics(VkCommandBuffer& buffer, std::uint32_t image_index, 
@@ -365,6 +397,9 @@ namespace ENGINE_NAMESPACE
 
 		VK_CRASH_CHECK(vkBeginCommandBuffer(buffer, &begin_info), "Failed to begin secondary graphics command buffer");
 
+		vkCmdSetViewport(buffer, 0, 1, &main_swapchain.viewport());
+		vkCmdSetScissor(buffer, 0, 1, &main_swapchain.scissor());
+
 		for (graphics_pipeline* pipeline : graphics_pipelines)
 		{
 			pipeline->record_commands(buffer, current_frame);
@@ -382,12 +417,24 @@ namespace ENGINE_NAMESPACE
 		vkWaitForFences(handle, 1, &frame_fences[current_frame], VK_TRUE, UINT64_MAX);
 		for (auto& pipeline : graphics_pipelines) pipeline.update_descriptor_sets(previous_frame, current_frame, next_frame); //TODO consider parallelizing this
 		memory.flush_in(current_frame);
+		main_swapchain.check_destroy_old(handle, current_frame);
+		if (!old_framebuffers.empty())
+		{
+			old_framebuffer_set& old = old_framebuffers.front();
+			if (old.deletion_frame == current_frame)
+			{
+				for (std::size_t i = 0; i < old.n_framebuffers; i++)
+					vkDestroyFramebuffer(handle, old.framebuffers[i], nullptr);
+				std::free(old.framebuffers);
+				old_framebuffers.pop();
+			}
+		}
 
 		std::uint32_t imageIndex;
-		VkResult result = vkAcquireNextImageKHR(handle, main_swapchain.handle, UINT64_MAX, image_available_semaphores[current_frame], VK_NULL_HANDLE, &imageIndex);
+		VkResult result = vkAcquireNextImageKHR(handle, main_swapchain.vk_handle(), UINT64_MAX, image_available_semaphores[current_frame], VK_NULL_HANDLE, &imageIndex);
 		if (result == VK_ERROR_OUT_OF_DATE_KHR)
 		{
-			//TODO: recreate target
+			recreate_swapchain();
 			return true; //Skip this frame
 		}
 		else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
@@ -412,7 +459,7 @@ namespace ENGINE_NAMESPACE
 		renderPassInfo.renderPass = render_pass;
 		renderPassInfo.framebuffer = framebuffers[imageIndex];
 		renderPassInfo.renderArea.offset = { 0, 0 };
-		renderPassInfo.renderArea.extent = main_swapchain.extent;
+		renderPassInfo.renderArea.extent = main_swapchain.extent();
 
 		VkClearValue clearColor = { 0.0f, 0.0f, 0.0f, 1.0f };
 		renderPassInfo.clearValueCount = 1;
@@ -463,7 +510,7 @@ namespace ENGINE_NAMESPACE
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 		presentInfo.waitSemaphoreCount = 1;
 		presentInfo.pWaitSemaphores = &render_finished_semaphores[current_frame];
-		VkSwapchainKHR swapchains[] = { main_swapchain.handle };
+		VkSwapchainKHR swapchains[] = { main_swapchain.vk_handle() };
 		presentInfo.swapchainCount = 1;
 		presentInfo.pSwapchains = swapchains;
 		presentInfo.pImageIndices = &imageIndex;
@@ -472,8 +519,8 @@ namespace ENGINE_NAMESPACE
 		result = vkQueuePresentKHR(present_queue, &presentInfo);
 		if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR)
 		{
-			DEBUG_BREAK;
-			//TODO: recreate target, add framebuffer resized(?)
+			//DEBUG_BREAK;
+			recreate_swapchain();
 		}
 		else if (result != VK_SUCCESS)
 		{

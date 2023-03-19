@@ -10,6 +10,12 @@ const std::uint32_t pipeline_descriptor_sets = 2;
 const std::uint32_t initial_object_descriptor_set_capacity = 10;
 const std::uint32_t object_descriptor_set_increment = 10;
 
+const VkExtent2D placeholder_extent = { 10, 10 };
+const VkExtent2D invalid_extent = {
+	std::numeric_limits<decltype(VkExtent2D::width)>::max(),
+	std::numeric_limits<decltype(VkExtent2D::height)>::max()
+};
+
 namespace ENGINE_NAMESPACE
 {
 	class data_layout_internal : data_layout
@@ -381,8 +387,14 @@ namespace ENGINE_NAMESPACE
 		}
 	}
 
-	//TODO: change some of the initialisation to smaller functions and put them in the initialiser list
-	graphics_pipeline::graphics_pipeline(device& owner, const std::vector<const shader*>& shaders) : owner(&owner)
+	graphics_pipeline::graphics_pipeline(device& owner, const std::vector<const shader*>& shaders)
+		: graphics_pipeline(owner, shaders, placeholder_extent, true) {}
+
+	graphics_pipeline::graphics_pipeline(device& owner, const std::vector<const shader*>& shaders,
+		const VkExtent2D& extent) : graphics_pipeline(owner, shaders, extent, false) {}
+
+	graphics_pipeline::graphics_pipeline(device& owner, const std::vector<const shader*>& shaders, 
+		const VkExtent2D& extent, bool dynamic_viewport) : owner(&owner)
 	{
 		LOG_INTERNAL_INFO("Initialising new graphics pipeline..");
 
@@ -416,14 +428,14 @@ namespace ENGINE_NAMESPACE
 		VkViewport viewport = {};
 		viewport.x = 0.0f;
 		viewport.y = 0.0f;
-		viewport.width = static_cast<float>(owner.main_swapchain.extent.width);
-		viewport.height = static_cast<float>(owner.main_swapchain.extent.height);
+		viewport.width = static_cast<float>(extent.width);
+		viewport.height = static_cast<float>(extent.height);
 		viewport.minDepth = 0.0f;
 		viewport.maxDepth = 1.0f; //always between 1 and 0
 
 		VkRect2D scissor = {}; //all values measured in pixels
 		scissor.offset = { 0, 0 };
-		scissor.extent = owner.main_swapchain.extent;
+		scissor.extent = extent;
 
 		VkPipelineViewportStateCreateInfo viewport_state = {};
 		viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
@@ -487,7 +499,13 @@ namespace ENGINE_NAMESPACE
 		color_blending.blendConstants[2] = 0.0f; // Optional
 		color_blending.blendConstants[3] = 0.0f; // Optional
 
-		//dynamicstates missing
+		VkPipelineDynamicStateCreateInfo dynamic_state = {};
+		dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+		dynamic_state.pNext = nullptr;
+		dynamic_state.flags = 0;
+		dynamic_state.dynamicStateCount = 2;
+		VkDynamicState states_array[2] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+		dynamic_state.pDynamicStates = states_array;
 
 		VkPipelineLayoutCreateInfo pipeline_layout_info = {};
 		pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -520,7 +538,7 @@ namespace ENGINE_NAMESPACE
 		pipeline_info.pMultisampleState = &multisampling;
 		pipeline_info.pDepthStencilState = nullptr; // Optional
 		pipeline_info.pColorBlendState = &color_blending;
-		pipeline_info.pDynamicState = nullptr; // Optional
+		pipeline_info.pDynamicState = dynamic_viewport ? &dynamic_state : nullptr;
 		pipeline_info.layout = pipeline_layout;
 		pipeline_info.renderPass = owner.render_pass;
 		pipeline_info.subpass = 0;

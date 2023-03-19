@@ -17,8 +17,8 @@ namespace ENGINE_NAMESPACE
 
 		std::size_t score();
 
-		bool create_swapchain();
-		bool recreate_swapchain();
+		void create_swapchain();
+		void recreate_swapchain();
 
 		bool draw();
 
@@ -97,6 +97,15 @@ namespace ENGINE_NAMESPACE
 		swapchain main_swapchain;
 		VkRenderPass render_pass = VK_NULL_HANDLE;
 		VkFramebuffer* framebuffers = nullptr;
+
+		struct old_framebuffer_set
+		{
+			VkFramebuffer* framebuffers;
+			std::uint32_t n_framebuffers;
+			std::uint8_t deletion_frame;
+		};
+
+		std::queue<old_framebuffer_set> old_framebuffers;
 
 		VkCommandPool* graphics_command_pools = nullptr;
 		std::uint32_t command_parallelism;

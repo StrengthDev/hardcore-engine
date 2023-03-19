@@ -99,6 +99,10 @@ bool fractal_layer::handleEvent(const hc::Event & e)
 	case hc::EventType::MouseScrolled:
 		v_inputs.scale *= std::pow(1.1f, -e.y.f);
 		return false;
+	case hc::EventType::WindowResize:
+		hc::window::get_dimensions(&w, &h);
+		v_inputs.ratio = static_cast<float>(w) / h;
+		break;
 	}
 	return false;
 }
