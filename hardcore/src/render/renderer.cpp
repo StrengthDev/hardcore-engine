@@ -183,10 +183,7 @@ namespace ENGINE_NAMESPACE
 				}
 			}
 
-			if (!devices[present_device_idx].create_swapchain())
-			{
-				CRASH("Failed to create window swapchain");
-			}
+			devices[present_device_idx].create_swapchain();
 		}
 
 		void init(program_id engine, program_id client)

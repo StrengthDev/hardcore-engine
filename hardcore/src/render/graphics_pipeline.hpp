@@ -19,6 +19,7 @@ namespace ENGINE_NAMESPACE
 	{
 	public:
 		graphics_pipeline(device& owner, const std::vector<const shader*>& shaders);
+		graphics_pipeline(device& owner, const std::vector<const shader*>& shaders, const VkExtent2D& extent);
 		~graphics_pipeline();
 
 		graphics_pipeline(const graphics_pipeline&) = delete;
@@ -107,6 +108,9 @@ namespace ENGINE_NAMESPACE
 		}
 
 	private:
+		graphics_pipeline(device& owner, const std::vector<const shader*>& shaders, const VkExtent2D& extent, 
+			bool dynamic_viewport);
+
 		inline bool type_match(std::uint32_t descriptor_idx, const uniform&) const noexcept
 		{ return object_binding_types[descriptor_idx] == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC; }
 		inline bool type_match(std::uint32_t descriptor_idx, const unmapped_uniform&) const noexcept
@@ -370,38 +374,22 @@ namespace ENGINE_NAMESPACE
 		{
 			switch (type)
 			{
-			case VK_DESCRIPTOR_TYPE_SAMPLER:
-				return "Sampler";
-			case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-				return "Image Smapler";
-			case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-				return "Sampled image";
-			case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-				return "Storage image";
-			case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
-				return "Texel uniform";
-			case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
-				return "Texel storage";
-			case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-				return "Uniform";
-			case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-				return "Storage array/vector";
-			case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
-				return "Dynamic uniform";
-			case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
-				return "Dynamic storage array/vector";
-			case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
-				return "Input attachment";
-			case VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT:
-				return "Inline uniform";
-			case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
-				return "Acceleration structure";
-			case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV:
-				return "Acceleration structure NV";
-			case VK_DESCRIPTOR_TYPE_MUTABLE_VALVE:
-				return "Mutable valve";
-			case VK_DESCRIPTOR_TYPE_MAX_ENUM:
-				return "MAX ENUM";
+			case VK_DESCRIPTOR_TYPE_SAMPLER:						return "Sampler";
+			case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:			return "Image Smapler";
+			case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:					return "Sampled image";
+			case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:					return "Storage image";
+			case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:			return "Texel uniform";
+			case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:			return "Texel storage";
+			case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:					return "Uniform";
+			case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:					return "Storage array/vector";
+			case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:			return "Dynamic uniform";
+			case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:			return "Dynamic storage array/vector";
+			case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:				return "Input attachment";
+			case VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT:		return "Inline uniform";
+			case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:		return "Acceleration structure";
+			case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV:		return "Acceleration structure NV";
+			case VK_DESCRIPTOR_TYPE_MUTABLE_VALVE:					return "Mutable valve";
+			case VK_DESCRIPTOR_TYPE_MAX_ENUM:						return "MAX ENUM";
 			default:
 				break;
 			}

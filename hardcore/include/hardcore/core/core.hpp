@@ -131,6 +131,7 @@ namespace ENGINE_NAMESPACE
 	/**
 	 * @brief Reallocates the memory of a pointer.
 	 * @tparam Type Type of objects contained in the allocated memory.
+	 * @param ptr Pointer to already allocated memory.
 	 * @param count Number of objects in the allocated memory.
 	 * @return Pointer to the allocated memory.
 	 * @exception std::bad_alloc If any error occurs with the allocation.
