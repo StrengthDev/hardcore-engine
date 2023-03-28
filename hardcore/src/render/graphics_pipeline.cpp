@@ -684,6 +684,7 @@ namespace ENGINE_NAMESPACE
 	{
 		const std::uint32_t pipeline_descriptor = n_descriptor_pool_sizes[1] ? 1 : 0;
 		cached_buffer_infos.clear();
+		cached_buffer_infos.reserve(objects.size() * n_dynamic_descriptors); // must reserve here to avoid resizes
 		std::vector<VkWriteDescriptorSet> res;
 		res.reserve(cached_object_bindings.size());
 		for (std::size_t i = 0; i < cached_object_bindings.size(); i++)
@@ -914,11 +915,11 @@ namespace ENGINE_NAMESPACE
 		std::size_t idx = objects.size();
 		auto obj = objects.add();
 		auto& props = obj.properties();
-		props.binding = owner->get_memory().get_binding_args(mesh);
+		props.binding = owner->get_memory().binding_args(mesh);
 		props.count = mesh.draw_count();
 		props.index_t = to_vk_index_type(mesh.index_type());
 		if (props.index_t != VK_INDEX_TYPE_NONE_KHR)
-			props.index_binding = owner->get_memory().get_index_binding_args(mesh);
+			props.index_binding = owner->get_memory().index_binding_args(mesh);
 		props.instances = 1;
 		props.ref_key = key;
 		object_refs[props.ref_key] = idx;
@@ -948,17 +949,17 @@ namespace ENGINE_NAMESPACE
 	}
 
 	buffer_binding_args graphics_pipeline::get_binding(const uniform& resource) const 
-	{ return owner->get_memory().get_binding_args(resource); }
+	{ return owner->get_memory().binding_args(resource); }
 	buffer_binding_args graphics_pipeline::get_binding(const unmapped_uniform& resource) const
-	{ return owner->get_memory().get_binding_args(resource); }
+	{ return owner->get_memory().binding_args(resource); }
 	buffer_binding_args graphics_pipeline::get_binding(const storage_array& resource) const
-	{ return owner->get_memory().get_binding_args(resource); }
+	{ return owner->get_memory().binding_args(resource); }
 	buffer_binding_args graphics_pipeline::get_binding(const dynamic_storage_array& resource) const
-	{ return owner->get_memory().get_binding_args(resource); }
+	{ return owner->get_memory().binding_args(resource); }
 	buffer_binding_args graphics_pipeline::get_binding(const storage_vector& resource) const
-	{ return owner->get_memory().get_binding_args(resource); }
+	{ return owner->get_memory().binding_args(resource); }
 	buffer_binding_args graphics_pipeline::get_binding(const dynamic_storage_vector& resource) const
-	{ return owner->get_memory().get_binding_args(resource); }
+	{ return owner->get_memory().binding_args(resource); }
 
 	void graphics_pipeline::set_descriptor(std::size_t object_idx, std::uint32_t binding_idx, buffer_binding_args&& binding)
 	{

@@ -6,18 +6,15 @@
 
 namespace ENGINE_NAMESPACE
 {
-
-	class device;
-
 	class swapchain
 	{
 	public:
-		void init(VkPhysicalDevice& physical_handle, VkDevice& device_handle, VkSurfaceKHR& surface,
+		void init(VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface,
 			std::uint32_t graphics_queue_idx, std::uint32_t present_queue_idx);
-		void terminate(VkDevice &device_handle);
-		void recreate(VkPhysicalDevice& physical_handle, VkDevice& device_handle, VkSurfaceKHR& surface,
+		void terminate(VkDevice device);
+		void recreate(VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface,
 			std::uint8_t current_frame);
-		void check_destroy_old(VkDevice& device_handle, std::uint8_t current_frame);
+		void check_destroy_old(VkDevice device, std::uint8_t current_frame);
 
 		~swapchain();
 
@@ -59,7 +56,5 @@ namespace ENGINE_NAMESPACE
 		std::queue<old_swapchain> old_swapchains;
 
 		void update_dimensions(VkSurfaceCapabilitiesKHR& capabilities);
-
-		friend class graphics_pipeline;
 	};
 }
