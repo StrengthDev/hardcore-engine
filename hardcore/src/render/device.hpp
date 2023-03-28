@@ -9,7 +9,7 @@ namespace ENGINE_NAMESPACE
 	class device
 	{
 
-		typedef std::uint16_t index_t;
+		
 	public:
 		device(VkPhysicalDevice&& physical, VkSurfaceKHR& surface);
 		device() = default;
@@ -24,7 +24,7 @@ namespace ENGINE_NAMESPACE
 
 		inline device_memory& get_memory() noexcept { return memory; }
 
-		index_t add_graphics_pipeline(const shader& vertex, const shader& fragment);
+		std::uint32_t add_graphics_pipeline(const shader& vertex, const shader& fragment);
 		void add_instanced_graphics_pipeline();
 		void add_indirect_graphics_pipeline();
 
@@ -51,6 +51,7 @@ namespace ENGINE_NAMESPACE
 			framebuffers(std::exchange(other.framebuffers, nullptr)),
 			graphics_command_pools(std::exchange(other.graphics_command_pools, nullptr)),
 			command_parallelism(std::exchange(other.command_parallelism, 0)),
+			pipeline_stacks(std::move(other.pipeline_stacks)),
 			graphics_command_buffers(std::exchange(other.graphics_command_buffers, nullptr)),
 			graphics_pipelines(std::move(other.graphics_pipelines))
 		{
@@ -109,23 +110,22 @@ namespace ENGINE_NAMESPACE
 
 		VkCommandPool* graphics_command_pools = nullptr;
 		std::uint32_t command_parallelism;
+		std::vector<std::vector<graphics_pipeline*>> pipeline_stacks;
 
 		VkCommandBuffer* graphics_command_buffers = nullptr;
 
 		std::vector<graphics_pipeline> graphics_pipelines;
 
 		void record_secondary_graphics(VkCommandBuffer& buffer, std::uint32_t image_index,
-			const std::vector<graphics_pipeline*>& graphics_pipelines);
+			std::vector<graphics_pipeline*>& graphics_pipelines);
 
 		inline void reset_ownerships()
 		{
-			memory.set_owner(*this);
+			memory.update_refs(handle, &properties.limits, &current_frame);
 			//TODO add other objects using owner
 		}
 
 		//TODO: remove friends, use inline acessors
-		friend device_memory;
-		friend swapchain;
 		friend graphics_pipeline;
 	};
 }

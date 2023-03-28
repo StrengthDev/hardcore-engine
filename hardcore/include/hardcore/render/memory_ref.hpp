@@ -45,7 +45,7 @@ namespace ENGINE_NAMESPACE
 
 		inline std::size_t hash() const noexcept 
 		{
-			return (offset << 42) | (size << 20) | (static_cast<std::size_t>(pool) << 4) | pool_type;
+			return (offset << 42) ^ (size << 20) ^ (static_cast<std::size_t>(pool) << 4) ^ pool_type;
 		}
 
 	protected:

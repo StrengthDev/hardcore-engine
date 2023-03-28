@@ -97,7 +97,7 @@ namespace ENGINE_NAMESPACE
 
 	void uniform::update_map()
 	{
-		renderer::get_device().get_memory().get_uniform_map(ref, &data_ptr, &offset);
+		renderer::get_device().get_memory().uniform_map(ref, &data_ptr, &offset);
 	}
 
 	unmapped_uniform::unmapped_uniform(const data_layout& layout, std::uint32_t count) :
@@ -120,7 +120,7 @@ namespace ENGINE_NAMESPACE
 
 	void dynamic_storage_array::update_map()
 	{
-		renderer::get_device().get_memory().get_storage_map(ref, &data_ptr, &offset);
+		renderer::get_device().get_memory().storage_map(ref, &data_ptr, &offset);
 	}
 
 	storage_vector::storage_vector(const data_layout& layout, std::uint32_t count) :
@@ -147,6 +147,6 @@ namespace ENGINE_NAMESPACE
 
 	void dynamic_storage_vector::update_map()
 	{
-		renderer::get_device().get_memory().get_storage_map(ref, &data_ptr, &offset);
+		renderer::get_device().get_memory().storage_map(ref, &data_ptr, &offset);
 	}
 }

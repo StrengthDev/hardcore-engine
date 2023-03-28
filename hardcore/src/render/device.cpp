@@ -197,7 +197,7 @@ namespace ENGINE_NAMESPACE
 	}
 
 	device::device(VkPhysicalDevice&& physical, VkSurfaceKHR& surface) : surface(&surface), physical_handle(std::move(physical)),
-		command_parallelism(1) //TODO: + immediate_thread_num()
+		command_parallelism(1), pipeline_stacks(1) //TODO: + immediate_thread_num()
 	{
 		vkGetPhysicalDeviceProperties(physical_handle, &properties);
 		vkGetPhysicalDeviceFeatures(physical_handle, &features);
@@ -213,8 +213,9 @@ namespace ENGINE_NAMESPACE
 
 		create_command_buffers(handle, command_parallelism, graphics_idx, &graphics_command_pools, &graphics_command_buffers);
 
-		memory.init(*this);
-		memory.map_ranges(current_frame);
+		memory.init(physical_handle, handle, transfer_idx, &properties.limits, &current_frame);
+		memory.map_ranges(handle, current_frame);
+		pipeline_stacks.resize(1);
 	}
 
 	device::~device()
@@ -253,7 +254,7 @@ namespace ENGINE_NAMESPACE
 		if (handle != VK_NULL_HANDLE)
 		{
 			vkDeviceWaitIdle(handle);
-			memory.terminate();
+			memory.terminate(handle, current_frame);
 			for (std::size_t i = 0; i < command_parallelism; i++)
 			{
 				//Destroying a command pool frees all of its buffers as well
@@ -376,7 +377,7 @@ namespace ENGINE_NAMESPACE
 	}
 
 	void device::record_secondary_graphics(VkCommandBuffer& buffer, std::uint32_t image_index, 
-		const std::vector<graphics_pipeline*>& graphics_pipelines)
+		std::vector<graphics_pipeline*>& graphics_pipelines)
 	{
 		VK_CRASH_CHECK(vkResetCommandBuffer(buffer, 0), "Failed to reset secondary graphics command buffer");
 
@@ -406,6 +407,7 @@ namespace ENGINE_NAMESPACE
 		}
 
 		VK_CRASH_CHECK(vkEndCommandBuffer(buffer), "Failed to end secondary graphics command buffer");
+		graphics_pipelines.clear();
 	}
 
 	bool device::draw()
@@ -413,10 +415,10 @@ namespace ENGINE_NAMESPACE
 		const std::uint8_t next_frame = (current_frame + 1) % max_frames_in_flight;
 		const std::uint8_t previous_frame = (current_frame - 1 + max_frames_in_flight) % max_frames_in_flight;
 
-		memory.unmap_ranges(current_frame);
+		memory.unmap_ranges(handle, current_frame);
 		vkWaitForFences(handle, 1, &frame_fences[current_frame], VK_TRUE, UINT64_MAX);
 		for (auto& pipeline : graphics_pipelines) pipeline.update_descriptor_sets(previous_frame, current_frame, next_frame); //TODO consider parallelizing this
-		memory.flush_in(current_frame);
+		memory.flush_in(handle, transfer_queue, current_frame);
 		main_swapchain.check_destroy_old(handle, current_frame);
 		if (!old_framebuffers.empty())
 		{
@@ -465,9 +467,6 @@ namespace ENGINE_NAMESPACE
 		renderPassInfo.clearValueCount = 1;
 		renderPassInfo.pClearValues = &clearColor;
 
-		std::vector<graphics_pipeline*>* pipeline_stacks = t_malloc<std::vector<graphics_pipeline*>>(command_parallelism);
-		for (std::uint32_t i = 0; i < command_parallelism; i++) new (&pipeline_stacks[i]) std::vector<graphics_pipeline*>();
-
 		std::uint32_t index = 0;
 		for (graphics_pipeline& pipeline : graphics_pipelines)
 		{
@@ -483,7 +482,6 @@ namespace ENGINE_NAMESPACE
 		}
 
 		//TODO: wait for thread i to finish recording
-		std::free(pipeline_stacks);
 		vkCmdExecuteCommands(primary_buffer, command_parallelism, &graphics_command_buffers[(command_parallelism + 1) * current_frame + 1]);
 
 		vkCmdEndRenderPass(primary_buffer);
@@ -528,12 +526,12 @@ namespace ENGINE_NAMESPACE
 			return false;
 		}
 		current_frame = next_frame;
-		memory.synchronize(current_frame); //wait for the next frame's data transfers to finish, so nothing can be overwritten by the client
-		memory.map_ranges(current_frame);
+		memory.synchronize(handle, current_frame); //wait for the next frame's data transfers to finish, so nothing can be overwritten by the client
+		memory.map_ranges(handle, current_frame);
 		return true;
 	}
 
-	device::index_t device::add_graphics_pipeline(const shader& vertex, const shader& fragment)
+	std::uint32_t device::add_graphics_pipeline(const shader& vertex, const shader& fragment)
 	{
 
 		const std::vector<const shader*> shaders = { &vertex, &fragment };

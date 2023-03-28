@@ -11,8 +11,6 @@ const VkDeviceSize staging_buffer_size = MEGABYTES(8);
 
 const VkDeviceSize texture_pool_size = MEGABYTES(128);
 
-const uint32_t initial_pool_slot_size = 16;
-
 const VkBufferUsageFlags upload_buffer = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 const VkBufferUsageFlags compute_staging = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 const VkBufferUsageFlags download_buffer = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -69,13 +67,13 @@ namespace ENGINE_NAMESPACE
 	template<VkMemoryPropertyFlags MFlags>
 	struct heap { };
 	template<>
-	struct heap<main_heap> { using pool_t = memory_pool; };
+	struct heap<main_heap> { using pool_t = buffer_pool; };
 	template<>
-	struct heap<host_visible_heap> { using pool_t = dynamic_memory_pool; };
+	struct heap<host_visible_heap> { using pool_t = dynamic_buffer_pool; };
 	template<>
-	struct heap<upload_heap> { using pool_t = dynamic_memory_pool; };
+	struct heap<upload_heap> { using pool_t = dynamic_buffer_pool; };
 	template<>
-	struct heap<download_heap> { using pool_t = memory_pool; };
+	struct heap<download_heap> { using pool_t = buffer_pool; };
 
 	class mem_ref_internal : protected memory_ref
 	{
@@ -95,184 +93,45 @@ namespace ENGINE_NAMESPACE
 		friend device_memory;
 	};
 
-	inline VkDeviceSize alignment_pad(VkDeviceSize offset, VkDeviceSize alignment)
+	template<typename Pool>
+	inline bool search_pools(std::vector<Pool>& pools, const VkDeviceSize size, VkDeviceSize alignment,
+		std::uint32_t* out_pool_idx, std::uint32_t* out_slot_idx, VkDeviceSize* out_size_needed)
 	{
-		if (alignment)
-			return (alignment - (offset % alignment)) % alignment;
-		else
-			return 0;
-	}
+		static_assert(std::is_base_of<memory_pool, Pool>::value, "Invalid pool type");
 
-	inline VkDeviceSize aligned_offset(VkDeviceSize offset, VkDeviceSize alignment)
-	{
-		return offset + alignment_pad(offset, alignment);
-	}
-
-	memory_pool::memory_pool(VkDevice& handle, VkDeviceSize size) : size(size)
-	{
-		n_slots = initial_pool_slot_size;
-		slots = t_malloc<memory_slot>(initial_pool_slot_size);
-		slots[0].in_use = false;
-		slots[0].offset = 0;
-		slots[0].size = size;
-		largest_free_slot = 0;
-
-		for (std::uint32_t i = 1; i < n_slots; i++)
+		std::uint32_t selected_pool_idx = 0;
+		std::uint32_t selected_slot_idx = std::numeric_limits<std::uint32_t>::max();
+		for (memory_pool& pool : pools)
 		{
-			slots[i].in_use = false;
-			slots[i].offset = size;
-			slots[i].size = 0;
+			if (pool.search(size, alignment, &selected_slot_idx, out_size_needed)) break;
+			selected_pool_idx++;
 		}
-	}
-
-	memory_pool::~memory_pool()
-	{
-		INTERNAL_ASSERT(!slots, "Memory pool not freed");
-	}
-
-	void memory_pool::free(VkDevice& handle)
-	{
-		if (slots)
+		*out_pool_idx = selected_pool_idx;
+		if (selected_slot_idx == std::numeric_limits<std::uint32_t>::max())
 		{
-			vkDestroyBuffer(handle, buffer, nullptr);
-			vkFreeMemory(handle, memory, nullptr);
-			std::free(slots);
-			slots = nullptr;
+			*out_slot_idx = 0;
+			*out_size_needed = size;
+			return false;
 		}
-	}
-
-	bool memory_pool::search(VkDeviceSize size, VkDeviceSize alignment, 
-		std::uint32_t* out_slot_idx, VkDeviceSize* out_size_needed)
-	{
-		//largest free slot is unknown, must check everything, look for smallest possible fit
-		//if possible, update largest free slot to save some performance
-		if (slots[largest_free_slot].in_use)
-		{
-			VkDeviceSize largest_fit = 0;
-			std::uint32_t largest_idx = 0;
-			VkDeviceSize smallest_fit = std::numeric_limits<VkDeviceSize>::max();
-			std::uint32_t smallest_idx = std::numeric_limits<std::uint32_t>::max();
-			for (std::uint32_t slot_idx = 0; slot_idx < n_slots; slot_idx++)
-			{
-				if (!slots[slot_idx].in_use)
-				{
-					if (largest_fit < slots[slot_idx].size)
-					{
-						largest_fit = slots[slot_idx].size;
-						largest_idx = slot_idx;
-					}
-					if ((size + alignment_pad(slots[slot_idx].offset, alignment)) <= slots[slot_idx].size 
-						&& smallest_fit > slots[slot_idx].size)
-					{
-						smallest_fit = slots[slot_idx].size;
-						smallest_idx = slot_idx;
-					}
-				}
-			}
-			VkDeviceSize size_needed = (size + alignment_pad(slots[smallest_idx].offset, alignment));
-			if (size_needed <= smallest_fit)
-			{
-				*out_slot_idx = smallest_idx;
-				*out_size_needed = size_needed;
-				if (!(largest_idx == smallest_idx))
-					largest_free_slot = largest_idx;
-				return true;
-			}
-			else
-			{
-				largest_free_slot = largest_idx;
-				return false;
-			}
-		}
-
-		//largest free slot is known, so if it is large enough, assign a slot in this pool, otherwise move on to next pool
 		else
 		{
-			if (slots[largest_free_slot].size < size)
-				return false;
-
-			VkDeviceSize smallest_fit = std::numeric_limits<VkDeviceSize>::max();
-			std::uint32_t smallest_idx = std::numeric_limits<std::uint32_t>::max();
-			for (std::uint32_t slot_idx = 0; slot_idx < n_slots; slot_idx++)
-			{
-				if (!slots[slot_idx].in_use 
-					&& (size + alignment_pad(slots[slot_idx].offset, alignment)) <= slots[slot_idx].size 
-					&& smallest_fit > slots[slot_idx].size)
-				{
-					smallest_fit = slots[slot_idx].size;
-					smallest_idx = slot_idx;
-				}
-			}
-
-			if (smallest_fit == std::numeric_limits<VkDeviceSize>::max()) return false;
-
-			*out_slot_idx = smallest_idx;
-			*out_size_needed = size + alignment_pad(slots[smallest_idx].offset, alignment);
+			*out_slot_idx = selected_slot_idx;
 			return true;
 		}
-		return false;
 	}
 
-	void memory_pool::fill_slot(std::uint32_t slot_idx, VkDeviceSize size)
+	/* 
+	+---------------+
+	| Device Memory |
+	+---------------+
+	*/
+
+	void device_memory::init(VkPhysicalDevice physical_device, VkDevice device, std::uint32_t transfer_queue_idx,
+		const VkPhysicalDeviceLimits* limits, const std::uint8_t* current_frame)
 	{
-		INTERNAL_ASSERT(slot_idx < n_slots, "Slot index out of bounds");
-		INTERNAL_ASSERT(slot_idx == 0 ? true : slots[slot_idx - 1].in_use, "Slot before a selected slot must be in use.");
+		update_refs(device, limits, current_frame);
 
-		if (size < slots[slot_idx].size)
-		{
-			const std::uint32_t old_size = n_slots;
-			bool selected_last = slot_idx == (n_slots - 1);
-
-			//resize needed
-			if (selected_last || (slots[slot_idx + 1].in_use && slots[n_slots - 1].in_use))
-			{
-				n_slots += initial_pool_slot_size; //TODO check if this is the best way to increment
-				slots = t_realloc<memory_slot>(slots, n_slots);
-				for (std::uint32_t i = old_size; i < n_slots; i++)
-				{
-					slots[i].in_use = false;
-					slots[i].offset = slots[old_size - 1].offset + slots[old_size - 1].size;
-					slots[i].size = 0;
-				}
-			}
-
-			INTERNAL_ASSERT(slots[slot_idx + 1].in_use || !slots[slot_idx + 1].size,
-				"Slot after the selected slot must be either empty or in use");
-
-			//shift remaining slots one position and add new slot with the remaining unused memory
-			if (slots[slot_idx + 1].in_use)
-			{
-				std::uint32_t last_in_use = 0;
-				for (std::uint32_t i = old_size - 1; i > slot_idx; i--)
-				{
-					if (slots[i].in_use)
-					{
-						last_in_use = i;
-						break;
-					}
-				}
-				std::memmove(&slots[slot_idx + 2], &slots[slot_idx + 1], sizeof(memory_slot) * (last_in_use - slot_idx));
-			}
-
-			slots[slot_idx + 1].in_use = false;
-			slots[slot_idx + 1].offset = slots[slot_idx].offset + size;
-			slots[slot_idx + 1].size = slots[slot_idx].size - size;
-		}
-
-		slots[slot_idx].in_use = true;
-		slots[slot_idx].size = size;
-	}
-
-	dynamic_memory_pool::~dynamic_memory_pool()
-	{
-
-	}
-
-	void device_memory::init(device& owner)
-	{
-		this->owner = &owner;
-
-		vkGetPhysicalDeviceMemoryProperties(owner.physical_handle, &mem_properties);
+		vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_properties);
 
 		for (std::uint32_t i = 0; i < mem_properties.memoryTypeCount; i++)
 		{
@@ -288,10 +147,10 @@ namespace ENGINE_NAMESPACE
 
 		VkCommandPoolCreateInfo pool_info = {};
 		pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-		pool_info.queueFamilyIndex = owner.transfer_idx;
+		pool_info.queueFamilyIndex = transfer_queue_idx;
 		pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-		VK_CRASH_CHECK(vkCreateCommandPool(owner.handle, &pool_info, nullptr, &cmd_pool), "Failed to create command pool");
+		VK_CRASH_CHECK(vkCreateCommandPool(device, &pool_info, nullptr, &cmd_pool), "Failed to create command pool");
 		
 		VkCommandBufferAllocateInfo cmd_buffer_info = {};
 		cmd_buffer_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -299,7 +158,7 @@ namespace ENGINE_NAMESPACE
 		cmd_buffer_info.commandPool = cmd_pool;
 		cmd_buffer_info.commandBufferCount = max_frames_in_flight;
 
-		VK_CRASH_CHECK(vkAllocateCommandBuffers(owner.handle, &cmd_buffer_info, cmd_buffers.data()), "Failed to allocate command buffers");
+		VK_CRASH_CHECK(vkAllocateCommandBuffers(device, &cmd_buffer_info, cmd_buffers.data()), "Failed to allocate command buffers");
 
 		for (std::uint32_t i = 0; i < max_frames_in_flight; i++)
 		{
@@ -310,23 +169,23 @@ namespace ENGINE_NAMESPACE
 			VkSemaphoreCreateInfo semaphore_info = {};
 			semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-			VK_CRASH_CHECK(vkCreateSemaphore(owner.handle, &semaphore_info, nullptr, &device_in[i].semaphore),
+			VK_CRASH_CHECK(vkCreateSemaphore(device, &semaphore_info, nullptr, &device_in[i].semaphore),
 				"Failed to create semaphore");
-			VK_CRASH_CHECK(vkCreateSemaphore(owner.handle, &semaphore_info, nullptr, &device_out[i].semaphore),
+			VK_CRASH_CHECK(vkCreateSemaphore(device, &semaphore_info, nullptr, &device_out[i].semaphore),
 				"Failed to create semaphore");
 
 			VkFenceCreateInfo fence_info = {};
 			fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 			fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-			VK_CRASH_CHECK(vkCreateFence(owner.handle, &fence_info, nullptr, &device_in[i].fence), "Failed to create fence");
-			VK_CRASH_CHECK(vkCreateFence(owner.handle, &fence_info, nullptr, &device_out[i].fence), "Failed to create fence");
+			VK_CRASH_CHECK(vkCreateFence(device, &fence_info, nullptr, &device_in[i].fence), "Failed to create fence");
+			VK_CRASH_CHECK(vkCreateFence(device, &fence_info, nullptr, &device_out[i].fence), "Failed to create fence");
 
 			device_in[i].offset = 0;
 		}
 	}
 
-	void device_memory::terminate()
+	void device_memory::terminate(VkDevice device, std::uint8_t current_frame)
 	{
 		for (std::uint8_t i = 0; i < max_frames_in_flight; i++)
 		{
@@ -336,38 +195,38 @@ namespace ENGINE_NAMESPACE
 			sp_pending_copies[i].clear();
 		}
 
-		unmap_ranges(owner->current_frame);
-		for (memory_pool& pool : vertex_pools) pool.free(owner->handle);
+		unmap_ranges(device, current_frame);
+		for (buffer_pool& pool : vertex_pools) pool.free(device);
 		vertex_pools.clear();
-		for (memory_pool& pool : index_pools) pool.free(owner->handle);
+		for (buffer_pool& pool : index_pools) pool.free(device);
 		index_pools.clear();
-		for (memory_pool& pool : uniform_pools) pool.free(owner->handle);
+		for (buffer_pool& pool : uniform_pools) pool.free(device);
 		uniform_pools.clear();
-		for (memory_pool& pool : storage_pools) pool.free(owner->handle);
+		for (buffer_pool& pool : storage_pools) pool.free(device);
 		storage_pools.clear();
-		for (memory_pool& pool : d_vertex_pools) pool.free(owner->handle);
+		for (buffer_pool& pool : d_vertex_pools) pool.free(device);
 		d_vertex_pools.clear();
-		for (memory_pool& pool : d_index_pools) pool.free(owner->handle);
+		for (buffer_pool& pool : d_index_pools) pool.free(device);
 		d_index_pools.clear();
-		for (memory_pool& pool : d_uniform_pools) pool.free(owner->handle);
+		for (buffer_pool& pool : d_uniform_pools) pool.free(device);
 		d_uniform_pools.clear();
-		for (memory_pool& pool : d_storage_pools) pool.free(owner->handle);
+		for (buffer_pool& pool : d_storage_pools) pool.free(device);
 		d_storage_pools.clear();
 
 		for (std::uint32_t i = 0; i < max_frames_in_flight; i++)
 		{
-			vkDestroyBuffer(owner->handle, device_in[i].buffer, nullptr);
-			vkFreeMemory(owner->handle, device_in[i].device, nullptr);
-			vkDestroySemaphore(owner->handle, device_in[i].semaphore, nullptr);
-			vkDestroyFence(owner->handle, device_in[i].fence, nullptr);
+			vkDestroyBuffer(device, device_in[i].buffer, nullptr);
+			vkFreeMemory(device, device_in[i].device, nullptr);
+			vkDestroySemaphore(device, device_in[i].semaphore, nullptr);
+			vkDestroyFence(device, device_in[i].fence, nullptr);
 
-			//vkDestroyBuffer(owner->handle, device_out[i].buffer, nullptr);
-			//vkFreeMemory(owner->handle, device_out[i].device, nullptr);
-			vkDestroySemaphore(owner->handle, device_out[i].semaphore, nullptr);
-			vkDestroyFence(owner->handle, device_out[i].fence, nullptr);
+			//vkDestroyBuffer(device, device_out[i].buffer, nullptr);
+			//vkFreeMemory(device, device_out[i].device, nullptr);
+			vkDestroySemaphore(device, device_out[i].semaphore, nullptr);
+			vkDestroyFence(device, device_out[i].fence, nullptr);
 		}
 
-		vkDestroyCommandPool(owner->handle, cmd_pool, nullptr);
+		vkDestroyCommandPool(device, cmd_pool, nullptr);
 	}
 
 	inline VkBuffer& get_staging_buffer(transfer_memory& memory, std::uint32_t idx)
@@ -382,7 +241,7 @@ namespace ENGINE_NAMESPACE
 		memory.offset = 0;
 	}
 
-	void device_memory::flush_in(const std::uint8_t current_frame)
+	void device_memory::flush_in(VkDevice device, VkQueue transfer_queue, std::uint8_t current_frame)
 	{
 		transfer_memory& memory = device_in[current_frame];
 		//TODO: if not host coherent...
@@ -400,25 +259,25 @@ namespace ENGINE_NAMESPACE
 			for (auto copy_details : vp_pending_copies[current_frame])
 			{
 				vkCmdCopyBuffer(cmd_buffers[current_frame], get_staging_buffer(memory, copy_details.first.first),
-					vertex_pools[copy_details.first.second].get_buffer(), static_cast<std::uint32_t>(copy_details.second.size()),
+					vertex_pools[copy_details.first.second].buffer(), static_cast<std::uint32_t>(copy_details.second.size()),
 					copy_details.second.data());
 			}
 			for (auto copy_details : ip_pending_copies[current_frame])
 			{
 				vkCmdCopyBuffer(cmd_buffers[current_frame], get_staging_buffer(memory, copy_details.first.first),
-					index_pools[copy_details.first.second].get_buffer(), static_cast<std::uint32_t>(copy_details.second.size()),
+					index_pools[copy_details.first.second].buffer(), static_cast<std::uint32_t>(copy_details.second.size()),
 					copy_details.second.data());
 			}
 			for (auto copy_details : up_pending_copies[current_frame])
 			{
 				vkCmdCopyBuffer(cmd_buffers[current_frame], get_staging_buffer(memory, copy_details.first.first),
-					uniform_pools[copy_details.first.second].get_buffer(), static_cast<std::uint32_t>(copy_details.second.size()),
+					uniform_pools[copy_details.first.second].buffer(), static_cast<std::uint32_t>(copy_details.second.size()),
 					copy_details.second.data());
 			}
 			for (auto copy_details : sp_pending_copies[current_frame])
 			{
 				vkCmdCopyBuffer(cmd_buffers[current_frame], get_staging_buffer(memory, copy_details.first.first),
-					storage_pools[copy_details.first.second].get_buffer(), static_cast<std::uint32_t>(copy_details.second.size()),
+					storage_pools[copy_details.first.second].buffer(), static_cast<std::uint32_t>(copy_details.second.size()),
 					copy_details.second.data());
 			}
 
@@ -434,72 +293,36 @@ namespace ENGINE_NAMESPACE
 		submit_info.signalSemaphoreCount = 1;
 		submit_info.pSignalSemaphores = &memory.semaphore;
 
-		vkResetFences(owner->handle, 1, &memory.fence);
-		vkQueueSubmit(owner->transfer_queue, 1, &submit_info, memory.fence);
+		vkResetFences(device, 1, &memory.fence);
+		vkQueueSubmit(transfer_queue, 1, &submit_info, memory.fence);
 
 		memory.offset = 0;
 	}
 
-	void device_memory::map_ranges(const std::uint8_t current_frame)
+	void device_memory::map_ranges(VkDevice device, std::uint8_t current_frame)
 	{
-		VK_CRASH_CHECK(vkMapMemory(owner->handle, device_in[current_frame].device, 0, VK_WHOLE_SIZE, 0, &device_in[current_frame].host),
+		VK_CRASH_CHECK(vkMapMemory(device, device_in[current_frame].device, 0, VK_WHOLE_SIZE, 0, &device_in[current_frame].host),
 			"Failed to map memory");
 
-		for (dynamic_memory_pool& pool : d_vertex_pools)
-		{
-			VK_CRASH_CHECK(vkMapMemory(owner->handle, pool.get_memory(), pool.get_size() * current_frame, pool.get_size(), 0, &pool.host_ptr),
-				"Failed to map memory");
-		}
-		for (dynamic_memory_pool& pool : d_index_pools)
-		{
-			VK_CRASH_CHECK(vkMapMemory(owner->handle, pool.get_memory(), pool.get_size() * current_frame, pool.get_size(), 0, &pool.host_ptr),
-				"Failed to map memory");
-		}
-		for (dynamic_memory_pool& pool : d_uniform_pools)
-		{
-			VK_CRASH_CHECK(vkMapMemory(owner->handle, pool.get_memory(), pool.get_size() * current_frame, pool.get_size(), 0, &pool.host_ptr),
-				"Failed to map memory");
-		}
-		for (dynamic_memory_pool& pool : d_storage_pools)
-		{
-			VK_CRASH_CHECK(vkMapMemory(owner->handle, pool.get_memory(), pool.get_size() * current_frame, pool.get_size(), 0, &pool.host_ptr),
-				"Failed to map memory");
-		}
+		for (dynamic_buffer_pool& pool : d_vertex_pools)	pool.map(device, current_frame);
+		for (dynamic_buffer_pool& pool : d_index_pools)		pool.map(device, current_frame);
+		for (dynamic_buffer_pool& pool : d_uniform_pools)	pool.map(device, current_frame);
+		for (dynamic_buffer_pool& pool : d_storage_pools)	pool.map(device, current_frame);
 	}
 
-	void device_memory::unmap_ranges(const std::uint8_t current_frame)
+	void device_memory::unmap_ranges(VkDevice device, std::uint8_t current_frame)
 	{
-		vkUnmapMemory(owner->handle, device_in[current_frame].device);
+		vkUnmapMemory(device, device_in[current_frame].device);
 
-		for (dynamic_memory_pool& pool : d_vertex_pools)
-		{
-			INTERNAL_ASSERT(pool.host_ptr != nullptr, "Memmory not mapped");
-			vkUnmapMemory(owner->handle, pool.get_memory());
-			pool.host_ptr = nullptr;
-		}
-		for (dynamic_memory_pool& pool : d_index_pools)
-		{
-			INTERNAL_ASSERT(pool.host_ptr != nullptr, "Memmory not mapped");
-			vkUnmapMemory(owner->handle, pool.get_memory());
-			pool.host_ptr = nullptr;
-		}
-		for (dynamic_memory_pool& pool : d_uniform_pools)
-		{
-			INTERNAL_ASSERT(pool.host_ptr != nullptr, "Memmory not mapped");
-			vkUnmapMemory(owner->handle, pool.get_memory());
-			pool.host_ptr = nullptr;
-		}
-		for (dynamic_memory_pool& pool : d_storage_pools)
-		{
-			INTERNAL_ASSERT(pool.host_ptr != nullptr, "Memmory not mapped");
-			vkUnmapMemory(owner->handle, pool.get_memory());
-			pool.host_ptr = nullptr;
-		}
+		for (dynamic_buffer_pool& pool : d_vertex_pools)	pool.unmap(device);
+		for (dynamic_buffer_pool& pool : d_index_pools)		pool.unmap(device);
+		for (dynamic_buffer_pool& pool : d_uniform_pools)	pool.unmap(device);
+		for (dynamic_buffer_pool& pool : d_storage_pools)	pool.unmap(device);
 	}
 
-	void device_memory::synchronize(const std::uint8_t current_frame)
+	void device_memory::synchronize(VkDevice device, std::uint8_t current_frame)
 	{
-		vkWaitForFences(owner->handle, 1, &device_in[current_frame].fence, VK_TRUE, std::numeric_limits<std::uint64_t>::max());
+		vkWaitForFences(device, 1, &device_in[current_frame].fence, VK_TRUE, std::numeric_limits<std::uint64_t>::max());
 	}
 
 	memory_ref device_memory::alloc_vertices(const VkDeviceSize size) { return alloc<VERTEX, main_heap>(size); }
@@ -553,36 +376,29 @@ namespace ENGINE_NAMESPACE
 	void device_memory::memcpy_storage(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset)
 	{ this->memcpy<STORAGE>(ref, data, size, offset); }
 
-	void device_memory::get_vertex_map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept
-	{ get_map<VERTEX>(ref, out_map_ptr, out_offset); }
-	void device_memory::get_index_map(const memory_ref & ref, void*** out_map_ptr, std::size_t * out_offset) noexcept
-	{ get_map<INDEX>(ref, out_map_ptr, out_offset); }
-	void device_memory::get_uniform_map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept
-	{ get_map<UNIFORM>(ref, out_map_ptr, out_offset); }
-	void device_memory::get_storage_map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept
-	{ get_map<STORAGE>(ref, out_map_ptr, out_offset); }
+	void device_memory::vertex_map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept
+	{ map<VERTEX>(ref, out_map_ptr, out_offset); }
+	void device_memory::index_map(const memory_ref & ref, void*** out_map_ptr, std::size_t * out_offset) noexcept
+	{ map<INDEX>(ref, out_map_ptr, out_offset); }
+	void device_memory::uniform_map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept
+	{ map<UNIFORM>(ref, out_map_ptr, out_offset); }
+	void device_memory::storage_map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept
+	{ map<STORAGE>(ref, out_map_ptr, out_offset); }
 
-	buffer_binding_args device_memory::get_binding_args(const mesh& object) noexcept
-	{ return get_binding_args<VERTEX>(object); }
-	buffer_binding_args device_memory::get_binding_args(const uniform& uniform) noexcept
-	{ return get_dynamic_binding_args<UNIFORM>(uniform); }
-	buffer_binding_args device_memory::get_binding_args(const unmapped_uniform& uniform) noexcept
-	{ return get_binding_args<UNIFORM>(uniform); }
-	buffer_binding_args device_memory::get_binding_args(const storage_array& array) noexcept
-	{ return get_binding_args<STORAGE>(array); }
-	buffer_binding_args device_memory::get_binding_args(const dynamic_storage_array& array) noexcept
-	{ return get_dynamic_binding_args<STORAGE>(array); }
-	buffer_binding_args device_memory::get_binding_args(const storage_vector& vector) noexcept
-	{ return get_binding_args<STORAGE>(vector); }
-	buffer_binding_args device_memory::get_binding_args(const dynamic_storage_vector& vector) noexcept
-	{ return get_dynamic_binding_args<STORAGE>(vector); }
-
-	template<device_memory::buffer_t BType> inline VkDeviceSize device_memory::offset_alignment() const noexcept 
-	{ return 0; }
-	template<> inline VkDeviceSize device_memory::offset_alignment<device_memory::UNIFORM>() const noexcept
-	{ return owner->properties.limits.minUniformBufferOffsetAlignment; }
-	template<> inline VkDeviceSize device_memory::offset_alignment<device_memory::STORAGE>() const noexcept
-	{ return owner->properties.limits.minStorageBufferOffsetAlignment; }
+	buffer_binding_args device_memory::binding_args(const mesh& object) noexcept
+	{ return binding_args<VERTEX>(object); }
+	buffer_binding_args device_memory::binding_args(const uniform& uniform) noexcept
+	{ return dynamic_binding_args<UNIFORM>(uniform); }
+	buffer_binding_args device_memory::binding_args(const unmapped_uniform& uniform) noexcept
+	{ return binding_args<UNIFORM>(uniform); }
+	buffer_binding_args device_memory::binding_args(const storage_array& array) noexcept
+	{ return binding_args<STORAGE>(array); }
+	buffer_binding_args device_memory::binding_args(const dynamic_storage_array& array) noexcept
+	{ return dynamic_binding_args<STORAGE>(array); }
+	buffer_binding_args device_memory::binding_args(const storage_vector& vector) noexcept
+	{ return binding_args<STORAGE>(vector); }
+	buffer_binding_args device_memory::binding_args(const dynamic_storage_vector& vector) noexcept
+	{ return dynamic_binding_args<STORAGE>(vector); }
 
 	std::uint32_t device_memory::find_memory_type(std::uint32_t type_filter, VkMemoryPropertyFlags properties)
 	{
@@ -610,7 +426,7 @@ namespace ENGINE_NAMESPACE
 		LOG_INTERNAL_ERROR("Failed to find suitable memory type. Type bit mask: "
 			<< std::bitset<sizeof(type_filter) * 8>(type_filter) << " Property flags: "
 			<< std::bitset<sizeof(properties) * 8>(properties));
-		return std::numeric_limits<uint32_t>::max();
+		return std::numeric_limits<std::uint32_t>::max();
 	}
 
 	void device_memory::alloc_buffer(VkDeviceMemory& memory, VkBuffer& buffer, VkDeviceSize size, 
@@ -622,47 +438,44 @@ namespace ENGINE_NAMESPACE
 		buffer_info.usage = usage;
 		buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-		VK_CRASH_CHECK(vkCreateBuffer(owner->handle, &buffer_info, nullptr, &buffer), "Failed to create buffer");
+		VK_CRASH_CHECK(vkCreateBuffer(radd.device, &buffer_info, nullptr, &buffer), "Failed to create buffer");
 
 		VkMemoryRequirements memory_requirements;
-		vkGetBufferMemoryRequirements(owner->handle, buffer, &memory_requirements);
+		vkGetBufferMemoryRequirements(radd.device, buffer, &memory_requirements);
 
 		VkMemoryAllocateInfo memory_info = {};
 		memory_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		memory_info.allocationSize = memory_requirements.size;
 		memory_info.memoryTypeIndex = find_memory_type(memory_requirements.memoryTypeBits, properties);
 
-		VK_CRASH_CHECK(vkAllocateMemory(owner->handle, &memory_info, nullptr, &memory), "Failed to allocate device memory");
+		VK_CRASH_CHECK(vkAllocateMemory(radd.device, &memory_info, nullptr, &memory), "Failed to allocate device memory");
 
-		vkBindBufferMemory(owner->handle, buffer, memory, 0);
+		vkBindBufferMemory(radd.device, buffer, memory, 0);
 	}
 
-	template<typename Pool>
-	inline bool search_pools(std::vector<Pool>& pools, const VkDeviceSize size, VkDeviceSize alignment,
-		std::uint32_t* out_pool_idx, std::uint32_t* out_slot_idx, VkDeviceSize* out_size_needed)
+	void alloc_image()
 	{
-		static_assert(std::is_same<Pool, memory_pool>::value || std::is_same<Pool, dynamic_memory_pool>::value, 
-			"Invalid pool type");
+		VkImageCreateInfo image_info = {};
+		image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		image_info.pNext = nullptr;
+		image_info.flags;
+		image_info.imageType;
+		image_info.format;
+		image_info.extent;
+		image_info.mipLevels;
+		image_info.arrayLayers;
+		image_info.samples;
+		image_info.tiling;
+		image_info.usage;
+		image_info.sharingMode;
+		image_info.queueFamilyIndexCount;
+		image_info.pQueueFamilyIndices;
+		image_info.initialLayout;
 
-		std::uint32_t selected_pool_idx = 0;
-		std::uint32_t selected_slot_idx = std::numeric_limits<std::uint32_t>::max();
-		for (memory_pool& pool : pools)
-		{
-			if (pool.search(size, alignment, &selected_slot_idx, out_size_needed)) break;
-			selected_pool_idx++;
-		}
-		*out_pool_idx = selected_pool_idx;
-		if (selected_slot_idx == std::numeric_limits<std::uint32_t>::max())
-		{
-			*out_slot_idx = 0;
-			*out_size_needed = size;
-			return false;
-		}
-		else
-		{
-			*out_slot_idx = selected_slot_idx;
-			return true;
-		}
+		VkMemoryRequirements memory_requirements;
+		//vkGetImageMemoryRequirements(radd.device, image, &memory_requirements);
+
+		//vkBindImageMemory(radd.device, image, memory, 0);
 	}
 	
 	template<device_memory::buffer_t BType, VkMemoryPropertyFlags MFlags>
@@ -672,14 +485,14 @@ namespace ENGINE_NAMESPACE
 		const VkDeviceSize alignment = offset_alignment<BType>();
 		std::vector<pool_t>* pools;
 		VkDeviceSize pool_size;
-		if constexpr (std::is_same<pool_t, memory_pool>::value)
+		if constexpr (std::is_same<pool_t, buffer_pool>::value)
 		{
-			pools = &get_pools<BType>();
+			pools = &static_pools<BType>();
 			pool_size = buffer<BType>::size;
 		}
 		else
 		{
-			pools = &get_dynamic_pools<BType>();
+			pools = &dynamic_pools<BType>();
 			pool_size = buffer<BType>::dynamic_size;
 		}
 
@@ -694,19 +507,18 @@ namespace ENGINE_NAMESPACE
 				//TODO increase pool_size
 			}
 
-			if constexpr (std::is_same<pool_t, memory_pool>::value)
+			if constexpr (std::is_same<pool_t, buffer_pool>::value)
 			{
-				pools->push_back(memory_pool(owner->handle, pool_size));
-				alloc_buffer(pools->back().get_memory(), pools->back().get_buffer(), pool_size, buffer<BType>::usage, MFlags);
+				pools->push_back(buffer_pool(radd.device, pool_size));
+				alloc_buffer(pools->back().memory(), pools->back().buffer(), pool_size, buffer<BType>::usage, MFlags);
 			}
 			else
 			{
-				pools->push_back(dynamic_memory_pool(owner->handle, pool_size));
-				alloc_buffer(pools->back().get_memory(), pools->back().get_buffer(), pool_size * max_frames_in_flight,
+				pools->push_back(dynamic_buffer_pool(radd.device, pool_size));
+				alloc_buffer(pools->back().memory(), pools->back().buffer(), pool_size * max_frames_in_flight,
 					buffer<BType>::dynamic_usage, MFlags);
 				pool_t& pool = (*pools)[selected_pool_idx];
-				vkMapMemory(owner->handle, pool.get_memory(), pool.get_size() * owner->current_frame, pool.get_size(), 
-					0, &pool.host_ptr);
+				pool.map(radd.device, *radd.current_frame);
 			}
 		}
 
@@ -715,42 +527,9 @@ namespace ENGINE_NAMESPACE
 		*out_slot_idx = selected_slot_idx;
 		LOGF_INTERNAL_INFO("Allocated {0} bytes in slot {1} (offset {2}->{3}) of pool {4} {5}", 
 			size, selected_slot_idx, 
-			(*pools)[selected_pool_idx].get_slot(selected_slot_idx).offset,
-			aligned_offset((*pools)[selected_pool_idx].get_slot(selected_slot_idx).offset, alignment),
+			(*pools)[selected_pool_idx][selected_slot_idx].offset,
+			aligned_offset((*pools)[selected_pool_idx][selected_slot_idx].offset, alignment),
 			buffer<BType>::debug_name, selected_pool_idx);
-	}
-
-	//TODO change or add version that takes memory ref as argument
-	template<device_memory::buffer_t BType>
-	inline void device_memory::submit_upload(std::uint32_t pool_idx, VkDeviceSize offset, const void* data, const VkDeviceSize size)
-	{
-		transfer_memory* memory_ptr = &device_in[owner->current_frame];
-		std::uint32_t transfer_idx = 0;
-		if (memory_ptr->offset + size > staging_buffer_size)
-		{
-			//TODO: add new tranfer memory to "memory", then update "memory_ptr" and "transfer_idx"
-			//call submit_upload recursively, copy large blocks of memory in chunks
-		}
-
-		memory_pool& pool = get_pools<BType>()[pool_idx];
-		VkBufferCopy info = {};
-		info.srcOffset = memory_ptr->offset;
-		info.dstOffset = offset;
-		info.size = size;
-
-		std::memcpy(reinterpret_cast<char*>(memory_ptr->host) + memory_ptr->offset, data, size);
-
-		get_pending_copies<BType>(owner->current_frame)[copy_path_t(transfer_idx, pool_idx)].push_back(info);
-		memory_ptr->offset += size;
-	}
-
-	template<device_memory::buffer_t BType>
-	inline void device_memory::memcpy(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset)
-	{
-		const mem_ref_internal& int_ref = reinterpret_cast<const mem_ref_internal&>(ref);
-		std::vector<dynamic_memory_pool>& pools = get_dynamic_pools<BType>();
-		INTERNAL_ASSERT(int_ref.offset + offset + size <= int_ref.size, "Out of bounds memory access");
-		std::memcpy(reinterpret_cast<std::byte*>(pools[int_ref.pool].host_ptr) + int_ref.offset + offset, data, size);
 	}
 
 	template<device_memory::buffer_t BType, VkMemoryPropertyFlags MFlags>
@@ -762,15 +541,15 @@ namespace ENGINE_NAMESPACE
 		std::uint32_t selected_slot_idx = std::numeric_limits<std::uint32_t>::max();
 
 		alloc_slot<BType, MFlags>(&selected_pool_idx, &selected_slot_idx, size);
-		if constexpr (std::is_same<pool_t, memory_pool>::value)
+		if constexpr (std::is_same<pool_t, buffer_pool>::value)
 		{
 			return mem_ref_internal(BType, selected_pool_idx, 
-				get_pools<BType>()[selected_pool_idx].get_slot(selected_slot_idx).offset, size);
+				static_pools<BType>()[selected_pool_idx][selected_slot_idx].offset, size);
 		}
 		else
 		{
-			dynamic_memory_pool& pool = get_dynamic_pools<BType>()[selected_pool_idx];
-			return mem_ref_internal(BType, selected_pool_idx, pool.get_slot(selected_slot_idx).offset, size);
+			dynamic_buffer_pool& pool = dynamic_pools<BType>()[selected_pool_idx];
+			return mem_ref_internal(BType, selected_pool_idx, pool[selected_slot_idx].offset, size);
 		}
 	}
 
@@ -783,54 +562,87 @@ namespace ENGINE_NAMESPACE
 		std::uint32_t selected_slot_idx = std::numeric_limits<std::uint32_t>::max();
 
 		alloc_slot<BType, MFlags>(&selected_pool_idx, &selected_slot_idx, size);
-		if constexpr (std::is_same<pool_t, memory_pool>::value)
+		if constexpr (std::is_same<pool_t, buffer_pool>::value)
 		{
-			const memory_slot& slot = get_pools<BType>()[selected_pool_idx].get_slot(selected_slot_idx);
+			const memory_slot& slot = static_pools<BType>()[selected_pool_idx][selected_slot_idx];
 			submit_upload<BType>(selected_pool_idx, slot.offset, data, size);
 			return mem_ref_internal(BType, selected_pool_idx, slot.offset, size);
 		}
 		else
 		{
-			dynamic_memory_pool& pool = get_dynamic_pools<BType>()[selected_pool_idx];
-			mem_ref_internal ref(BType, selected_pool_idx, pool.get_slot(selected_slot_idx).offset, size);
+			dynamic_buffer_pool& pool = dynamic_pools<BType>()[selected_pool_idx];
+			mem_ref_internal ref(BType, selected_pool_idx, pool[selected_slot_idx].offset, size);
 			this->memcpy<BType>(ref, data, size, 0);
 			return std::move(ref);
 		}
 	}
 
+	//TODO change or add version that takes memory ref as argument
 	template<device_memory::buffer_t BType>
-	void device_memory::get_map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept
+	inline void device_memory::submit_upload(std::uint32_t pool_idx, VkDeviceSize offset, const void* data, const VkDeviceSize size)
+	{
+		transfer_memory* memory_ptr = &device_in[*radd.current_frame];
+		std::uint32_t transfer_idx = 0;
+		if (memory_ptr->offset + size > staging_buffer_size)
+		{
+			//TODO: add new tranfer memory to "memory", then update "memory_ptr" and "transfer_idx"
+			//call submit_upload recursively, copy large blocks of memory in chunks
+		}
+
+		buffer_pool& pool = static_pools<BType>()[pool_idx];
+		VkBufferCopy info = {};
+		info.srcOffset = memory_ptr->offset;
+		info.dstOffset = offset;
+		info.size = size;
+
+		std::memcpy(reinterpret_cast<char*>(memory_ptr->host) + memory_ptr->offset, data, size);
+
+		pending_copies<BType>(*radd.current_frame)[copy_path_t(transfer_idx, pool_idx)].push_back(info);
+		memory_ptr->offset += size;
+	}
+
+	template<device_memory::buffer_t BType>
+	inline void device_memory::memcpy(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset)
+	{
+		const mem_ref_internal& int_ref = reinterpret_cast<const mem_ref_internal&>(ref);
+		std::vector<dynamic_buffer_pool>& pools = dynamic_pools<BType>();
+		INTERNAL_ASSERT(int_ref.offset + offset + size <= int_ref.size, "Out of bounds memory access");
+		std::memcpy(reinterpret_cast<std::byte*>(pools[int_ref.pool].host_ptr()) + int_ref.offset + offset, data, size);
+	}
+
+	template<device_memory::buffer_t BType>
+	void device_memory::map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept
 	{
 		const mem_ref_internal& int_ref = reinterpret_cast<const mem_ref_internal&>(ref);
 		*out_offset = aligned_offset(int_ref.offset, offset_alignment<BType>());
-		*out_map_ptr = &get_dynamic_pools<BType>()[int_ref.pool].host_ptr;
+		*out_map_ptr = &dynamic_pools<BType>()[int_ref.pool].host_ptr();
 	}
 
-	buffer_binding_args device_memory::get_index_binding_args(const mesh& object) noexcept
+	buffer_binding_args device_memory::index_binding_args(const mesh& object) noexcept
 	{
 		const mem_ref_internal& ref
 			= reinterpret_cast<const mem_ref_internal&>(reinterpret_cast<const mesh_internal&>(object).index_ref);
 		INTERNAL_ASSERT(ref.valid(), "Invalid memory reference");
-		return { index_pools[ref.pool].get_buffer(), index_pools[ref.pool].get_size(), ref.offset, ref.size };
+		return { index_pools[ref.pool].buffer(), index_pools[ref.pool].size(), ref.offset, ref.size };
 	}
 
 	template<device_memory::buffer_t BType>
-	buffer_binding_args device_memory::get_binding_args(const resource& resource) noexcept
+	buffer_binding_args device_memory::binding_args(const resource& resource) noexcept
 	{
 		const mem_ref_internal& ref
 			= reinterpret_cast<const mem_ref_internal&>(reinterpret_cast<const resource_internal&>(resource).ref);
 		INTERNAL_ASSERT(ref.valid(), "Invalid memory reference");
-		return { get_pools<BType>()[ref.pool].get_buffer(), 0, aligned_offset(ref.offset, offset_alignment<BType>()), 
+		return { static_pools<BType>()[ref.pool].buffer(), 0, aligned_offset(ref.offset, offset_alignment<BType>()), 
 			ref.size };
 	}
 
 	template<device_memory::buffer_t BType>
-	buffer_binding_args device_memory::get_dynamic_binding_args(const resource& resource) noexcept
+	buffer_binding_args device_memory::dynamic_binding_args(const resource& resource) noexcept
 	{
 		const mem_ref_internal& ref
 			= reinterpret_cast<const mem_ref_internal&>(reinterpret_cast<const resource_internal&>(resource).ref);
 		INTERNAL_ASSERT(ref.valid(), "Invalid memory reference");
-		dynamic_memory_pool& pool = get_dynamic_pools<BType>()[ref.pool];
-		return { pool.get_buffer(), pool.get_size(), aligned_offset(ref.offset, offset_alignment<BType>()), ref.size };
+		dynamic_buffer_pool& pool = dynamic_pools<BType>()[ref.pool];
+		return { pool.buffer(), pool.size(), aligned_offset(ref.offset, offset_alignment<BType>()), ref.size };
 	}
 }
