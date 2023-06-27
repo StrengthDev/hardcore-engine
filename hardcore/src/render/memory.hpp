@@ -47,7 +47,7 @@ namespace ENGINE_NAMESPACE
 
 		device_memory(device_memory&& other) noexcept :
 			radd(std::exchange(other.radd, {})),
-			mem_properties(std::exchange(other.mem_properties, {})),
+			heap_manager(std::move(other.heap_manager)),
 			cmd_pool(std::exchange(other.cmd_pool, VK_NULL_HANDLE)), cmd_buffers(std::move(other.cmd_buffers)),
 			device_in(std::move(other.device_in)), device_out(std::move(other.device_out)),
 			vertex_pools(std::move(other.vertex_pools)), index_pools(std::move(other.index_pools)),
@@ -121,6 +121,7 @@ namespace ENGINE_NAMESPACE
 			INDEX,
 			UNIFORM,
 			STORAGE,
+			UNIVERSAL, //writable
 			NONE,
 		};
 
@@ -149,6 +150,7 @@ namespace ENGINE_NAMESPACE
 		template<> inline std::vector<buffer_pool>& static_pools<INDEX>() noexcept { return index_pools; }
 		template<> inline std::vector<buffer_pool>& static_pools<UNIFORM>() noexcept { return uniform_pools; }
 		template<> inline std::vector<buffer_pool>& static_pools<STORAGE>() noexcept { return storage_pools; }
+		template<> inline std::vector<buffer_pool>& static_pools<UNIVERSAL>() noexcept { return writable_pools; }
 
 		template<buffer_t BType>
 		inline std::vector<dynamic_buffer_pool>& dynamic_pools() 
@@ -177,23 +179,17 @@ namespace ENGINE_NAMESPACE
 		template<buffer_t BType> inline VkDeviceSize offset_alignment() const noexcept
 		{ return 0; }
 		template<> inline VkDeviceSize offset_alignment<device_memory::UNIFORM>() const noexcept
-		{ return (*radd.limits).minUniformBufferOffsetAlignment; }
+		{ return radd.limits->minUniformBufferOffsetAlignment; }
 		template<> inline VkDeviceSize offset_alignment<device_memory::STORAGE>() const noexcept
-		{ return (*radd.limits).minStorageBufferOffsetAlignment; }
+		{ return radd.limits->minStorageBufferOffsetAlignment; }
+		template<> inline VkDeviceSize offset_alignment<device_memory::UNIVERSAL>() const noexcept
+		{ return radd.limits->minStorageBufferOffsetAlignment; }
 
-		std::uint32_t find_memory_type(std::uint32_t type_filter, VkMemoryPropertyFlags properties);
+		template<buffer_t BType, bool Dynamic>
+		memory_ref alloc_buffer(VkDeviceSize size);
 
-		void alloc_buffer(VkDeviceMemory& memory, VkBuffer& buffer, VkDeviceSize size, 
-			VkBufferUsageFlags usage, VkMemoryPropertyFlags properties);
-
-		template<buffer_t BType, VkMemoryPropertyFlags MFlags>
-		void alloc_slot(std::uint32_t* out_pool_idx, std::uint32_t* out_slot_idx, VkDeviceSize size);
-
-		template<buffer_t BType, VkMemoryPropertyFlags MFlags>
-		memory_ref alloc(const VkDeviceSize size);
-
-		template<buffer_t BType, VkMemoryPropertyFlags MFlags>
-		memory_ref alloc(const void* data, const VkDeviceSize size);
+		template<buffer_t BType, bool Dynamic>
+		memory_ref alloc_buffer(const void* data, VkDeviceSize size);
 
 		template<buffer_t BType>
 		void submit_upload(std::uint32_t pool_idx, VkDeviceSize offset, const void* data, const VkDeviceSize size);
@@ -209,9 +205,12 @@ namespace ENGINE_NAMESPACE
 		template<buffer_t BType>
 		buffer_binding_args dynamic_binding_args(const resource&) noexcept;
 
+		template<bool Dynamic>
+		memory_ref alloc_texture(VkDeviceSize size);
+
 		random_access_device_data radd;
 
-		VkPhysicalDeviceMemoryProperties mem_properties = {};
+		device_heap_manager heap_manager;
 
 		VkCommandPool cmd_pool = VK_NULL_HANDLE;
 		std::array<VkCommandBuffer, max_frames_in_flight> cmd_buffers;
@@ -239,7 +238,9 @@ namespace ENGINE_NAMESPACE
 		std::vector<dynamic_buffer_pool> d_uniform_pools;
 		std::vector<dynamic_buffer_pool> d_storage_pools;
 
-		std::array<pending_copies_t, max_frames_in_flight> vp_pending_copies;
+		std::vector<std::vector<texture_pool>> texture_pools;
+
+		std::array<pending_copies_t, max_frames_in_flight> vp_pending_copies; //TODO only 1 pending copies is needed
 		std::array<pending_copies_t, max_frames_in_flight> ip_pending_copies;
 		std::array<pending_copies_t, max_frames_in_flight> up_pending_copies;
 		std::array<pending_copies_t, max_frames_in_flight> sp_pending_copies;

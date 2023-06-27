@@ -351,7 +351,11 @@ namespace ENGINE_NAMESPACE
 			std::size_t descriptor_stride = 0;
 
 			void* object_data = nullptr;
-			buffer_binding_args* object_descriptor_data = nullptr; //bindings are only used when updating descriptors, so its seperate
+			
+			//bindings are only used when updating descriptors, so theyre stored in a seperate buffer
+			buffer_binding_args* object_descriptor_data = nullptr;
+			
+			//smp is a temporary object used for swapping, it is part of the class to avoid allocating memory with every swap
 			void* smp = nullptr;
 
 			static const std::size_t element_base_size = sizeof(base_object);
@@ -360,7 +364,7 @@ namespace ENGINE_NAMESPACE
 		using task_properties = object_vector::properties_t;
 		typedef object_vector::offset_t dynamic_offset_t;
 
-		std::unordered_map<std::size_t, std::size_t> object_refs;
+		std::unordered_map<std::size_t, std::size_t> object_refs; //TODO change key to memory_ref to avoid collisions
 		object_vector objects;
 
 		std::vector<buffer_binding_args> cached_object_bindings;
@@ -375,15 +379,15 @@ namespace ENGINE_NAMESPACE
 			switch (type)
 			{
 			case VK_DESCRIPTOR_TYPE_SAMPLER:						return "Sampler";
-			case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:			return "Image Smapler";
+			case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:			return "Image sampler";
 			case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:					return "Sampled image";
 			case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:					return "Storage image";
 			case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:			return "Texel uniform";
 			case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:			return "Texel storage";
 			case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:					return "Uniform";
-			case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:					return "Storage array/vector";
+			case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:					return "Storage";
 			case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:			return "Dynamic uniform";
-			case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:			return "Dynamic storage array/vector";
+			case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:			return "Dynamic storage";
 			case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:				return "Input attachment";
 			case VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT:		return "Inline uniform";
 			case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:		return "Acceleration structure";
