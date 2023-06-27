@@ -33,4 +33,4 @@ const bool enable_validation_layers = true;
 	}															\
 }
 
-const uint8_t max_frames_in_flight = 2;
+const std::uint8_t max_frames_in_flight = 2;

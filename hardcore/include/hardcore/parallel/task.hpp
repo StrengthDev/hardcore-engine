@@ -55,7 +55,7 @@ namespace ENGINE_NAMESPACE
 		 * @return std::future object which will contain the result of the function once it has been executed.
 		*/
 		template<typename Type>
-		inline std::future<Type> immediate_async(func_t<Type> task)
+		inline [[nodiscard("Task result should be checked")]] std::future<Type> immediate_async(func_t<Type> task)
 		{
 			std::promise<Type>* promise = new std::promise<Type>();
 			func_t<Type>* func = new func_t<Type>(std::move(task));
@@ -70,7 +70,7 @@ namespace ENGINE_NAMESPACE
 		 * @return std::future object which will contain the result of the function once it has been executed.
 		*/
 		template<typename Type>
-		inline std::future<Type> background_async(func_t<Type> task)
+		inline [[nodiscard("Task result should be checked")]]  std::future<Type> background_async(func_t<Type> task)
 		{
 			std::promise<Type>* promise = new std::promise<Type>();
 			func_t<Type>* func = new func_t<Type>(std::move(task));

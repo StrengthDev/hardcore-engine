@@ -1,6 +1,7 @@
 #pragma once
 
 #include "render_core.hpp"
+#include "device_heap_manager.hpp"
 
 namespace ENGINE_NAMESPACE
 {
@@ -15,13 +16,12 @@ namespace ENGINE_NAMESPACE
 	{
 	public:
 		memory_pool() = default;
-		memory_pool(VkDevice device, VkDeviceSize size);
 		~memory_pool();
 
-		void free(VkDevice device);
+		void free(VkDevice device, device_heap_manager& heap_manager);
 
 		bool search(VkDeviceSize size, VkDeviceSize alignment, 
-			std::uint32_t* out_slot_idx, VkDeviceSize* out_size_needed);
+			std::uint32_t* out_slot_idx, VkDeviceSize* out_size_needed) const;
 		void fill_slot(std::uint32_t slot_idx, VkDeviceSize size);
 
 		memory_pool(const memory_pool&) = delete;
@@ -43,13 +43,16 @@ namespace ENGINE_NAMESPACE
 			slots = std::exchange(other.slots, nullptr);
 			n_slots = std::exchange(other.n_slots, 0);
 			largest_free_slot = std::exchange(other.largest_free_slot, 0);
+			return *this;
 		}
 
-		inline VkDeviceMemory& memory() noexcept { return _memory; }
+		//inline VkDeviceMemory& memory() noexcept { return _memory; }
 		inline VkDeviceSize size() const noexcept { return _size; }
 		inline const memory_slot& operator[](std::uint32_t idx) const noexcept { return slots[idx]; }
 
 	protected:
+		memory_pool(VkDeviceSize size, bool per_frame_allocation = false);
+
 		virtual void realloc_slots(std::uint32_t new_count) = 0;
 		virtual void move_slots(std::uint32_t dst, std::uint32_t src, std::uint32_t count) = 0;
 
@@ -58,16 +61,21 @@ namespace ENGINE_NAMESPACE
 
 		memory_slot* slots = nullptr;
 		std::uint32_t n_slots = 0;
-		std::uint32_t largest_free_slot = 0;
+
+		mutable std::uint32_t largest_free_slot = 0;
+
+		bool per_frame_allocation = false;
 	};
 
 	class buffer_pool : public memory_pool
 	{
 	public:
 		buffer_pool() = default;
-		buffer_pool(VkDevice device, VkDeviceSize size) : memory_pool(device, size) {}
+		buffer_pool(VkDevice device, device_heap_manager& heap_manager,
+			VkDeviceSize size, VkBufferUsageFlags usage, device_heap_manager::heap h,
+			bool per_frame_allocation = false);
 
-		void buffer_pool::free(VkDevice device);
+		void buffer_pool::free(VkDevice device, device_heap_manager& heap_manager);
 
 		buffer_pool(buffer_pool&& other) noexcept :
 			memory_pool(std::move(other)),
@@ -78,6 +86,7 @@ namespace ENGINE_NAMESPACE
 		{
 			memory_pool::operator=(std::move(other));
 			_buffer = std::exchange(other._buffer, VK_NULL_HANDLE);
+			return *this;
 		}
 
 		inline VkBuffer& buffer() noexcept { return _buffer; }
@@ -93,7 +102,10 @@ namespace ENGINE_NAMESPACE
 	{
 	public:
 		dynamic_buffer_pool() = default;
-		dynamic_buffer_pool(VkDevice device, VkDeviceSize size) : buffer_pool(device, size), _host_ptr(nullptr) {}
+		dynamic_buffer_pool(VkDevice device, device_heap_manager& heap_manager,
+			VkDeviceSize size, VkBufferUsageFlags usage, device_heap_manager::heap h) :
+			buffer_pool(device, heap_manager, size, usage, h, true), _host_ptr(nullptr)
+		{ }
 
 		dynamic_buffer_pool(dynamic_buffer_pool&& other) noexcept :
 			buffer_pool(std::move(other)),
@@ -104,6 +116,7 @@ namespace ENGINE_NAMESPACE
 		{
 			buffer_pool::operator=(std::move(other));
 			_host_ptr = std::exchange(other._host_ptr, nullptr);
+			return *this;
 		}
 
 		void map(VkDevice device, std::uint8_t current_frame);
@@ -115,30 +128,41 @@ namespace ENGINE_NAMESPACE
 		void* _host_ptr = nullptr;
 	};
 
-	struct texture_slot
+	struct texture
 	{
 		VkImage image;
 		VkImageView view;
 	};
 
-	struct writable_texture_slot
-	{
-		VkImage image;
-		std::array<VkImageView, max_frames_in_flight> views;
-	};
+	texture create_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements* out_memory_requirements);
 
-	class texture_pool : public memory_pool
+	class texture_pool : public memory_pool //maybe use templated texture_memory_pool
 	{
 	public:
+		texture_pool() = default;
+		texture_pool(VkDevice device, device_heap_manager& heap_manager, VkDeviceSize size,
+			std::uint32_t memory_type_bits, VkMemoryPropertyFlags heap_properties);
+
+		bool search(VkDeviceSize size, VkDeviceSize alignment, std::uint32_t memory_type_bits,
+			std::uint32_t* out_slot_idx, VkDeviceSize* out_size_needed);
+		void fill_slot(VkDevice device, texture&& tex, std::uint32_t slot_idx, VkDeviceSize size, VkDeviceSize alignment);
 
 	protected:
 		void realloc_slots(std::uint32_t new_count) override;
 		void move_slots(std::uint32_t dst, std::uint32_t src, std::uint32_t count) override;
 
 	private:
-		texture_slot* texture_slots = nullptr;
+		std::uint32_t memory_type_idx = std::numeric_limits<std::uint32_t>::max();
+		texture* texture_slots = nullptr;
 	};
 
+	/**
+	 * @brief This function calculates the amount of bytes necessary to add to the given offset, in order for it to be
+	 * aligned to the given alignment
+	 * @param offset Starting offset
+	 * @param alignment Target memory alignment
+	 * @return Number of padding bytes
+	*/
 	constexpr VkDeviceSize alignment_pad(VkDeviceSize offset, VkDeviceSize alignment)
 	{
 		if (alignment)
@@ -147,9 +171,14 @@ namespace ENGINE_NAMESPACE
 			return 0;
 	}
 
+	/**
+	 * @brief This function calculates a new offset, larger than the given offset, aligned to alignment
+	 * @param offset Starting offset
+	 * @param alignment Target memory alignment
+	 * @return New aligned offset
+	*/
 	constexpr VkDeviceSize aligned_offset(VkDeviceSize offset, VkDeviceSize alignment)
 	{
 		return offset + alignment_pad(offset, alignment);
 	}
-
 }
