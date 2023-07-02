@@ -206,6 +206,27 @@ namespace ENGINE_NAMESPACE
 		_host_ptr = nullptr;
 	}
 
+	void dynamic_buffer_pool::flush(VkDevice device, std::uint8_t current_frame,
+		const std::vector<const std::vector<dynamic_buffer_pool>*>& pools)
+	{
+		std::size_t size = 0;
+		for (std::size_t i = 0; i < pools.size(); i++)
+			size += pools[i]->size();
+
+		std::vector<VkMappedMemoryRange> ranges(size);
+		
+		std::size_t i = 0;
+		for (std::size_t j = 0; j < pools.size(); j++)
+		{
+			for (std::size_t k = 0; k < pools[j]->size(); k++)
+			{
+				ranges[i] = pools[j]->at(k).mapped_range(current_frame);
+				i++;
+			}
+		}
+		VK_CRASH_CHECK(vkFlushMappedMemoryRanges(device, ranges.size(), ranges.data()), "Failed to flush memory ranges");
+	}
+
 	texture create_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements* out_memory_requirements)
 	{
 		VkImage image;
@@ -268,7 +289,8 @@ namespace ENGINE_NAMESPACE
 		std::uint32_t memory_type_bits, VkMemoryPropertyFlags heap_properties) :
 		memory_pool(size)
 	{
-		memory_type_idx = heap_manager.alloc_texture_memory(device, _memory, size, memory_type_bits, heap_properties);
+		memory_type_idx = heap_manager.alloc_texture_memory(device, _memory, size, 
+			device_heap_manager::heap::MAIN, memory_type_bits);
 	}
 
 	bool texture_pool::search(VkDeviceSize size, VkDeviceSize alignment, std::uint32_t memory_type_bits,

@@ -143,6 +143,26 @@ namespace ENGINE_NAMESPACE
 		return std::numeric_limits<std::uint32_t>::max();
 	}
 
+	std::uint32_t device_heap_manager::get_memory_type_idx(heap h, std::uint32_t memory_type_bits) const
+	{
+		std::uint32_t res = 0;
+
+		switch (h)
+		{
+		case heap::MAIN:		res = main_type_idx;		break;
+		case heap::DYNAMIC:		res = dynamic_type_idx;		break;
+		case heap::UPLOAD:		res = upload_type_idx;		break;
+		case heap::DOWNLOAD:	res = download_type_idx;	break;
+		default:
+			CRASH("Invalid heap");
+			break;
+		}
+		//TODO this really shouldnt be just an assert, im assuming the chosen heap always meets the requirements
+		INTERNAL_ASSERT(memory_type_bits & 1U << res, "Memory requirements not met");
+
+		return res;
+	}
+
 	void device_heap_manager::alloc_buffer(VkDevice device,
 		VkDeviceMemory& memory, VkBuffer& buffer, VkDeviceSize size,
 		VkBufferUsageFlags usage, heap h)
@@ -161,28 +181,7 @@ namespace ENGINE_NAMESPACE
 		VkMemoryAllocateInfo memory_info = {};
 		memory_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		memory_info.allocationSize = memory_requirements.size;
-
-		switch (h)
-		{
-		case hc::device_heap_manager::heap::MAIN:
-			memory_info.memoryTypeIndex = main_type_idx;
-			break;
-		case hc::device_heap_manager::heap::DYNAMIC:
-			memory_info.memoryTypeIndex = dynamic_type_idx;
-			break;
-		case hc::device_heap_manager::heap::UPLOAD:
-			memory_info.memoryTypeIndex = upload_type_idx;
-			break;
-		case hc::device_heap_manager::heap::DOWNLOAD:
-			memory_info.memoryTypeIndex = download_type_idx;
-			break;
-		default:
-			CRASH("Invalid heap");
-			break;
-		}
-		//TODO this really shouldnt be just an assert, im assuming the chosen heap always meets the requirements
-		INTERNAL_ASSERT(memory_requirements.memoryTypeBits & 1U << memory_info.memoryTypeIndex,
-			"Memory requirements not met");
+		memory_info.memoryTypeIndex = get_memory_type_idx(h, memory_requirements.memoryTypeBits);
 
 		VK_CRASH_CHECK(vkAllocateMemory(device, &memory_info, nullptr, &memory), "Failed to allocate device memory");
 
@@ -192,12 +191,12 @@ namespace ENGINE_NAMESPACE
 	}
 
 	std::uint32_t device_heap_manager::alloc_texture_memory(VkDevice device, VkDeviceMemory& memory, VkDeviceSize size,
-		std::uint32_t memory_type_bits, VkMemoryPropertyFlags heap_properties)
+		heap preferred_heap, std::uint32_t memory_type_bits)
 	{
 		VkMemoryAllocateInfo memory_info = {};
 		memory_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		memory_info.allocationSize = size;
-		memory_info.memoryTypeIndex = find_memory_type(memory_type_bits, heap_properties);
+		memory_info.memoryTypeIndex = get_memory_type_idx(preferred_heap, memory_type_bits);
 
 		VK_CRASH_CHECK(vkAllocateMemory(device, &memory_info, nullptr, &memory), "Failed to allocate device memory");
 

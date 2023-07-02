@@ -21,13 +21,13 @@ namespace ENGINE_NAMESPACE
 			vertex_data_size = offset;
 			index_data_size = size - offset;
 			vertex_data = data;
-			index_data = reinterpret_cast<const std::byte*>(data) + offset;
+			index_data = static_cast<const std::byte*>(data) + offset;
 		}
 		else
 		{
 			vertex_data_size = size - offset;
 			index_data_size = offset;
-			vertex_data = reinterpret_cast<const std::byte*>(data) + offset;
+			vertex_data = static_cast<const std::byte*>(data) + offset;
 			index_data = data;
 		}
 

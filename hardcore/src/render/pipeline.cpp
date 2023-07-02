@@ -8,7 +8,7 @@ namespace ENGINE_NAMESPACE
 {
 	volatile_pipeline_task_ref<pipeline_t::RENDER>& volatile_pipeline_task_ref<pipeline_t::RENDER>::set_instances(std::uint32_t num)
 	{
-		graphics_pipeline& pipeline = *reinterpret_cast<graphics_pipeline*>(pipeline_p);
+		graphics_pipeline& pipeline = *static_cast<graphics_pipeline*>(pipeline_p);
 		pipeline.set_instances(task_id, num);
 		return *this;
 	}
@@ -37,7 +37,7 @@ SET_DESCRIPTOR(Return, dynamic_storage_vector)
 	volatile_pipeline_task_ref<pipeline_t::RENDER>& volatile_pipeline_task_ref<pipeline_t::RENDER>::t_set_descriptor(
 		std::uint32_t descriptor_idx, const Resource& buffer)
 	{
-		graphics_pipeline& pipeline = *reinterpret_cast<graphics_pipeline*>(pipeline_p);
+		graphics_pipeline& pipeline = *static_cast<graphics_pipeline*>(pipeline_p);
 		pipeline.set_descriptor(task_id, descriptor_idx, buffer);
 		return *this;
 	}

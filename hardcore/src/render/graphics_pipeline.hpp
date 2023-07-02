@@ -236,12 +236,14 @@ namespace ENGINE_NAMESPACE
 			public:
 				inline properties_t& properties() const noexcept
 				{
-					return *reinterpret_cast<base_object*>(reinterpret_cast<std::byte*>(data_ptr) + push_data_size + offsets_size);
+					return *reinterpret_cast<base_object*>(static_cast<std::byte*>(data_ptr) + push_data_size + offsets_size);
 				}
+
 				inline offset_t* dynamic_offsets() const noexcept
 				{
-					return reinterpret_cast<offset_t*>(reinterpret_cast<std::byte*>(data_ptr) + push_data_size);
+					return reinterpret_cast<offset_t*>(static_cast<std::byte*>(data_ptr) + push_data_size);
 				}
+
 				inline void* push_data() const noexcept { return data_ptr; }
 				inline buffer_binding_args* bindings() const noexcept { return binding_ptr; }
 
@@ -280,7 +282,7 @@ namespace ENGINE_NAMESPACE
 
 				inline iterator& operator++() 
 				{
-					current.data_ptr = reinterpret_cast<std::byte*>(current.data_ptr) + 
+					current.data_ptr = static_cast<std::byte*>(current.data_ptr) + 
 						push_data_size + offsets_size + element_base_size;
 					current.binding_ptr += binding_increment;
 					return *this;
@@ -288,7 +290,7 @@ namespace ENGINE_NAMESPACE
 				inline iterator operator++(int)
 				{
 					iterator tmp = *this;
-					current.data_ptr = reinterpret_cast<std::byte*>(current.data_ptr) +
+					current.data_ptr = static_cast<std::byte*>(current.data_ptr) +
 						push_data_size + offsets_size + element_base_size;
 					current.binding_ptr += binding_increment;
 					return tmp;
@@ -325,7 +327,7 @@ namespace ENGINE_NAMESPACE
 			}
 			inline iterator end()
 			{
-				void* objects = reinterpret_cast<std::byte*>(object_data) + count * element_stride;
+				void* objects = static_cast<std::byte*>(object_data) + count * element_stride;
 				buffer_binding_args* bindings = object_descriptor_data + count * n_descriptors;
 				return iterator(objects, bindings, element_stride, n_descriptors, push_data_size,
 					n_dynamic_descriptors * sizeof(offset_t));
@@ -334,7 +336,7 @@ namespace ENGINE_NAMESPACE
 			inline object_ref operator[](std::size_t idx)
 			{
 				INTERNAL_ASSERT(idx < count, "Index out of bounds");
-				void* object_p = reinterpret_cast<std::byte*>(object_data) + idx * element_stride;
+				void* object_p = static_cast<std::byte*>(object_data) + idx * element_stride;
 				buffer_binding_args* binding_p = object_descriptor_data + idx * n_descriptors;
 				return object_ref(object_p, binding_p, push_data_size, n_dynamic_descriptors * sizeof(offset_t));
 			}

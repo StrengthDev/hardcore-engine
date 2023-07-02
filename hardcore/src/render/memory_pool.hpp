@@ -122,9 +122,17 @@ namespace ENGINE_NAMESPACE
 		void map(VkDevice device, std::uint8_t current_frame);
 		void unmap(VkDevice device);
 
+		static void flush(VkDevice device, std::uint8_t current_frame, 
+			const std::vector<const std::vector<dynamic_buffer_pool>*>& pools); //TODO the amount of vectors is known at compile time
+
 		inline void*& host_ptr() noexcept { return _host_ptr; }
 
 	private:
+		inline VkMappedMemoryRange mapped_range(std::uint8_t current_frame) const noexcept
+		{
+			return { VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, nullptr, _memory, _size * current_frame, _size };
+		}
+
 		void* _host_ptr = nullptr;
 	};
 

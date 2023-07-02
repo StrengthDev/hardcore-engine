@@ -4,9 +4,11 @@
 
 #include <hardcore/core/core.hpp>
 
+#include <vector>
+
 namespace ENGINE_NAMESPACE
 {
-	namespace shader_extensions
+	namespace shader_ext
 	{
 		static const char VERTEX[]					= ".vert";
 		static const char FRAGMENT[]				= ".frag";
@@ -28,7 +30,7 @@ namespace ENGINE_NAMESPACE
 		static const char CONFIG[] = ".conf";
 	}
 
-	enum class shader_t : uint8_t
+	enum class shader_t : std::uint8_t
 	{
 		NONE = 0,
 		VERTEX, FRAGMENT,
@@ -53,9 +55,8 @@ namespace ENGINE_NAMESPACE
 
 		shader(shader&& other) noexcept : data(std::exchange(other.data, nullptr)), size(std::exchange(other.size, 0)),
 			stage(std::exchange(other.stage, shader_t::NONE)), entry_point(std::exchange(other.entry_point, nullptr)),
-			n_inputs(std::exchange(other.n_inputs, 0)), inputs(std::exchange(other.inputs, nullptr)),
-			n_descriptors(std::exchange(other.n_descriptors, 0)), descriptors(std::exchange(other.descriptors, nullptr)),
-			name(std::exchange(other.name, nullptr))
+			_inputs(std::move(other._inputs)), _descriptors(std::move(other._descriptors)),
+			_name(std::exchange(other._name, nullptr))
 		{ }
 
 		shader& operator=(shader&& other) noexcept
@@ -66,22 +67,20 @@ namespace ENGINE_NAMESPACE
 			size = std::exchange(other.size, 0);
 			stage = std::exchange(other.stage, shader_t::NONE);
 			entry_point = std::exchange(other.entry_point, nullptr);
-			n_inputs = std::exchange(other.n_inputs, 0);
-			inputs = std::exchange(other.inputs, nullptr);
-			n_descriptors = std::exchange(other.n_descriptors, 0);
-			descriptors = std::exchange(other.descriptors, nullptr);
-			name = std::exchange(other.name, nullptr);
+			_inputs = std::move(other._inputs);
+			_descriptors = std::move(other._descriptors);
+			_name = std::exchange(other._name, nullptr);
 			return *this;
 		}
 
 		shader(const shader&) = delete;
 		shader& operator=(const shader&) = delete;
 
-		const char* get_name() const noexcept { return name; }
-		const data_layout* get_inputs() const noexcept { return inputs; }
+		const char* name() const noexcept { return _name; }
+		const data_layout* inputs(std::size_t& out_size) const noexcept;
 
 		//uniform types
-		enum descriptor_t : uint8_t
+		enum descriptor_t : std::uint8_t
 		{
 			NONE = 0,
 			UNIFORM,
@@ -114,14 +113,11 @@ namespace ENGINE_NAMESPACE
 		shader_t stage = shader_t::NONE;
 		char* entry_point = nullptr;
 
-		std::uint8_t n_inputs = 0;
-		data_layout* inputs = nullptr;
-
-		std::uint32_t n_descriptors = 0;
-		descriptor_data* descriptors = nullptr;
+		std::vector<data_layout> _inputs;
+		std::vector<descriptor_data> _descriptors;
 
 	private:
-		char* name = nullptr;
+		char* _name = nullptr;
 
 		void reflect();
 	};

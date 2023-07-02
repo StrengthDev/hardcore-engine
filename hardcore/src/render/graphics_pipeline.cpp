@@ -18,98 +18,100 @@ const VkExtent2D invalid_extent = {
 
 namespace ENGINE_NAMESPACE
 {
-	class data_layout_internal : data_layout
+	class data_layout_internal : public data_layout
 	{
 	public:
 		data_layout_internal() = delete; //TODO delete this and add accessors, why wouldnt users be able to check the types???
 
 		friend VkFormat to_vk_format(const data_layout::value&);
-		friend VkPipelineVertexInputStateCreateInfo get_vertex_inputs(const data_layout*, std::uint32_t);
+		friend VkPipelineVertexInputStateCreateInfo to_pipeline_inputs(const std::vector<data_layout>&);
 	};
 
-#define CASE(cond, form) case data_layout::component_type::cond: format = form; break;
 	inline VkFormat to_vk_format(const data_layout::value& type)
 	{
+		typedef data_layout::component_type component_t;
+		typedef data_layout::type vector_t;
+
 		VkFormat format = VK_FORMAT_UNDEFINED;
 		switch (type.t)
 		{
 		case data_layout::type::SCALAR:
 			switch (type.ct)
 			{
-				CASE(FLOAT16, VK_FORMAT_R16_SFLOAT);
-				CASE(FLOAT32, VK_FORMAT_R32_SFLOAT);
-				CASE(FLOAT64, VK_FORMAT_R64_SFLOAT);
-				CASE(INT8, VK_FORMAT_R8_SINT);
-				CASE(INT16, VK_FORMAT_R16_SINT);
-				CASE(INT32, VK_FORMAT_R32_SINT);
-				CASE(INT64, VK_FORMAT_R64_SINT);
-				CASE(UINT8, VK_FORMAT_R8_UINT);
-				CASE(UINT16, VK_FORMAT_R16_UINT);
-				CASE(UINT32, VK_FORMAT_R32_UINT);
-				CASE(UINT64, VK_FORMAT_R64_UINT);
+				case component_t::FLOAT16:	format = VK_FORMAT_R16_SFLOAT; break;
+				case component_t::FLOAT32:	format = VK_FORMAT_R32_SFLOAT; break;
+				case component_t::FLOAT64:	format = VK_FORMAT_R64_SFLOAT; break;
+				case component_t::INT8:		format = VK_FORMAT_R8_SINT; break;
+				case component_t::INT16:	format = VK_FORMAT_R16_SINT; break;
+				case component_t::INT32:	format = VK_FORMAT_R32_SINT; break;
+				case component_t::INT64:	format = VK_FORMAT_R64_SINT; break;
+				case component_t::UINT8:	format = VK_FORMAT_R8_UINT; break;
+				case component_t::UINT16:	format = VK_FORMAT_R16_UINT; break;
+				case component_t::UINT32:	format = VK_FORMAT_R32_UINT; break;
+				case component_t::UINT64:	format = VK_FORMAT_R64_UINT; break;
 			default:
 				break;
 			}
 			break;
-		case data_layout::type::VEC2:
-		case data_layout::type::MAT2:
-		case data_layout::type::MAT3x2:
-		case data_layout::type::MAT4x2:
+		case vector_t::VEC2:
+		case vector_t::MAT2:
+		case vector_t::MAT3x2:
+		case vector_t::MAT4x2:
 			switch (type.ct)
 			{
-				CASE(FLOAT16, VK_FORMAT_R16G16_SFLOAT);
-				CASE(FLOAT32, VK_FORMAT_R32G32_SFLOAT);
-				CASE(FLOAT64, VK_FORMAT_R64G64_SFLOAT);
-				CASE(INT8, VK_FORMAT_R8G8_SINT);
-				CASE(INT16, VK_FORMAT_R16G16_SINT);
-				CASE(INT32, VK_FORMAT_R32G32_SINT);
-				CASE(INT64, VK_FORMAT_R64G64_SINT);
-				CASE(UINT8, VK_FORMAT_R8G8_UINT);
-				CASE(UINT16, VK_FORMAT_R16G16_UINT);
-				CASE(UINT32, VK_FORMAT_R32G32_UINT);
-				CASE(UINT64, VK_FORMAT_R64G64_UINT);
+				case component_t::FLOAT16:	format = VK_FORMAT_R16G16_SFLOAT; break;
+				case component_t::FLOAT32:	format = VK_FORMAT_R32G32_SFLOAT; break;
+				case component_t::FLOAT64:	format = VK_FORMAT_R64G64_SFLOAT; break;
+				case component_t::INT8:		format = VK_FORMAT_R8G8_SINT; break;
+				case component_t::INT16:	format = VK_FORMAT_R16G16_SINT; break;
+				case component_t::INT32:	format = VK_FORMAT_R32G32_SINT; break;
+				case component_t::INT64:	format = VK_FORMAT_R64G64_SINT; break;
+				case component_t::UINT8:	format = VK_FORMAT_R8G8_UINT; break;
+				case component_t::UINT16:	format = VK_FORMAT_R16G16_UINT; break;
+				case component_t::UINT32:	format = VK_FORMAT_R32G32_UINT; break;
+				case component_t::UINT64:	format = VK_FORMAT_R64G64_UINT; break;
 			default:
 				break;
 			}
 			break;
-		case data_layout::type::VEC3:
-		case data_layout::type::MAT2x3:
-		case data_layout::type::MAT3:
-		case data_layout::type::MAT4x3:
+		case vector_t::VEC3:
+		case vector_t::MAT2x3:
+		case vector_t::MAT3:
+		case vector_t::MAT4x3:
 			switch (type.ct)
 			{
-				CASE(FLOAT16, VK_FORMAT_R16G16B16_SFLOAT);
-				CASE(FLOAT32, VK_FORMAT_R32G32B32_SFLOAT);
-				CASE(FLOAT64, VK_FORMAT_R64G64B64_SFLOAT);
-				CASE(INT8, VK_FORMAT_R8G8B8_SINT);
-				CASE(INT16, VK_FORMAT_R16G16B16_SINT);
-				CASE(INT32, VK_FORMAT_R32G32B32_SINT);
-				CASE(INT64, VK_FORMAT_R64G64B64_SINT);
-				CASE(UINT8, VK_FORMAT_R8G8B8_UINT);
-				CASE(UINT16, VK_FORMAT_R16G16B16_UINT);
-				CASE(UINT32, VK_FORMAT_R32G32B32_UINT);
-				CASE(UINT64, VK_FORMAT_R64G64B64_UINT);
+				case component_t::FLOAT16:	format = VK_FORMAT_R16G16B16_SFLOAT; break;
+				case component_t::FLOAT32:	format = VK_FORMAT_R32G32B32_SFLOAT; break;
+				case component_t::FLOAT64:	format = VK_FORMAT_R64G64B64_SFLOAT; break;
+				case component_t::INT8:		format = VK_FORMAT_R8G8B8_SINT; break;
+				case component_t::INT16:	format = VK_FORMAT_R16G16B16_SINT; break;
+				case component_t::INT32:	format = VK_FORMAT_R32G32B32_SINT; break;
+				case component_t::INT64:	format = VK_FORMAT_R64G64B64_SINT; break;
+				case component_t::UINT8:	format = VK_FORMAT_R8G8B8_UINT; break;
+				case component_t::UINT16:	format = VK_FORMAT_R16G16B16_UINT; break;
+				case component_t::UINT32:	format = VK_FORMAT_R32G32B32_UINT; break;
+				case component_t::UINT64:	format = VK_FORMAT_R64G64B64_UINT; break;
 			default:
 				break;
 			}
 			break;
-		case data_layout::type::VEC4:
-		case data_layout::type::MAT2x4:
-		case data_layout::type::MAT3x4:
-		case data_layout::type::MAT4:
+		case vector_t::VEC4:
+		case vector_t::MAT2x4:
+		case vector_t::MAT3x4:
+		case vector_t::MAT4:
 			switch (type.ct)
 			{
-				CASE(FLOAT16, VK_FORMAT_R16G16B16A16_SFLOAT);
-				CASE(FLOAT32, VK_FORMAT_R32G32B32A32_SFLOAT);
-				CASE(FLOAT64, VK_FORMAT_R64G64B64A64_SFLOAT);
-				CASE(INT8, VK_FORMAT_R8G8B8A8_SINT);
-				CASE(INT16, VK_FORMAT_R16G16B16A16_SINT);
-				CASE(INT32, VK_FORMAT_R32G32B32A32_SINT);
-				CASE(INT64, VK_FORMAT_R64G64B64A64_SINT);
-				CASE(UINT8, VK_FORMAT_R8G8B8A8_UINT);
-				CASE(UINT16, VK_FORMAT_R16G16B16A16_UINT);
-				CASE(UINT32, VK_FORMAT_R32G32B32A32_UINT);
-				CASE(UINT64, VK_FORMAT_R64G64B64A64_UINT);
+				case component_t::FLOAT16:	format = VK_FORMAT_R16G16B16A16_SFLOAT; break;
+				case component_t::FLOAT32:	format = VK_FORMAT_R32G32B32A32_SFLOAT; break;
+				case component_t::FLOAT64:	format = VK_FORMAT_R64G64B64A64_SFLOAT; break;
+				case component_t::INT8:		format = VK_FORMAT_R8G8B8A8_SINT; break;
+				case component_t::INT16:	format = VK_FORMAT_R16G16B16A16_SINT; break;
+				case component_t::INT32:	format = VK_FORMAT_R32G32B32A32_SINT; break;
+				case component_t::INT64:	format = VK_FORMAT_R64G64B64A64_SINT; break;
+				case component_t::UINT8:	format = VK_FORMAT_R8G8B8A8_UINT; break;
+				case component_t::UINT16:	format = VK_FORMAT_R16G16B16A16_UINT; break;
+				case component_t::UINT32:	format = VK_FORMAT_R32G32B32A32_UINT; break;
+				case component_t::UINT64:	format = VK_FORMAT_R64G64B64A64_UINT; break;
 			default:
 				break;
 			}
@@ -119,24 +121,23 @@ namespace ENGINE_NAMESPACE
 		}
 		return format;
 	}
-#undef CASE
 
-	inline VkPipelineVertexInputStateCreateInfo get_vertex_inputs(const data_layout* vertex_layouts, std::uint32_t n_layouts)
+	inline VkPipelineVertexInputStateCreateInfo to_pipeline_inputs(const std::vector<data_layout>& layouts)
 	{
 		VkPipelineVertexInputStateCreateInfo vertex_input_info = {};
 		vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
-		vertex_input_info.vertexBindingDescriptionCount = n_layouts;
+		vertex_input_info.vertexBindingDescriptionCount = layouts.size();
 		std::uint32_t attribute_description_count = 0;
-		VkVertexInputBindingDescription* binding_descriptions = t_calloc<VkVertexInputBindingDescription>(n_layouts);
-		for (std::uint32_t i = 0; i < n_layouts; i++)
+		VkVertexInputBindingDescription* binding_descriptions = t_calloc<VkVertexInputBindingDescription>(layouts.size());
+		for (std::uint32_t i = 0; i < layouts.size(); i++)
 		{
 			VkVertexInputBindingDescription desc = {};
 			binding_descriptions[i].binding = 0;
-			binding_descriptions[i].stride = static_cast<std::uint32_t>(vertex_layouts[i].size());
+			binding_descriptions[i].stride = static_cast<std::uint32_t>(layouts[i].size());
 			binding_descriptions[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 			
-			attribute_description_count += vertex_layouts[i].vector_count();
+			attribute_description_count += layouts[i].vector_count();
 		}
 		vertex_input_info.pVertexBindingDescriptions = binding_descriptions;
 		vertex_input_info.vertexAttributeDescriptionCount = attribute_description_count;
@@ -144,14 +145,14 @@ namespace ENGINE_NAMESPACE
 			t_calloc<VkVertexInputAttributeDescription>(attribute_description_count);
 
 		std::uint32_t c = 0;
-		for (std::uint32_t i = 0; i < n_layouts; i++)
+		for (std::uint32_t i = 0; i < layouts.size(); i++)
 		{
 			std::uint32_t offset = 0;
-			const data_layout_internal& layouts = reinterpret_cast<const data_layout_internal&>(vertex_layouts[i]);
-			for (std::uint32_t k = 0; k < vertex_layouts[i].vector_count(); k++)
+			const data_layout_internal& layout = static_cast<const data_layout_internal&>(layouts[i]);
+			for (std::uint32_t k = 0; k < layouts[i].vector_count(); k++)
 			{
 				std::uint32_t iterations; //matrix inputs are passed as several vectors
-				switch (layouts[k].t)
+				switch (layout[k].t)
 				{
 				case data_layout::type::MAT2:
 				case data_layout::type::MAT2x3:
@@ -173,7 +174,7 @@ namespace ENGINE_NAMESPACE
 					break;
 				}
 
-				const VkFormat format = to_vk_format(layouts[k]);
+				const VkFormat format = to_vk_format(layout[k]);
 				INTERNAL_ASSERT(format != VK_FORMAT_UNDEFINED, "Invalid type.");
 				for (std::uint32_t j = 0; j < iterations; j++)
 				{
@@ -182,7 +183,7 @@ namespace ENGINE_NAMESPACE
 					attribute_descriptions[c].format = format;
 					attribute_descriptions[c].offset = offset;
 
-					offset += layouts[k].size() / iterations;
+					offset += layout[k].size() / iterations;
 					c++;
 				}
 			}
@@ -276,42 +277,43 @@ namespace ENGINE_NAMESPACE
 		//parse bindings
 		for (const shader* p : shaders)
 		{
-			const internal_shader& cast_shader = reinterpret_cast<const internal_shader&>(*p);
-			std::uint32_t n_descriptors = 0;
-			shader::descriptor_data* descriptors = cast_shader.get_descriptors(&n_descriptors);
+			const internal_shader& cast_shader = *static_cast<const internal_shader*>(p);
+			const std::vector<shader::descriptor_data>& descriptors = cast_shader.descriptors();
 
-			for (std::uint32_t i = 0; i < n_descriptors; i++)
+			for (const auto& descriptor : descriptors)
 			{
-				for (std::uint32_t s = static_cast<std::uint32_t>(sets.size()); s < descriptors[i].set + 1; s++) sets.emplace_back();
-				for (std::uint32_t b = static_cast<std::uint32_t>(sets[descriptors[i].set].size()); b < descriptors[i].binding + 1; b++)
-				{
-					sets[descriptors[i].set].push_back({});
-					sets[descriptors[i].set][b].descriptorType = VK_DESCRIPTOR_TYPE_MAX_ENUM;
-				}
+				const VkDescriptorSetLayoutBinding null_binding = { 0, VK_DESCRIPTOR_TYPE_MAX_ENUM, 0, 0, nullptr };
 
-				VkDescriptorSetLayoutBinding& layout_binding = sets[descriptors[i].set][descriptors[i].binding];
-				VkDescriptorType descriptor_type = to_vk_descriptor_type(descriptors[i].type);
+				const std::size_t min_set_size = static_cast<std::size_t>(descriptor.set + 1);
+				if (sets.size() < min_set_size) sets.resize(min_set_size);
+
+				const std::size_t min_binding_size = static_cast<std::size_t>(descriptor.binding + 1);
+				if (sets[descriptor.set].size() < min_binding_size)
+					sets[descriptor.set].resize(min_binding_size, null_binding);
+
+				VkDescriptorSetLayoutBinding& layout_binding = sets[descriptor.set][descriptor.binding];
+				VkDescriptorType descriptor_type = to_vk_descriptor_type(descriptor.type);
 				if (layout_binding.descriptorType != VK_DESCRIPTOR_TYPE_MAX_ENUM)
 				{
-					if (layout_binding.descriptorType == descriptor_type && layout_binding.descriptorCount == descriptors[i].count)
+					if (layout_binding.descriptorType == descriptor_type && layout_binding.descriptorCount == descriptor.count)
 						layout_binding.stageFlags |= cast_shader.get_stage();
 					else INTERNAL_ASSERT(false, "Different descriptor for the same binding in different shaders"); //TODO throw exception instead
 				}
 				else
 				{
-					const std::uint32_t count = descriptors[i].count ? descriptors[i].count : 1;
+					const std::uint32_t count = descriptor.count ? descriptor.count : 1;
 
-					layout_binding.binding = descriptors[i].binding;
+					layout_binding.binding = descriptor.binding;
 					layout_binding.descriptorCount = count;
 					layout_binding.stageFlags = cast_shader.get_stage();
 					layout_binding.pImmutableSamplers = nullptr; //TODO deal with this
 					layout_binding.descriptorType = descriptor_type;
 
-					if (descriptors[i].set == 0)
+					if (descriptor.set == 0)
 						pool_sizes_0[descriptor_type].descriptorCount += count;
 					else
 					{
-						if (descriptors[i].set == 1) pool_sizes_1[descriptor_type].descriptorCount += count;
+						if (descriptor.set == 1) pool_sizes_1[descriptor_type].descriptorCount += count;
 					}
 				}
 			}
@@ -398,7 +400,8 @@ namespace ENGINE_NAMESPACE
 	{
 		LOG_INTERNAL_INFO("Initialising new graphics pipeline..");
 
-		VkPipelineVertexInputStateCreateInfo vertex_input_info = get_vertex_inputs(shaders[0]->get_inputs(), 1);
+		VkPipelineVertexInputStateCreateInfo vertex_input_info = 
+			to_pipeline_inputs(static_cast<const internal_shader*>(shaders[0])->inputs());
 
 		init_descriptors(owner.handle, shaders, n_descriptor_pool_sizes, descriptor_pool_sizes,
 			&n_descriptor_set_layouts, &descriptor_set_layouts, &frame_descriptors[0].descriptor_pool, &descriptor_sets,
@@ -560,6 +563,8 @@ namespace ENGINE_NAMESPACE
 		}
 
 		std::free(shader_stages);
+
+		//ideally these shouldnt be manually allocated
 		std::free(const_cast<VkVertexInputBindingDescription*>(vertex_input_info.pVertexBindingDescriptions)); //a bit messy, but shouldn't cause issues
 		std::free(const_cast<VkVertexInputAttributeDescription*>(vertex_input_info.pVertexAttributeDescriptions)); //a bit messy, but shouldn't cause issues
 	}
@@ -1000,7 +1005,7 @@ namespace ENGINE_NAMESPACE
 			object_descriptor_data = t_realloc<buffer_binding_args>(object_descriptor_data, capacity * n_descriptors);
 		}
 
-		void* object_p = reinterpret_cast<std::byte*>(object_data) + idx * element_stride;
+		void* object_p = static_cast<std::byte*>(object_data) + idx * element_stride;
 		buffer_binding_args* binding_p = object_descriptor_data + idx * n_descriptors;
 		std::memset(binding_p, 0, descriptor_stride);
 		return object_ref(object_p, binding_p, push_data_size, n_dynamic_descriptors * sizeof(offset_t));
@@ -1013,8 +1018,8 @@ namespace ENGINE_NAMESPACE
 
 	void graphics_pipeline::object_vector::swap(std::size_t a, std::size_t b)
 	{
-		void* aop = reinterpret_cast<std::byte*>(object_data) + element_stride * a;
-		void* bop = reinterpret_cast<std::byte*>(object_data) + element_stride * b;
+		void* aop = static_cast<std::byte*>(object_data) + element_stride * a;
+		void* bop = static_cast<std::byte*>(object_data) + element_stride * b;
 		void* adp = object_descriptor_data + n_descriptors * a;
 		void* bdp = object_descriptor_data + n_descriptors * b;
 		

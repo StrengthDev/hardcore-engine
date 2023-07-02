@@ -16,7 +16,7 @@ As mentioned earlier, the engine is low-level, with the goal being giving as muc
 
 [TO ADD]: # (Some utilities such as a dedicated physics thread are provided, but can be disabled.)
 
-Resources, specifically those on the GPU, are implemented as classes, being allocated/created when the class is instantiated, and freed/destroyed when the class instance is destroyed. The goal of this design is to hopefuly make managing the resources intuitive and easy to use. Additionally, API functions deal mainly with context changes instead of things that are typically done every frame. (i.e. when doing something like drawing a mesh, as long as the resource class instances being used haven't been destroyed and the repective pipelines or tasks haven't been disabled, then the mesh will keep getting drawn every frame, without the client calling any functions.)
+Resources, specifically those on the GPU, are implemented as classes, being allocated/created when the class is instantiated, and freed/destroyed when the class instance is destroyed. The goal of this design is to hopefuly make managing the resources intuitive and easy to use. Additionally, API functions deal mainly with context changes instead of things that are typically done every frame. (i.e. when doing something like drawing a mesh, as long as the resource class instances being used haven't been destroyed and the respective pipelines or tasks haven't been disabled or destroyed, then the mesh will keep getting drawn every frame, without the client calling any functions.)
 
 # Some implementation details
 

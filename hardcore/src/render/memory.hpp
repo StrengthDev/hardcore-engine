@@ -64,7 +64,7 @@ namespace ENGINE_NAMESPACE
 		//void update_largest_slots();
 		//void tick(); could maybe replace the above function and performa all updates and cleanup
 
-		void flush_in(VkDevice device, VkQueue transfer_queue, std::uint8_t current_frame);
+		bool flush_in(VkDevice device, VkQueue transfer_queue, std::uint8_t current_frame);
 		//void flush_out();
 
 		void map_ranges(VkDevice device, std::uint8_t current_frame);

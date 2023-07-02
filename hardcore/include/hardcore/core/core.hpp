@@ -112,7 +112,7 @@ namespace ENGINE_NAMESPACE
 	template<typename Type>
 	inline Type* t_malloc(std::size_t count)
 	{
-		return reinterpret_cast<Type*>(ex_malloc(count * sizeof(Type)));
+		return static_cast<Type*>(ex_malloc(count * sizeof(Type)));
 	}
 
 	/**
@@ -125,7 +125,7 @@ namespace ENGINE_NAMESPACE
 	template<typename Type>
 	inline Type* t_calloc(std::size_t count)
 	{
-		return reinterpret_cast<Type*>(ex_calloc(count, sizeof(Type)));
+		return static_cast<Type*>(ex_calloc(count, sizeof(Type)));
 	}
 
 	/**
@@ -139,7 +139,7 @@ namespace ENGINE_NAMESPACE
 	template<typename Type>
 	inline Type* t_realloc(void* ptr, std::size_t count)
 	{
-		return reinterpret_cast<Type*>(ex_realloc(ptr, count * sizeof(Type)));
+		return static_cast<Type*>(ex_realloc(ptr, count * sizeof(Type)));
 	}
 
 	inline void crash(const char* msg, const char* file, std::uint32_t line, const char* func, int error = -1)
