@@ -226,10 +226,23 @@ namespace ENGINE_NAMESPACE
 		memory.offset = 0;
 	}
 
-	void device_memory::flush_in(VkDevice device, VkQueue transfer_queue, std::uint8_t current_frame)
+	bool device_memory::flush_in(VkDevice device, VkQueue transfer_queue, std::uint8_t current_frame)
 	{
+		if (!heap_manager.host_coherent_dynamic_heap())
+		{
+			dynamic_buffer_pool::flush(device, current_frame, 
+				{ &d_vertex_pools, &d_index_pools, &d_uniform_pools, &d_storage_pools });
+		}
+
 		transfer_memory& memory = device_in[current_frame];
-		//TODO: if not host coherent...
+
+		//return if there is nothing to flush
+		if (!memory.offset) return false;
+
+		if (!heap_manager.host_coherent_upload_heap())
+		{
+			//TODO
+		}
 
 		vkResetCommandBuffer(cmd_buffers[current_frame], 0);
 
@@ -239,31 +252,28 @@ namespace ENGINE_NAMESPACE
 
 		vkBeginCommandBuffer(cmd_buffers[current_frame], &begin_info);
 
-		if (memory.offset) //TODO: cancel command buffer when offset is 0, make this function return bool to indicate if it is necessary to wait for the semaphore
+		for (const auto& [path, copies] : vp_pending_copies[current_frame])
 		{
-			for (const auto& [path, copies] : vp_pending_copies[current_frame])
-			{
-				vkCmdCopyBuffer(cmd_buffers[current_frame], get_staging_buffer(memory, path.first),
-					vertex_pools[path.second].buffer(), static_cast<std::uint32_t>(copies.size()), copies.data());
-			}
-			for (const auto& [path, copies] : ip_pending_copies[current_frame])
-			{
-				vkCmdCopyBuffer(cmd_buffers[current_frame], get_staging_buffer(memory, path.first),
-					index_pools[path.second].buffer(), static_cast<std::uint32_t>(copies.size()), copies.data());
-			}
-			for (const auto& [path, copies] : up_pending_copies[current_frame])
-			{
-				vkCmdCopyBuffer(cmd_buffers[current_frame], get_staging_buffer(memory, path.first),
-					uniform_pools[path.second].buffer(), static_cast<std::uint32_t>(copies.size()), copies.data());
-			}
-			for (const auto& [path, copies] : sp_pending_copies[current_frame])
-			{
-				vkCmdCopyBuffer(cmd_buffers[current_frame], get_staging_buffer(memory, path.first),
-					storage_pools[path.second].buffer(), static_cast<std::uint32_t>(copies.size()), copies.data());
-			}
-
-			clear_transfer_memory(memory);
+			vkCmdCopyBuffer(cmd_buffers[current_frame], get_staging_buffer(memory, path.first),
+				vertex_pools[path.second].buffer(), static_cast<std::uint32_t>(copies.size()), copies.data());
 		}
+		for (const auto& [path, copies] : ip_pending_copies[current_frame])
+		{
+			vkCmdCopyBuffer(cmd_buffers[current_frame], get_staging_buffer(memory, path.first),
+				index_pools[path.second].buffer(), static_cast<std::uint32_t>(copies.size()), copies.data());
+		}
+		for (const auto& [path, copies] : up_pending_copies[current_frame])
+		{
+			vkCmdCopyBuffer(cmd_buffers[current_frame], get_staging_buffer(memory, path.first),
+				uniform_pools[path.second].buffer(), static_cast<std::uint32_t>(copies.size()), copies.data());
+		}
+		for (const auto& [path, copies] : sp_pending_copies[current_frame])
+		{
+			vkCmdCopyBuffer(cmd_buffers[current_frame], get_staging_buffer(memory, path.first),
+				storage_pools[path.second].buffer(), static_cast<std::uint32_t>(copies.size()), copies.data());
+		}
+
+		clear_transfer_memory(memory);
 
 		vkEndCommandBuffer(cmd_buffers[current_frame]);
 
@@ -278,6 +288,8 @@ namespace ENGINE_NAMESPACE
 		vkQueueSubmit(transfer_queue, 1, &submit_info, memory.fence);
 
 		memory.offset = 0;
+
+		return true;
 	}
 
 	void device_memory::map_ranges(VkDevice device, std::uint8_t current_frame)
@@ -342,7 +354,7 @@ namespace ENGINE_NAMESPACE
 
 	void device_memory::submit_upload(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset)
 	{
-		const mem_ref_internal& int_ref = reinterpret_cast<const mem_ref_internal&>(ref); //TODO seperate into different functions like memcpy
+		const mem_ref_internal& int_ref = static_cast<const mem_ref_internal&>(ref); //TODO seperate into different functions like memcpy
 		INTERNAL_ASSERT(offset + size <= int_ref.size, "Out of bounds memory access");
 		switch (int_ref.pool_type)
 		{
@@ -445,7 +457,7 @@ namespace ENGINE_NAMESPACE
 	inline memory_ref device_memory::alloc_buffer(const void* data, VkDeviceSize size)
 	{
 		memory_ref ref = alloc_buffer<BType, Dynamic>(size);
-		const mem_ref_internal& int_ref = reinterpret_cast<const mem_ref_internal&>(ref);
+		const mem_ref_internal& int_ref = static_cast<const mem_ref_internal&>(ref);
 
 		if constexpr (!Dynamic || BType == buffer_t::UNIVERSAL)
 			submit_upload<BType>(int_ref.pool, int_ref.offset, data, size);
@@ -472,7 +484,7 @@ namespace ENGINE_NAMESPACE
 		info.dstOffset = offset;
 		info.size = size;
 
-		std::memcpy(reinterpret_cast<char*>(memory_ptr->host) + memory_ptr->offset, data, size);
+		std::memcpy(static_cast<std::byte*>(memory_ptr->host) + memory_ptr->offset, data, size);
 
 		pending_copies<BType>(*radd.current_frame)[copy_path_t(transfer_idx, pool_idx)].push_back(info);
 		memory_ptr->offset += size;
@@ -481,16 +493,16 @@ namespace ENGINE_NAMESPACE
 	template<device_memory::buffer_t BType>
 	inline void device_memory::memcpy(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset)
 	{
-		const mem_ref_internal& int_ref = reinterpret_cast<const mem_ref_internal&>(ref);
+		const mem_ref_internal& int_ref = static_cast<const mem_ref_internal&>(ref);
 		std::vector<dynamic_buffer_pool>& pools = dynamic_pools<BType>();
 		INTERNAL_ASSERT(int_ref.offset + offset + size <= int_ref.size, "Out of bounds memory access");
-		std::memcpy(reinterpret_cast<std::byte*>(pools[int_ref.pool].host_ptr()) + int_ref.offset + offset, data, size);
+		std::memcpy(static_cast<std::byte*>(pools[int_ref.pool].host_ptr()) + int_ref.offset + offset, data, size);
 	}
 
 	template<device_memory::buffer_t BType>
 	void device_memory::map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept
 	{
-		const mem_ref_internal& int_ref = reinterpret_cast<const mem_ref_internal&>(ref);
+		const mem_ref_internal& int_ref = static_cast<const mem_ref_internal&>(ref);
 		*out_offset = aligned_offset(int_ref.offset, offset_alignment<BType>());
 		*out_map_ptr = &dynamic_pools<BType>()[int_ref.pool].host_ptr();
 	}
@@ -498,7 +510,7 @@ namespace ENGINE_NAMESPACE
 	buffer_binding_args device_memory::index_binding_args(const mesh& object) noexcept
 	{
 		const mem_ref_internal& ref
-			= reinterpret_cast<const mem_ref_internal&>(reinterpret_cast<const mesh_internal&>(object).index_ref);
+			= static_cast<const mem_ref_internal&>(static_cast<const mesh_internal&>(object).index_ref);
 		INTERNAL_ASSERT(ref.valid(), "Invalid memory reference");
 		return { index_pools[ref.pool].buffer(), index_pools[ref.pool].size(), ref.offset, ref.size };
 	}
@@ -507,7 +519,7 @@ namespace ENGINE_NAMESPACE
 	buffer_binding_args device_memory::binding_args(const resource& resource) noexcept
 	{
 		const mem_ref_internal& ref
-			= reinterpret_cast<const mem_ref_internal&>(reinterpret_cast<const resource_internal&>(resource).ref);
+			= static_cast<const mem_ref_internal&>(static_cast<const resource_internal&>(resource).ref);
 		INTERNAL_ASSERT(ref.valid(), "Invalid memory reference");
 		return { static_pools<BType>()[ref.pool].buffer(), 0, aligned_offset(ref.offset, offset_alignment<BType>()), 
 			ref.size };
@@ -517,7 +529,7 @@ namespace ENGINE_NAMESPACE
 	buffer_binding_args device_memory::dynamic_binding_args(const resource& resource) noexcept
 	{
 		const mem_ref_internal& ref
-			= reinterpret_cast<const mem_ref_internal&>(reinterpret_cast<const resource_internal&>(resource).ref);
+			= static_cast<const mem_ref_internal&>(static_cast<const resource_internal&>(resource).ref);
 		INTERNAL_ASSERT(ref.valid(), "Invalid memory reference");
 		dynamic_buffer_pool& pool = dynamic_pools<BType>()[ref.pool];
 		return { pool.buffer(), pool.size(), aligned_offset(ref.offset, offset_alignment<BType>()), ref.size };

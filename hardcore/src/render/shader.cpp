@@ -4,51 +4,46 @@
 #include <render/shader.hpp>
 
 #include <debug/log_internal.hpp>
+#include <io/file.hpp>
 
 #include <shaderc/shaderc.h>
 #include <spirv_cross/spirv_reflect.hpp>
 
 namespace ENGINE_NAMESPACE
 {
-//This macro is implemented as a std function in C++20, could consider updating (TODO)
-#define ENDS_WITH(str, size, suffix) (size >= sizeof(suffix) - 1 && !str.compare(size - (sizeof(suffix) - 1), sizeof(suffix) - 1, suffix))
-
-#define CASE(str, size, suffix, result) if (ENDS_WITH(str, size, suffix)) return result
-
 	inline shader_t stage_from_filename(const char* filename)
 	{
 		std::string fn(filename);
-		std::size_t fnl = fn.length();
-		if (ENDS_WITH(fn, fnl, shader_extensions::SPIRV))
+		std::size_t offset_0 = fn.rfind('.');
+		std::string extension = fn.substr(offset_0);
+
+		if (extension == shader_ext::SPIRV)
 		{
-			std::size_t pos = fn.rfind(shader_extensions::SPIRV);
-			fn = fn.substr(0, pos);
-			fnl = fn.length();
+			std::size_t offset_1 = fn.rfind('.', offset_0 - 1);
+			extension = fn.substr(offset_1, offset_0 - offset_1);
 		}
 
-		CASE(fn, fnl, shader_extensions::VERTEX, shader_t::VERTEX);
-		CASE(fn, fnl, shader_extensions::FRAGMENT, shader_t::FRAGMENT);
-		CASE(fn, fnl, shader_extensions::COMPUTE, shader_t::COMPUTE);
-		CASE(fn, fnl, shader_extensions::TESSELATION_CONTROL, shader_t::TESSELATION_CONTROL);
-		CASE(fn, fnl, shader_extensions::TESSELATION_EVALUATION, shader_t::TESSELATION_EVALUATION);
-		CASE(fn, fnl, shader_extensions::GEOMETRY, shader_t::GEOMETRY);
-		CASE(fn, fnl, shader_extensions::RAY_GENERATION, shader_t::RAY_GENERATION);
-		CASE(fn, fnl, shader_extensions::RAY_INTERSECTION, shader_t::RAY_INTERSECTION);
-		CASE(fn, fnl, shader_extensions::RAY_ANY_HIT, shader_t::RAY_ANY_HIT);
-		CASE(fn, fnl, shader_extensions::RAY_CLOSEST_HIT, shader_t::RAY_CLOSEST_HIT);
-		CASE(fn, fnl, shader_extensions::RAY_MISS, shader_t::RAY_MISS);
-		CASE(fn, fnl, shader_extensions::RAY_CALLABLE, shader_t::RAY_CALLABLE);
-		CASE(fn, fnl, shader_extensions::MESH, shader_t::MESH);
-		CASE(fn, fnl, shader_extensions::TASK, shader_t::TASK);
+		if (extension == shader_ext::VERTEX)					return shader_t::VERTEX;
+		if (extension == shader_ext::FRAGMENT)					return shader_t::FRAGMENT;
+		if (extension == shader_ext::COMPUTE)					return shader_t::COMPUTE;
+		if (extension == shader_ext::TESSELATION_CONTROL)		return shader_t::TESSELATION_CONTROL;
+		if (extension == shader_ext::TESSELATION_EVALUATION)	return shader_t::TESSELATION_EVALUATION;
+		if (extension == shader_ext::GEOMETRY)					return shader_t::GEOMETRY;
+		if (extension == shader_ext::RAY_GENERATION)			return shader_t::RAY_GENERATION;
+		if (extension == shader_ext::RAY_INTERSECTION)			return shader_t::RAY_INTERSECTION;
+		if (extension == shader_ext::RAY_ANY_HIT)				return shader_t::RAY_ANY_HIT;
+		if (extension == shader_ext::RAY_CLOSEST_HIT)			return shader_t::RAY_CLOSEST_HIT;
+		if (extension == shader_ext::RAY_MISS)					return shader_t::RAY_MISS;
+		if (extension == shader_ext::RAY_CALLABLE)				return shader_t::RAY_CALLABLE;
+		if (extension == shader_ext::MESH)						return shader_t::MESH;
+		if (extension == shader_ext::TASK)						return shader_t::TASK;
 
 		INTERNAL_ASSERT(false, "Unknown shader type");
 		return shader_t::NONE;
 	}
 
-#undef CASE
-
 	/**
-	 * @brief Helper function to allocate and copy an identical C string.
+	 * @brief Helper function to allocate and copy an identical C string. The returned copy MUST be manually freed.
 	 * @param name C string to copy
 	 * @return Newly allocated C string copy
 	*/
@@ -146,9 +141,10 @@ namespace ENGINE_NAMESPACE
 			INTERNAL_ASSERT(false, "Unhandled error in shader compilation");
 		}
 
-		*out_datasize = shaderc_result_get_length(result);
-		*out_data = reinterpret_cast<std::uint32_t*>(ex_malloc(*out_datasize));
-		memcpy(*out_data, shaderc_result_get_bytes(result), *out_datasize);
+		std::size_t datasize = shaderc_result_get_length(result);
+		*out_data = static_cast<std::uint32_t*>(ex_malloc(datasize));
+		memcpy(*out_data, shaderc_result_get_bytes(result), datasize);
+		*out_datasize = datasize;
 
 		shaderc_result_release(result);
 	}
@@ -158,85 +154,74 @@ namespace ENGINE_NAMESPACE
 		spirv_cross::SPIRType type;
 	};
 
-#define BASE_CASE(cross_type, internal_type) case spirv_cross::SPIRType::BaseType::cross_type: *out_ct = data_layout::component_type::internal_type; break;
-	inline void cross_to_internal_type(const spirv_cross::SPIRType& type, data_layout::type* out_t, data_layout::component_type* out_ct)
+	constexpr std::pair<data_layout::type, data_layout::component_type> cross_to_internal_type(const spirv_cross::SPIRType& type)
 	{
+		typedef spirv_cross::SPIRType::BaseType cross_t;
+		typedef data_layout::component_type component_t;
+		typedef data_layout::type vector_t;
+
+		std::pair<vector_t, component_t> res;
+
 		switch (type.basetype)
 		{
-			BASE_CASE(Half, FLOAT16);
-			BASE_CASE(Float, FLOAT32);
-			BASE_CASE(Double, FLOAT64);
-			BASE_CASE(SByte, INT8);
-			BASE_CASE(Short, INT16);
-			BASE_CASE(Int, INT32);
-			BASE_CASE(Int64, INT64);
-			BASE_CASE(UByte, UINT8);
-			BASE_CASE(UShort, UINT16);
-			BASE_CASE(UInt, UINT32);
-			BASE_CASE(UInt64, UINT64);
+		case cross_t::Half:		res.second = component_t::FLOAT16; break;
+		case cross_t::Float:	res.second = component_t::FLOAT32; break;
+		case cross_t::Double:	res.second = component_t::FLOAT64; break;
+		case cross_t::SByte:	res.second = component_t::INT8; break;
+		case cross_t::Short:	res.second = component_t::INT16; break;
+		case cross_t::Int:		res.second = component_t::INT32; break;
+		case cross_t::Int64:	res.second = component_t::INT64; break;
+		case cross_t::UByte:	res.second = component_t::UINT8; break;
+		case cross_t::UShort:	res.second = component_t::UINT16; break;
+		case cross_t::UInt:		res.second = component_t::UINT32; break;
+		case cross_t::UInt64:	res.second = component_t::UINT64; break;
 		default:
 			INTERNAL_ASSERT(false, "Invalid component type");
 		}
 
 		switch (type.vecsize)
 		{
-		case 1: *out_t = data_layout::type::SCALAR; break;
-		case 2: *out_t = data_layout::type::VEC2; break;
-		case 3: *out_t = data_layout::type::VEC3; break;
-		case 4: *out_t = data_layout::type::VEC4; break;
+		case 1: res.first = vector_t::SCALAR; break;
+		case 2: res.first = vector_t::VEC2; break;
+		case 3: res.first = vector_t::VEC3; break;
+		case 4: res.first = vector_t::VEC4; break;
 		default:
 			INTERNAL_ASSERT(false, "Invalid vector size");
 		}
+
+		return res;
 	}
-#undef BASE_CASE
 
 	shader::shader(const char* filename, const char* entry_point, const char* name, shader_t stage) :
 		stage(stage == shader_t::NONE ? stage_from_filename(filename) : stage), 
-		entry_point(create_cstr(entry_point)), name(create_cstr(name))
+		entry_point(create_cstr(entry_point)), _name(create_cstr(name))
 	{
-		std::ifstream file(filename, std::ios::ate | std::ios::binary);
-		if (!file.is_open())
-		{
-			CRASH("Failed to open shader file");
-		}
-
-		std::streampos pos = file.tellg();
-		std::size_t buffer_size = static_cast<std::int32_t>(pos) > 0 && static_cast<std::int32_t>(pos) < MEGABYTES(1)
-			? static_cast<std::int32_t>(pos) : BIT(12);
-		std::vector<std::byte> buffer(buffer_size);
-		file.seekg(0, std::ios::beg);
-
-		std::vector<std::byte> file_data;
-		file_data.reserve(buffer_size);
 		std::size_t filesize = 0;
-		while (file.read(reinterpret_cast<char*>(buffer.data()), buffer_size))
-		{
-			file_data.insert(file_data.end(), buffer.begin(), buffer.begin() + file.gcount());
-			filesize += file.gcount();
-		}
-		file.close();
+		void* filedata = read_binary_file(filename, filesize);
 		
 		std::string fn(filename);
-		std::size_t fnl = fn.length();
-		if (!ENDS_WITH(fn, fnl, shader_extensions::SPIRV)) //needs to be compiled
+		std::string extension = fn.substr(fn.rfind('.'));
+
+		//check if shader needs to be compiled
+		if (extension != shader_ext::SPIRV)
 		{
-			compile_shader(reinterpret_cast<char*>(file_data.data()), filesize / sizeof(char), entry_point, this->stage, filename,
+			//TODO implement read text file and change the read function depending if there is a need to compile
+			compile_shader(static_cast<char*>(filedata), filesize / sizeof(char), entry_point, this->stage, filename,
 				&data, &size);
+
+			std::free(filedata);
 		}
 		else
 		{
 			size = filesize;
-			data = reinterpret_cast<std::uint32_t*>(ex_malloc(filesize));
-			memcpy(data, file_data.data(), filesize);
+			data = static_cast<std::uint32_t*>(filedata);
 		}
 
 		reflect();
 	}
 
-#undef ENDS_WITH
-
 	shader::shader(const char* name, const char* entry_point, shader_t stage, const char* code) :
-		name(create_cstr(name)), entry_point(create_cstr(entry_point)), stage(stage)
+		_name(create_cstr(name)), entry_point(create_cstr(entry_point)), stage(stage)
 	{
 		compile_shader(code, (std::strlen(name) + 1) / sizeof(char), entry_point, this->stage, name, &data, &size);
 		reflect();
@@ -246,51 +231,55 @@ namespace ENGINE_NAMESPACE
 	{
 		if (data)
 		{
-			for (std::uint8_t i = 0; i < n_inputs; i++) inputs[i].~data_layout();
-			
 			std::free(data);
-			std::free(inputs);
-			std::free(name);
+			std::free(_name);
 			std::free(entry_point);
 			data = nullptr;
 		}
 	}
 
-	inline void reflect_inputs(const spirv_cross::Compiler& reflection, const spirv_cross::ShaderResources& resources,
-		std::uint8_t* out_n_inputs, data_layout** out_inputs)
+	const data_layout* shader::inputs(std::size_t& out_size) const noexcept
+	{
+		out_size = _inputs.size();
+		return _inputs.data();
+	}
+
+	inline std::vector<data_layout> reflect_inputs(const spirv_cross::Compiler& reflection, const spirv_cross::ShaderResources& resources)
 	{
 		std::vector<std::vector<input_resource>> inputs_vector;
 		for (const spirv_cross::Resource& input : resources.stage_inputs)
 		{
 			std::uint32_t binding = reflection.get_decoration(input.id, spv::DecorationBinding);
 
-			for (std::size_t i = inputs_vector.size(); i < static_cast<std::size_t>(binding) + 1; i++) inputs_vector.emplace_back();
+			const std::size_t min_binding_size = static_cast<std::size_t>(binding + 1);
+			if (inputs_vector.size() < min_binding_size) inputs_vector.resize(min_binding_size);
 
 			auto& binding_vector = inputs_vector[binding];
 			std::uint32_t location = reflection.get_decoration(input.id, spv::DecorationLocation);
 
-			for (std::size_t i = binding_vector.size(); i < static_cast<std::size_t>(location) + 1; i++) binding_vector.emplace_back();
+			const std::size_t min_location_size = static_cast<std::size_t>(location + 1);
+			if (binding_vector.size() < min_location_size) binding_vector.resize(min_location_size);
 
 			binding_vector[location].type = reflection.get_type(input.type_id);
 		}
 
+		std::vector<data_layout> inputs(inputs_vector.size());
+
 		std::uint32_t i = 0;
-		*out_n_inputs = static_cast<std::uint8_t>(inputs_vector.size());
-		*out_inputs = t_malloc<data_layout>(*out_n_inputs);
 		for (const auto& binding : inputs_vector)
 		{
 			std::uint32_t k = 0;
-			new (&(*out_inputs)[i]) data_layout(static_cast<std::uint8_t>(binding.size()));
+			inputs[i] = data_layout(static_cast<std::uint8_t>(binding.size()));
 			for (const auto& location : binding)
 			{
-				data_layout::type t;
-				data_layout::component_type ct;
-				cross_to_internal_type(location.type, &t, &ct);
-				(*out_inputs)[i].set_type(k, t, ct);
+				const auto [vt, ct] = cross_to_internal_type(location.type);
+				inputs[i].set_type(k, vt, ct);
 				k++;
 			}
 			i++;
 		}
+
+		return inputs;
 	}
 
 	template<shader::descriptor_t Type>
@@ -351,24 +340,18 @@ namespace ENGINE_NAMESPACE
 		spirv_cross::Compiler reflection(data, size / sizeof(std::uint32_t));
 		spirv_cross::ShaderResources resources = reflection.get_shader_resources();
 		
-		reflect_inputs(reflection, resources, &n_inputs, &inputs);
+		_inputs = reflect_inputs(reflection, resources);
 		//TODO: reflect_outputs to check shader compatibility maybe, or set write mask in VkPipelineColorBlendAttachmentState
 		//TODO: reflect_subpass_inputs not sure what this is
 
-		std::vector<descriptor_data> descriptors;
-		reflect_descriptors<UNIFORM>(reflection, resources, descriptors);
-		reflect_descriptors<STORAGE>(reflection, resources, descriptors);
-		reflect_descriptors<SAMPLER>(reflection, resources, descriptors);
-		reflect_descriptors<TEXTURE>(reflection, resources, descriptors);
-		reflect_descriptors<IMAGE>(reflection, resources, descriptors);
-		reflect_descriptors<SAMPLER_SHADOW>(reflection, resources, descriptors);
+		reflect_descriptors<UNIFORM>(reflection, resources, _descriptors);
+		reflect_descriptors<STORAGE>(reflection, resources, _descriptors);
+		reflect_descriptors<SAMPLER>(reflection, resources, _descriptors);
+		reflect_descriptors<TEXTURE>(reflection, resources, _descriptors);
+		reflect_descriptors<IMAGE>(reflection, resources, _descriptors);
+		reflect_descriptors<SAMPLER_SHADOW>(reflection, resources, _descriptors);
 
-		if (descriptors.size())
-		{
-			this->descriptors = t_malloc<descriptor_data>(descriptors.size());
-			this->n_descriptors = static_cast<std::uint32_t>(descriptors.size());
-			std::memcpy(this->descriptors, descriptors.data(), descriptors.size() * sizeof(descriptor_data));
-		}
+		_descriptors.shrink_to_fit();
 
 		//TODO: reflect_push_constants
 		//TODO: reflect_specialisation_constants
@@ -378,7 +361,7 @@ namespace ENGINE_NAMESPACE
 		VkShaderStageFlagBits* out_stage, const char** out_entry_point)
 	{
 		//cast should cause no issues, as internal shader is merely a helper class to help access base class variables
-		const internal_shader& cast_shader = reinterpret_cast<const internal_shader&>(shader);
+		const internal_shader& cast_shader = static_cast<const internal_shader&>(shader);
 
 		VkShaderModule module;
 

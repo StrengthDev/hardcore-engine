@@ -205,7 +205,7 @@ namespace ENGINE_NAMESPACE
 	public:
 		inline void set(void* data) noexcept
 		{
-			std::memcpy(reinterpret_cast<std::byte*>(*ref->data_ptr) + ref->offset + ref->layout().size() * index, data, 
+			std::memcpy(static_cast<std::byte*>(*ref->data_ptr) + ref->offset + ref->layout().size() * index, data, 
 				ref->layout().size());
 		}
 

@@ -204,7 +204,7 @@ namespace ENGINE_NAMESPACE
 			return converted;
 		}
 
-		static inline bool convertion_equals(const data_layout& x, const data_layout& y)
+		static inline bool vectorized_equals(const data_layout& x, const data_layout& y)
 		{
 			if (x.vector_count() == y.vector_count())
 			{

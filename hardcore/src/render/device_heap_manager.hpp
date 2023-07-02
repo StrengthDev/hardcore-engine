@@ -47,7 +47,7 @@ namespace ENGINE_NAMESPACE
 			VkBufferUsageFlags usage, heap h);
 
 		std::uint32_t alloc_texture_memory(VkDevice device, VkDeviceMemory& memory, VkDeviceSize size,
-			std::uint32_t memory_type_bits, VkMemoryPropertyFlags heap_properties);
+			heap preferred_heap, std::uint32_t memory_type_bits);
 
 		void free(VkDevice device, VkDeviceMemory& memory);
 
@@ -58,10 +58,16 @@ namespace ENGINE_NAMESPACE
 			return _mem_properties.memoryTypes[dynamic_type_idx].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		}
 
+		inline bool host_coherent_upload_heap() const noexcept
+		{
+			return _mem_properties.memoryTypes[upload_type_idx].propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		}
+
 		std::uint32_t allocations() const noexcept { return _allocations; }
 
 	private:
 		std::uint32_t find_memory_type(std::uint32_t type_filter, VkMemoryPropertyFlags properties);
+		std::uint32_t get_memory_type_idx(heap h, std::uint32_t memory_type_bits) const;
 
 		VkPhysicalDeviceMemoryProperties _mem_properties;
 

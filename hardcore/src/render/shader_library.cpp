@@ -10,7 +10,7 @@ namespace ENGINE_NAMESPACE
 	{
 		const shader& add(shader&& s)
 		{
-			const char* name = s.get_name();
+			const char* name = s.name();
 			shaders.insert(std::pair(name, std::move(s)));
 			return shaders[name];
 		}

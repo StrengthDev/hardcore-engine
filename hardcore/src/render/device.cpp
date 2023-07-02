@@ -289,7 +289,7 @@ namespace ENGINE_NAMESPACE
 				"Failed to create image semaphore");
 			VK_CRASH_CHECK(vkCreateSemaphore(handle, &semaphore_info, nullptr, &render_finished_semaphores[i]), 
 				"Failed to create render semaphore");
-			VK_CRASH_CHECK(vkCreateFence(handle, &fence_info, nullptr, &frame_fences[i]), "");
+			VK_CRASH_CHECK(vkCreateFence(handle, &fence_info, nullptr, &frame_fences[i]), "Failed to create frame fence");
 		}
 
 		VkAttachmentDescription attachment = {};
@@ -415,10 +415,10 @@ namespace ENGINE_NAMESPACE
 		const std::uint8_t next_frame = (current_frame + 1) % max_frames_in_flight;
 		const std::uint8_t previous_frame = (current_frame - 1 + max_frames_in_flight) % max_frames_in_flight;
 
-		memory.unmap_ranges(handle, current_frame);
 		vkWaitForFences(handle, 1, &frame_fences[current_frame], VK_TRUE, UINT64_MAX);
 		for (auto& pipeline : graphics_pipelines) pipeline.update_descriptor_sets(previous_frame, current_frame, next_frame); //TODO consider parallelizing this
-		memory.flush_in(handle, transfer_queue, current_frame);
+		const bool memory_flushed = memory.flush_in(handle, transfer_queue, current_frame);
+		memory.unmap_ranges(handle, current_frame);
 		main_swapchain.check_destroy_old(handle, current_frame);
 		if (!old_framebuffers.empty())
 		{
@@ -488,13 +488,16 @@ namespace ENGINE_NAMESPACE
 
 		VK_CRASH_CHECK(vkEndCommandBuffer(primary_buffer), "Failed to end primary graphics command buffer");
 
-		VkSemaphore pre_render_semaphores[] = { image_available_semaphores[current_frame], memory.get_device_in_semaphore(current_frame) };
+		std::vector<VkSemaphore> pre_render_semaphores;
+		pre_render_semaphores.reserve(2);
+		pre_render_semaphores.push_back(image_available_semaphores[current_frame]);
+		if (memory_flushed) pre_render_semaphores.push_back(memory.get_device_in_semaphore(current_frame));
 
 		VkSubmitInfo submitInfo = {};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT };
-		submitInfo.waitSemaphoreCount = 2;
-		submitInfo.pWaitSemaphores = pre_render_semaphores;
+		submitInfo.waitSemaphoreCount = static_cast<std::uint32_t>(pre_render_semaphores.size());
+		submitInfo.pWaitSemaphores = pre_render_semaphores.data();
 		submitInfo.pWaitDstStageMask = waitStages;
 		submitInfo.commandBufferCount = 1;
 		submitInfo.pCommandBuffers = &primary_buffer;
