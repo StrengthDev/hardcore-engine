@@ -143,7 +143,7 @@ namespace ENGINE_NAMESPACE
 		void* m_host_ptr = nullptr;
 	};
 
-	struct texture //TODO rename to texture_slot
+	struct texture_slot
 	{
 		VkImage image;
 		VkImageView view;
@@ -153,7 +153,7 @@ namespace ENGINE_NAMESPACE
 		VkImageLayout layout; // layout of the image at the start of the frame
 	};
 
-	texture create_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements& out_memory_requirements);
+	texture_slot create_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements& out_memory_requirements);
 
 	class texture_pool : public memory_pool //maybe use templated texture_memory_pool
 	{
@@ -166,9 +166,9 @@ namespace ENGINE_NAMESPACE
 
 		bool search(VkDeviceSize size, VkDeviceSize alignment, u32 memory_type_bits,
 			u32& out_slot_idx, VkDeviceSize& out_size_needed, VkDeviceSize& out_offset) const;
-		void fill_slot(VkDevice device, texture&& tex, u32 slot_idx, VkDeviceSize size, VkDeviceSize alignment);
+		void fill_slot(VkDevice device, texture_slot&& tex, u32 slot_idx, VkDeviceSize size, VkDeviceSize alignment);
 
-		const texture& tex_at(u32 idx) const noexcept { return texture_slots[idx]; }
+		const texture_slot& tex_at(u32 idx) const noexcept { return texture_slots[idx]; }
 
 	protected:
 		void realloc_slots(u32 new_count) override;
@@ -176,7 +176,7 @@ namespace ENGINE_NAMESPACE
 
 	private:
 		u32 memory_type_idx = std::numeric_limits<u32>::max();
-		texture* texture_slots = nullptr;
+		texture_slot* texture_slots = nullptr;
 	};
 
 	/**

@@ -1,11 +1,11 @@
 #include <pch.hpp>
 
-#include <render/memory_pool.hpp>
+#include <render/resource_pool.hpp>
 
 namespace ENGINE_NAMESPACE
 {
 	const u32 initial_pool_slot_size = 16;
-	//TODO rename to resource_pool
+	
 	memory_pool::memory_pool(VkDeviceSize size, bool per_frame_allocation) : m_size(size)
 	{
 		n_slots = initial_pool_slot_size;
@@ -47,7 +47,7 @@ namespace ENGINE_NAMESPACE
 		if (m_size < size)
 			return false;
 
-		const u32 invalid_idx = std::numeric_limits<u32>::max();
+		constexpr u32 invalid_idx = std::numeric_limits<u32>::max();
 
 		// largest free slot is unknown, must check everything, look for smallest possible fit
 		// if possible, update largest free slot to reduce cost of future calls
@@ -250,7 +250,7 @@ namespace ENGINE_NAMESPACE
 		}
 	}
 
-	texture create_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements& out_memory_requirements)
+	texture_slot create_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements& out_memory_requirements)
 	{
 		VkImage image;
 		VK_CRASH_CHECK(vkCreateImage(device, &image_info, nullptr, &image), "Failed to create image");
@@ -320,7 +320,7 @@ namespace ENGINE_NAMESPACE
 		memory_pool(size)
 	{
 		memory_type_idx = heap_manager.alloc_texture_memory(device, m_memory, size, preferred_heap, memory_type_bits);
-		texture_slots = t_malloc<texture>(initial_pool_slot_size);
+		texture_slots = t_malloc<texture_slot>(initial_pool_slot_size);
 	}
 
 	void texture_pool::free(VkDevice device, device_heap_manager& heap_manager)
@@ -338,7 +338,7 @@ namespace ENGINE_NAMESPACE
 		return false;
 	}
 
-	void texture_pool::fill_slot(VkDevice device, texture&& tex, u32 slot_idx, VkDeviceSize size, VkDeviceSize alignment)
+	void texture_pool::fill_slot(VkDevice device, texture_slot&& tex, u32 slot_idx, VkDeviceSize size, VkDeviceSize alignment)
 	{
 		memory_pool::fill_slot(slot_idx, size);
 
@@ -353,7 +353,7 @@ namespace ENGINE_NAMESPACE
 	void texture_pool::realloc_slots(u32 new_count)
 	{
 		slots = t_realloc<memory_slot>(slots, new_count);
-		texture_slots = t_realloc<texture>(texture_slots, new_count);
+		texture_slots = t_realloc<texture_slot>(texture_slots, new_count);
 	}
 
 	void texture_pool::move_slots(u32 dst, u32 src, u32 count)

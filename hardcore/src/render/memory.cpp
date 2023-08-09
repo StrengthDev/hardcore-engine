@@ -619,7 +619,7 @@ namespace ENGINE_NAMESPACE
 		image_info.initialLayout = Dynamic ? VK_IMAGE_LAYOUT_PREINITIALIZED : VK_IMAGE_LAYOUT_UNDEFINED;
 		
 		VkMemoryRequirements requirements;
-		texture tex = create_texture(radd.device, image_info, requirements);
+		texture_slot tex = create_texture(radd.device, image_info, requirements);
 
 		using pool_t = typename get_texture_pool<Dynamic>::type;
 		std::vector<pool_t>* pools;
@@ -697,7 +697,7 @@ namespace ENGINE_NAMESPACE
 		texture_upload_pool& up_pool = m_tex_upload_pools[up_pool_idx];
 
 		const texture_pool& tex_pool = texture_pools[iref.pool];
-		const texture& tex = tex_pool.tex_at(tex_pool.find_slot(iref.offset));
+		const texture_slot& tex = tex_pool.tex_at(tex_pool.find_slot(iref.offset));
 		up_pool.buffer_image_copy(data, size, tex.image, VK_IMAGE_LAYOUT_GENERAL, tex.dims);
 		
 		m_uploads_pending = true;
