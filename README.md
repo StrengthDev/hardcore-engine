@@ -6,6 +6,12 @@ Hardcore is a low-level graphics engine implemented using the Vulkan API. The pr
 
 (To be expanded)
 
+# Dependencies
+
+- C++ 20 (required, some features are used)
+- [Vulkan SDK](https://vulkan.lunarg.com/sdk/home) 1.2.176.1
+- [GLFW](https://www.glfw.org) 3.3.8
+
 # API
 
 (This is only a simple description of how the engine is used and some of the design choices)
@@ -20,7 +26,6 @@ Resources, specifically those on the GPU, are implemented as classes, being allo
 
 # Some implementation details
 
-- To handle window creation and mangement GLFW is used
 - Vulkan calls are made using the C library
 - Device memory management is handled entirely by the engine, without the use of any library
 - Shader features are extracted using SPIRV-Cross

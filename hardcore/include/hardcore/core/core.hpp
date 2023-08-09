@@ -44,14 +44,27 @@
 
 #endif 
 
-#define BIT(x) (1 << x)
+#define BIT(x) (1ULL << x)
 
-#define KILOBYTES(x) x * BIT(10)
-#define MEGABYTES(x) KILOBYTES(x) * BIT(10)
-#define GIGABYTES(x) MEGABYTES(x) * BIT(10)
+#define KILOBYTES(x) (x * BIT(10))
+#define MEGABYTES(x) (KILOBYTES(x) * BIT(10))
+#define GIGABYTES(x) (MEGABYTES(x) * BIT(10))
 
 namespace ENGINE_NAMESPACE
 {
+	//normally id add _t at the end of typedefs, but to their nature and how frequently these are used, I felt it was 
+	//more appropriate to not do it
+
+	typedef std::uint8_t u8;
+	typedef std::uint16_t u16;
+	typedef std::uint32_t u32;
+	typedef std::uint64_t u64;
+
+	typedef std::int8_t i8;
+	typedef std::int16_t i16;
+	typedef std::int32_t i32;
+	typedef std::int64_t i64;
+
 	/**
 	 * @brief Allocates uninitialized memory.
 	 * @param size Number of bytes to allocate.
@@ -142,7 +155,7 @@ namespace ENGINE_NAMESPACE
 		return static_cast<Type*>(ex_realloc(ptr, count * sizeof(Type)));
 	}
 
-	inline void crash(const char* msg, const char* file, std::uint32_t line, const char* func, int error = -1)
+	inline void crash(const char* msg, const char* file, u32 line, const char* func, int error = -1)
 	{
 		
 		

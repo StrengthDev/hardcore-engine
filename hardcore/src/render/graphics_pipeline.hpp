@@ -71,18 +71,18 @@ namespace ENGINE_NAMESPACE
 			return *this;
 		}
 
-		void record_commands(VkCommandBuffer& buffer, std::uint8_t current_frame);
-		void update_descriptor_sets(std::uint8_t previous_frame, std::uint8_t current_frame, std::uint8_t next_frame);
+		void record_commands(VkCommandBuffer& buffer, u8 current_frame);
+		void update_descriptor_sets(u8 previous_frame, u8 current_frame, u8 next_frame);
 
 		std::size_t add(const mesh& object);
 		void remove(const mesh& object);
 
-		std::size_t set_instances(const mesh& object, std::uint32_t num);
-		inline void set_instances(std::size_t object_idx, std::uint32_t num) { objects[object_idx].properties().instances = num; }
+		std::size_t set_instances(const mesh& object, u32 num);
+		inline void set_instances(std::size_t object_idx, u32 num) { objects[object_idx].properties().instances = num; }
 
 		template<typename Type, 
 			std::enable_if_t<std::is_base_of<resource, Type>::value && std::is_final<Type>::value, bool> = true>
-		inline std::size_t set_descriptor(const mesh& object, std::uint32_t descriptor_idx, const Type& buffer)
+		inline std::size_t set_descriptor(const mesh& object, u32 descriptor_idx, const Type& buffer)
 		{
 			auto it = object_refs.find(std::hash<resource>{}(object));
 			if (it == object_refs.end())
@@ -94,7 +94,7 @@ namespace ENGINE_NAMESPACE
 
 		template<typename Type,
 			std::enable_if_t<std::is_base_of<resource, Type>::value && std::is_final<Type>::value, bool> = true>
-		inline void set_descriptor(std::size_t object_idx, std::uint32_t descriptor_idx, const Type& buffer)
+		inline void set_descriptor(std::size_t object_idx, u32 descriptor_idx, const Type& buffer)
 		{
 			INTERNAL_ASSERT(n_object_bindings > descriptor_idx, "Descriptor index out of bounds");
 			if (!type_match(descriptor_idx, buffer))
@@ -111,17 +111,17 @@ namespace ENGINE_NAMESPACE
 		graphics_pipeline(device& owner, const std::vector<const shader*>& shaders, const VkExtent2D& extent, 
 			bool dynamic_viewport);
 
-		inline bool type_match(std::uint32_t descriptor_idx, const uniform&) const noexcept
+		inline bool type_match(u32 descriptor_idx, const uniform&) const noexcept
 		{ return object_binding_types[descriptor_idx] == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC; }
-		inline bool type_match(std::uint32_t descriptor_idx, const unmapped_uniform&) const noexcept
+		inline bool type_match(u32 descriptor_idx, const unmapped_uniform&) const noexcept
 		{ return object_binding_types[descriptor_idx] == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC; }
-		inline bool type_match(std::uint32_t descriptor_idx, const storage_array&) const noexcept
+		inline bool type_match(u32 descriptor_idx, const storage_array&) const noexcept
 		{ return object_binding_types[descriptor_idx] == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC; }
-		inline bool type_match(std::uint32_t descriptor_idx, const dynamic_storage_array&) const noexcept
+		inline bool type_match(u32 descriptor_idx, const dynamic_storage_array&) const noexcept
 		{ return object_binding_types[descriptor_idx] == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC; }
-		inline bool type_match(std::uint32_t descriptor_idx, const storage_vector&) const noexcept
+		inline bool type_match(u32 descriptor_idx, const storage_vector&) const noexcept
 		{ return object_binding_types[descriptor_idx] == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC; }
-		inline bool type_match(std::uint32_t descriptor_idx, const dynamic_storage_vector&) const noexcept
+		inline bool type_match(u32 descriptor_idx, const dynamic_storage_vector&) const noexcept
 		{ return object_binding_types[descriptor_idx] == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC; }
 
 		buffer_binding_args get_binding(const uniform& resource) const;
@@ -131,46 +131,46 @@ namespace ENGINE_NAMESPACE
 		buffer_binding_args get_binding(const storage_vector& resource) const;
 		buffer_binding_args get_binding(const dynamic_storage_vector& resource) const;
 
-		void set_descriptor(std::size_t object_idx, std::uint32_t descriptor_idx, buffer_binding_args&& binding);
+		void set_descriptor(std::size_t object_idx, u32 descriptor_idx, buffer_binding_args&& binding);
 
 		device* owner;
 
-		std::uint32_t n_descriptor_set_layouts = 0;
+		u32 n_descriptor_set_layouts = 0;
 		VkDescriptorSetLayout* descriptor_set_layouts = nullptr;
 		VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
 		VkPipeline handle = VK_NULL_HANDLE;
 
-		std::uint32_t push_data_size = 0;
+		u32 push_data_size = 0;
 		VkShaderStageFlags push_flags = 0;
 
 		//object descriptors => set 0 ; pipeline descriptors => set 1
-		std::uint32_t n_descriptor_pool_sizes[2] = { 0, 0 }; //TODO change
+		u32 n_descriptor_pool_sizes[2] = { 0, 0 }; //TODO change
 		VkDescriptorPoolSize* descriptor_pool_sizes[2] = { nullptr, nullptr };
 
 		VkDescriptorSet* descriptor_sets = nullptr;
-		std::uint32_t object_descriptor_set_capacity = 0;
+		u32 object_descriptor_set_capacity = 0;
 
 		struct frame_descriptor_data
 		{
 			VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
-			std::uint32_t object_set_cap = 0;
+			u32 object_set_cap = 0;
 			bool dirty = false; //client made changes this frame
 			bool outdated = false; //no changes this frame, but in previous frame
 		};
 
 		std::array<frame_descriptor_data, max_frames_in_flight> frame_descriptors;
 
-		std::uint32_t frame_descriptor_count = 0;
+		u32 frame_descriptor_count = 0;
 
-		std::uint32_t n_object_bindings = 0;
+		u32 n_object_bindings = 0;
 		VkDescriptorType* object_binding_types = nullptr;
-		std::uint32_t n_dynamic_descriptors = 0;
+		u32 n_dynamic_descriptors = 0;
 
 		class object_vector
 		{
 		public:
 			object_vector() = default;
-			object_vector(std::size_t push_data_size, std::uint32_t n_descriptors, std::uint32_t n_dynamic_descriptors);
+			object_vector(std::size_t push_data_size, u32 n_descriptors, u32 n_dynamic_descriptors);
 			~object_vector();
 
 			object_vector(object_vector&& other) noexcept :
@@ -214,20 +214,20 @@ namespace ENGINE_NAMESPACE
 			{
 				//void* push_data = nullptr;
 
-				//std::uint32_t* dynamic_offsets = nullptr;
+				//u32* dynamic_offsets = nullptr;
 				//buffer_binding_args* discriptor_args = nullptr;
 
 				std::size_t ref_key = 0;
 				buffer_binding_args binding = {};
-				std::uint32_t count = 0;
+				u32 count = 0;
 				VkIndexType index_t = VK_INDEX_TYPE_NONE_KHR;
 				buffer_binding_args index_binding = {};
-				std::uint32_t descriptor_set_idx = 0;
-				std::uint32_t instances = 1;
+				u32 descriptor_set_idx = 0;
+				u32 instances = 1;
 			};
 
 			using properties_t = base_object;
-			typedef std::uint32_t offset_t;
+			typedef u32 offset_t;
 
 			class iterator;
 
@@ -302,7 +302,7 @@ namespace ENGINE_NAMESPACE
 			private:
 				iterator() = delete;
 				iterator(void* objects, buffer_binding_args* bindings, std::size_t object_increment, 
-					std::uint32_t binding_increment, std::size_t push_data_size, std::size_t offsets_size) noexcept :
+					u32 binding_increment, std::size_t push_data_size, std::size_t offsets_size) noexcept :
 					current(objects, bindings, push_data_size, offsets_size), object_increment(object_increment), 
 					binding_increment(binding_increment), push_data_size(push_data_size), offsets_size(offsets_size)
 				{ }
@@ -310,7 +310,7 @@ namespace ENGINE_NAMESPACE
 				object_ref current;
 
 				std::size_t object_increment = 0;
-				std::uint32_t binding_increment = 0;
+				u32 binding_increment = 0;
 
 				std::size_t push_data_size = 0;
 				std::size_t offsets_size = 0;
@@ -346,8 +346,8 @@ namespace ENGINE_NAMESPACE
 			std::size_t capacity = 0;
 
 			std::size_t push_data_size = 0;
-			std::uint32_t n_descriptors = 0;
-			std::uint32_t n_dynamic_descriptors = 0;
+			u32 n_descriptors = 0;
+			u32 n_dynamic_descriptors = 0;
 
 			std::size_t element_stride = 0;
 			std::size_t descriptor_stride = 0;
@@ -374,7 +374,7 @@ namespace ENGINE_NAMESPACE
 
 		static void draw_object(VkCommandBuffer& buffer, const task_properties& obj);
 
-		std::vector<VkWriteDescriptorSet> generate_descriptor_write(std::uint8_t current_frame);
+		std::vector<VkWriteDescriptorSet> generate_descriptor_write(u8 current_frame);
 
 		inline static const char* debug_descriptor_type(VkDescriptorType type)
 		{

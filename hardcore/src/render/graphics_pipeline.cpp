@@ -5,19 +5,19 @@
 
 #include <debug/log_internal.hpp>
 
-//pipelines only need to account for the first 2 descriptor sets (0 and 1), as the rest are bound outside the pipeline scope
-const std::uint32_t pipeline_descriptor_sets = 2;
-const std::uint32_t initial_object_descriptor_set_capacity = 10;
-const std::uint32_t object_descriptor_set_increment = 10;
-
-const VkExtent2D placeholder_extent = { 10, 10 };
-const VkExtent2D invalid_extent = {
-	std::numeric_limits<decltype(VkExtent2D::width)>::max(),
-	std::numeric_limits<decltype(VkExtent2D::height)>::max()
-};
-
 namespace ENGINE_NAMESPACE
 {
+	//pipelines only need to account for the first 2 descriptor sets (0 and 1), as the rest are bound outside the pipeline scope
+	const u32 pipeline_descriptor_sets = 2;
+	const u32 initial_object_descriptor_set_capacity = 10;
+	const u32 object_descriptor_set_increment = 10;
+
+	const VkExtent2D placeholder_extent = { 10, 10 };
+	const VkExtent2D invalid_extent = {
+		std::numeric_limits<decltype(VkExtent2D::width)>::max(),
+		std::numeric_limits<decltype(VkExtent2D::height)>::max()
+	};
+
 	class data_layout_internal : public data_layout
 	{
 	public:
@@ -128,13 +128,13 @@ namespace ENGINE_NAMESPACE
 		vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
 		vertex_input_info.vertexBindingDescriptionCount = layouts.size();
-		std::uint32_t attribute_description_count = 0;
+		u32 attribute_description_count = 0;
 		VkVertexInputBindingDescription* binding_descriptions = t_calloc<VkVertexInputBindingDescription>(layouts.size());
-		for (std::uint32_t i = 0; i < layouts.size(); i++)
+		for (u32 i = 0; i < layouts.size(); i++)
 		{
 			VkVertexInputBindingDescription desc = {};
 			binding_descriptions[i].binding = 0;
-			binding_descriptions[i].stride = static_cast<std::uint32_t>(layouts[i].size());
+			binding_descriptions[i].stride = static_cast<u32>(layouts[i].size());
 			binding_descriptions[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 			
 			attribute_description_count += layouts[i].vector_count();
@@ -144,14 +144,14 @@ namespace ENGINE_NAMESPACE
 		VkVertexInputAttributeDescription* attribute_descriptions = 
 			t_calloc<VkVertexInputAttributeDescription>(attribute_description_count);
 
-		std::uint32_t c = 0;
-		for (std::uint32_t i = 0; i < layouts.size(); i++)
+		u32 c = 0;
+		for (u32 i = 0; i < layouts.size(); i++)
 		{
-			std::uint32_t offset = 0;
+			u32 offset = 0;
 			const data_layout_internal& layout = static_cast<const data_layout_internal&>(layouts[i]);
-			for (std::uint32_t k = 0; k < layouts[i].vector_count(); k++)
+			for (u32 k = 0; k < layouts[i].vector_count(); k++)
 			{
-				std::uint32_t iterations; //matrix inputs are passed as several vectors
+				u32 iterations; //matrix inputs are passed as several vectors
 				switch (layout[k].t)
 				{
 				case data_layout::type::MAT2:
@@ -176,7 +176,7 @@ namespace ENGINE_NAMESPACE
 
 				const VkFormat format = to_vk_format(layout[k]);
 				INTERNAL_ASSERT(format != VK_FORMAT_UNDEFINED, "Invalid type.");
-				for (std::uint32_t j = 0; j < iterations; j++)
+				for (u32 j = 0; j < iterations; j++)
 				{
 					attribute_descriptions[c].binding = i;
 					attribute_descriptions[c].location = k + j;
@@ -213,17 +213,17 @@ namespace ENGINE_NAMESPACE
 		return VK_DESCRIPTOR_TYPE_MAX_ENUM;
 	}
 
-	inline void alloc_descriptor_sets(VkDevice& handle, std::uint32_t object_descriptor_capacity,
-		const std::uint32_t* n_pool_sizes, VkDescriptorPoolSize* pool_sizes[pipeline_descriptor_sets], 
+	inline void alloc_descriptor_sets(VkDevice& handle, u32 object_descriptor_capacity,
+		const u32* n_pool_sizes, VkDescriptorPoolSize* pool_sizes[pipeline_descriptor_sets], 
 		const VkDescriptorSetLayout* descriptor_set_layouts, VkDescriptorPool* out_descriptor_pool, VkDescriptorSet** out_descriptor_sets)
 	{
 		std::unordered_map<VkDescriptorType, VkDescriptorPoolSize> pool_sizes_map;
-		for (std::uint32_t i = 0; i < n_pool_sizes[0]; i++)
+		for (u32 i = 0; i < n_pool_sizes[0]; i++)
 			pool_sizes_map[pool_sizes[0][i].type].descriptorCount += pool_sizes[0][i].descriptorCount * object_descriptor_capacity;
-		for (std::uint32_t i = 0; i < n_pool_sizes[1]; i++)
+		for (u32 i = 0; i < n_pool_sizes[1]; i++)
 			pool_sizes_map[pool_sizes[1][i].type].descriptorCount += pool_sizes[1][i].descriptorCount;
 
-		std::uint32_t sizes_count = 0;
+		u32 sizes_count = 0;
 		VkDescriptorPoolSize* pool_sizes_ptr = t_malloc<VkDescriptorPoolSize>(pool_sizes_map.size());
 		for (auto& pool_size : pool_sizes_map)
 		{
@@ -233,7 +233,7 @@ namespace ENGINE_NAMESPACE
 			sizes_count++;
 		}
 
-		std::uint32_t pipeline_descriptor = n_pool_sizes[1] ? 1 : 0;
+		u32 pipeline_descriptor = n_pool_sizes[1] ? 1 : 0;
 		VkDescriptorPoolCreateInfo pool_info = {};
 		pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		pool_info.poolSizeCount = sizes_count;
@@ -246,11 +246,11 @@ namespace ENGINE_NAMESPACE
 
 		VkDescriptorSetLayout* layouts = t_malloc<VkDescriptorSetLayout>(pool_info.maxSets);
 		if (n_pool_sizes[0])
-			for (std::uint32_t f = 0; f < max_frames_in_flight; f++)
-				for (std::uint32_t i = 0; i < object_descriptor_capacity; i++)
+			for (u32 f = 0; f < max_frames_in_flight; f++)
+				for (u32 i = 0; i < object_descriptor_capacity; i++)
 					layouts[i + pipeline_descriptor + (pipeline_descriptor + object_descriptor_capacity) * f] = descriptor_set_layouts[0];
 		if (n_pool_sizes[1])
-			for (std::uint32_t f = 0; f < max_frames_in_flight; f++)
+			for (u32 f = 0; f < max_frames_in_flight; f++)
 				layouts[(pipeline_descriptor + object_descriptor_capacity) * f] = descriptor_set_layouts[1];
 
 		*out_descriptor_sets = t_malloc<VkDescriptorSet>(pool_info.maxSets);
@@ -265,10 +265,10 @@ namespace ENGINE_NAMESPACE
 	}
 
 	inline void init_descriptors(VkDevice& handle, const std::vector<const shader*>& shaders,
-		std::uint32_t* n_pool_sizes, VkDescriptorPoolSize* pool_sizes[pipeline_descriptor_sets],
-		std::uint32_t* out_n_descriptor_set_layouts, VkDescriptorSetLayout** out_descriptor_set_layouts,
+		u32* n_pool_sizes, VkDescriptorPoolSize* pool_sizes[pipeline_descriptor_sets],
+		u32* out_n_descriptor_set_layouts, VkDescriptorSetLayout** out_descriptor_set_layouts,
 		VkDescriptorPool* out_descriptor_pool, VkDescriptorSet** out_descriptor_sets,
-		std::uint32_t* out_n_object_descriptors, VkDescriptorType** out_object_descriptors)
+		u32* out_n_object_descriptors, VkDescriptorType** out_object_descriptors)
 	{
 		std::vector<std::vector<VkDescriptorSetLayoutBinding>> sets;
 		std::unordered_map<VkDescriptorType, VkDescriptorPoolSize> pool_sizes_0;
@@ -301,7 +301,7 @@ namespace ENGINE_NAMESPACE
 				}
 				else
 				{
-					const std::uint32_t count = descriptor.count ? descriptor.count : 1;
+					const u32 count = descriptor.count ? descriptor.count : 1;
 
 					layout_binding.binding = descriptor.binding;
 					layout_binding.descriptorCount = count;
@@ -335,7 +335,7 @@ namespace ENGINE_NAMESPACE
 		//init descriptor set layouts
 		*out_n_descriptor_set_layouts = 0;
 		*out_descriptor_set_layouts = t_malloc<VkDescriptorSetLayout>(sets.size());
-		std::uint32_t total_pipeline_sets = 0;
+		u32 total_pipeline_sets = 0;
 		for (auto& set : sets)
 		{
 			if (set.empty()) (*out_descriptor_set_layouts)[*out_n_descriptor_set_layouts] = VK_NULL_HANDLE;
@@ -343,7 +343,7 @@ namespace ENGINE_NAMESPACE
 			{
 				VkDescriptorSetLayoutCreateInfo layout_info = {};
 				layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-				layout_info.bindingCount = static_cast<std::uint32_t>(set.size());
+				layout_info.bindingCount = static_cast<u32>(set.size());
 				layout_info.pBindings = set.data();
 
 				VK_CRASH_CHECK(vkCreateDescriptorSetLayout(handle, &layout_info, nullptr, 
@@ -357,8 +357,8 @@ namespace ENGINE_NAMESPACE
 		//init descriptor sets
 		if (total_pipeline_sets)
 		{
-			std::uint32_t sizes_count = 0;
-			n_pool_sizes[0] = static_cast<std::uint32_t>(pool_sizes_0.size());
+			u32 sizes_count = 0;
+			n_pool_sizes[0] = static_cast<u32>(pool_sizes_0.size());
 			pool_sizes[0] = t_malloc<VkDescriptorPoolSize>(n_pool_sizes[0]);
 			for (auto& pool_size : pool_sizes_0)
 			{
@@ -369,13 +369,13 @@ namespace ENGINE_NAMESPACE
 
 			if (sizes_count)
 			{
-				*out_n_object_descriptors = static_cast<std::uint32_t>(sets[0].size());
+				*out_n_object_descriptors = static_cast<u32>(sets[0].size());
 				*out_object_descriptors = t_malloc<VkDescriptorType>(*out_n_object_descriptors);
-				for (std::uint32_t i = 0; i < *out_n_object_descriptors; i++) (*out_object_descriptors)[i] = sets[0][i].descriptorType;
+				for (u32 i = 0; i < *out_n_object_descriptors; i++) (*out_object_descriptors)[i] = sets[0][i].descriptorType;
 			}
 
 			sizes_count = 0;
-			n_pool_sizes[1] = static_cast<std::uint32_t>(pool_sizes_1.size());
+			n_pool_sizes[1] = static_cast<u32>(pool_sizes_1.size());
 			pool_sizes[1] = t_malloc<VkDescriptorPoolSize>(n_pool_sizes[1]);
 			for (auto& pool_size : pool_sizes_1)
 			{
@@ -411,13 +411,13 @@ namespace ENGINE_NAMESPACE
 		{
 			object_descriptor_set_capacity = initial_object_descriptor_set_capacity;
 			n_dynamic_descriptors = 0;
-			for (std::uint32_t i = 0; i < n_object_bindings; i++)
+			for (u32 i = 0; i < n_object_bindings; i++)
 				if (object_binding_types[i] == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC ||
 					object_binding_types[i] == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC)
 					n_dynamic_descriptors++;
 		}
 		frame_descriptor_count = object_descriptor_set_capacity + (n_descriptor_pool_sizes[1] ? 1 : 0);
-		for (std::uint8_t i = 1; i < max_frames_in_flight; i++)
+		for (u8 i = 1; i < max_frames_in_flight; i++)
 		{
 			frame_descriptors[i].descriptor_pool = frame_descriptors[0].descriptor_pool;
 			frame_descriptors[i].object_set_cap = frame_descriptors[0].object_set_cap;
@@ -520,7 +520,7 @@ namespace ENGINE_NAMESPACE
 		VK_CRASH_CHECK(vkCreatePipelineLayout(owner.handle, &pipeline_layout_info, nullptr, &pipeline_layout),
 			"Failed to create pipeline layout");
 
-		std::uint32_t stage_count = 0;
+		u32 stage_count = 0;
 		VkPipelineShaderStageCreateInfo* shader_stages = t_calloc<VkPipelineShaderStageCreateInfo>(shaders.size());
 		for (const shader* shader : shaders)
 		{
@@ -556,7 +556,7 @@ namespace ENGINE_NAMESPACE
 
 		objects = object_vector(0, n_object_bindings, n_dynamic_descriptors);
 
-		for (std::uint32_t i = 0; i < stage_count; i++)
+		for (u32 i = 0; i < stage_count; i++)
 		{
 			vkDestroyShaderModule(owner.handle, shader_stages[i].module, nullptr);
 			std::free(const_cast<char*>(shader_stages[i].pName)); //a bit messy, but shouldn't cause issues
@@ -577,7 +577,7 @@ namespace ENGINE_NAMESPACE
 			vkDestroyPipelineLayout(owner->handle, pipeline_layout, nullptr);
 
 			VkDescriptorPool t_pool = VK_NULL_HANDLE;
-			for (std::uint8_t i = 0; i < max_frames_in_flight; i++)
+			for (u8 i = 0; i < max_frames_in_flight; i++)
 			{
 				if (frame_descriptors[i].descriptor_pool != t_pool)
 				{
@@ -586,7 +586,7 @@ namespace ENGINE_NAMESPACE
 				}
 			}
 
-			for (std::uint32_t i = 0; i < n_descriptor_set_layouts; i++)
+			for (u32 i = 0; i < n_descriptor_set_layouts; i++)
 				if (descriptor_set_layouts[i] != VK_NULL_HANDLE)
 					vkDestroyDescriptorSetLayout(owner->handle, descriptor_set_layouts[i], nullptr);
 
@@ -630,7 +630,7 @@ namespace ENGINE_NAMESPACE
 		}
 	}
 
-	void graphics_pipeline::record_commands(VkCommandBuffer& buffer, std::uint8_t current_frame)
+	void graphics_pipeline::record_commands(VkCommandBuffer& buffer, u8 current_frame)
 	{
 		vkCmdBindPipeline(buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, handle);
 
@@ -685,9 +685,9 @@ namespace ENGINE_NAMESPACE
 		}
 	}
 
-	inline std::vector<VkWriteDescriptorSet> graphics_pipeline::generate_descriptor_write(std::uint8_t current_frame)
+	inline std::vector<VkWriteDescriptorSet> graphics_pipeline::generate_descriptor_write(u8 current_frame)
 	{
-		const std::uint32_t pipeline_descriptor = n_descriptor_pool_sizes[1] ? 1 : 0;
+		const u32 pipeline_descriptor = n_descriptor_pool_sizes[1] ? 1 : 0;
 		cached_buffer_infos.clear();
 		cached_buffer_infos.reserve(objects.size() * n_dynamic_descriptors); // must reserve here to avoid resizes
 		std::vector<VkWriteDescriptorSet> res;
@@ -768,7 +768,7 @@ namespace ENGINE_NAMESPACE
 		return res;
 	}
 
-	void graphics_pipeline::update_descriptor_sets(std::uint8_t previous_frame, std::uint8_t current_frame, std::uint8_t next_frame)
+	void graphics_pipeline::update_descriptor_sets(u8 previous_frame, u8 current_frame, u8 next_frame)
 	{
 		if (!n_descriptor_pool_sizes[0]) return;
 
@@ -783,9 +783,9 @@ namespace ENGINE_NAMESPACE
 
 		if (frame_descriptors[current_frame].dirty)
 		{
-			for (std::uint8_t i = 0; i < current_frame; i++)
+			for (u8 i = 0; i < current_frame; i++)
 				frame_descriptors[i].outdated = true;
-			for (std::uint8_t i = current_frame + 1; i < max_frames_in_flight; i++)
+			for (u8 i = current_frame + 1; i < max_frames_in_flight; i++)
 				frame_descriptors[i].outdated = true;
 
 			cached_object_bindings.clear();
@@ -793,12 +793,12 @@ namespace ENGINE_NAMESPACE
 			for (const auto& obj : objects)
 			{
 				buffer_binding_args* bindings = obj.bindings();
-				for (std::uint32_t i = 0; i < n_object_bindings; i++)
+				for (u32 i = 0; i < n_object_bindings; i++)
 					cached_object_bindings.push_back(bindings[i]);
 			}
 
-			std::vector<std::uint32_t> duplicate_ranges;
-			std::uint32_t i = 0, j = 1, unique_set_counter = 0, first_of_duplicates = 1;
+			std::vector<u32> duplicate_ranges;
+			u32 i = 0, j = 1, unique_set_counter = 0, first_of_duplicates = 1;
 			bool not_sorted = objects.size();
 
 			while (not_sorted)
@@ -811,7 +811,7 @@ namespace ENGINE_NAMESPACE
 					if (j < objects.size())
 					{
 						bool equal_set = true;
-						for (std::uint32_t a = i * n_object_bindings, b = j * n_object_bindings; b < (j + 1) * n_object_bindings; a++, b++)
+						for (u32 a = i * n_object_bindings, b = j * n_object_bindings; b < (j + 1) * n_object_bindings; a++, b++)
 						{
 							if (cached_object_bindings[a].buffer != cached_object_bindings[b].buffer)
 							{
@@ -838,7 +838,7 @@ namespace ENGINE_NAMESPACE
 				while (j < objects.size())
 				{
 					bool equal_set = true;
-					for (std::uint32_t a = i * n_object_bindings, b = j * n_object_bindings; b < (j + 1) * n_object_bindings; a++, b++)
+					for (u32 a = i * n_object_bindings, b = j * n_object_bindings; b < (j + 1) * n_object_bindings; a++, b++)
 					{
 						if (cached_object_bindings[a].buffer != cached_object_bindings[b].buffer)
 						{
@@ -852,7 +852,7 @@ namespace ENGINE_NAMESPACE
 						objects[j].properties().descriptor_set_idx = unique_set_counter;
 						i++;
 						objects.swap(i, j);
-						for (std::uint32_t a = i * n_object_bindings, b = j * n_object_bindings; b < (j + 1) * n_object_bindings; a++, b++)
+						for (u32 a = i * n_object_bindings, b = j * n_object_bindings; b < (j + 1) * n_object_bindings; a++, b++)
 						{
 							buffer_binding_args t = cached_object_bindings[a];
 							cached_object_bindings[a] = cached_object_bindings[b];
@@ -874,7 +874,7 @@ namespace ENGINE_NAMESPACE
 				j = i + 1;
 			}
 
-			std::uint32_t total_erased = 0;
+			u32 total_erased = 0;
 			for (i = 0; i < duplicate_ranges.size(); i += 2)
 			{
 				cached_object_bindings.erase(cached_object_bindings.begin() + (duplicate_ranges[i] - total_erased) * n_object_bindings,
@@ -943,7 +943,7 @@ namespace ENGINE_NAMESPACE
 			object_refs[objects[i].properties().ref_key]--;
 	}
 
-	std::size_t graphics_pipeline::set_instances(const mesh& object, std::uint32_t num)
+	std::size_t graphics_pipeline::set_instances(const mesh& object, u32 num)
 	{
 		auto it = object_refs.find(std::hash<resource>{}(object));
 		if (it == object_refs.end())
@@ -966,7 +966,7 @@ namespace ENGINE_NAMESPACE
 	buffer_binding_args graphics_pipeline::get_binding(const dynamic_storage_vector& resource) const
 	{ return owner->get_memory().binding_args(resource); }
 
-	void graphics_pipeline::set_descriptor(std::size_t object_idx, std::uint32_t binding_idx, buffer_binding_args&& binding)
+	void graphics_pipeline::set_descriptor(std::size_t object_idx, u32 binding_idx, buffer_binding_args&& binding)
 	{
 		frame_descriptors[owner->current_frame].dirty = true;
 		auto obj = objects[object_idx];
@@ -975,8 +975,8 @@ namespace ENGINE_NAMESPACE
 		obj.dynamic_offsets()[binding_idx] = static_cast<dynamic_offset_t>(binding.offset);
 	}
 
-	graphics_pipeline::object_vector::object_vector(std::size_t push_data_size, std::uint32_t n_descriptors, 
-		std::uint32_t n_dynamic_descriptors) :
+	graphics_pipeline::object_vector::object_vector(std::size_t push_data_size, u32 n_descriptors, 
+		u32 n_dynamic_descriptors) :
 		count(0), capacity(4), push_data_size(push_data_size), n_descriptors(n_descriptors), n_dynamic_descriptors(n_dynamic_descriptors)
 	{
 		element_stride = element_base_size + push_data_size + n_dynamic_descriptors * sizeof(offset_t);

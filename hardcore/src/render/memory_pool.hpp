@@ -8,94 +8,100 @@ namespace ENGINE_NAMESPACE
 	struct memory_slot
 	{
 		bool in_use;
-		VkDeviceSize offset;
+		VkDeviceSize offset; //relative to previous slot
 		VkDeviceSize size;
 	};
 
 	class memory_pool
 	{
 	public:
-		memory_pool() = default;
-		~memory_pool();
-
 		void free(VkDevice device, device_heap_manager& heap_manager);
 
 		bool search(VkDeviceSize size, VkDeviceSize alignment, 
-			std::uint32_t* out_slot_idx, VkDeviceSize* out_size_needed) const;
-		void fill_slot(std::uint32_t slot_idx, VkDeviceSize size);
+			u32& out_slot_idx, VkDeviceSize& out_size_needed, VkDeviceSize& out_offset) const;
+		void fill_slot(u32 slot_idx, VkDeviceSize size);
+
+		u32 find_slot(VkDeviceSize offset) const noexcept;
+
+		inline VkDeviceSize size() const noexcept { return m_size; }
+		inline const memory_slot& operator[](u32 idx) const noexcept { return slots[idx]; }
+
+	protected:
+		memory_pool() = default;
+		~memory_pool();
+
+		memory_pool(VkDeviceSize size, bool per_frame_allocation = false);
 
 		memory_pool(const memory_pool&) = delete;
 		memory_pool& operator=(const memory_pool&) = delete;
 
 		memory_pool(memory_pool&& other) noexcept :
-			_memory(std::exchange(other._memory, VK_NULL_HANDLE)),
-			_size(std::exchange(other._size, 0)),
+			m_memory(std::exchange(other.m_memory, VK_NULL_HANDLE)),
+			m_size(std::exchange(other.m_size, 0)),
 			slots(std::exchange(other.slots, nullptr)),
 			n_slots(std::exchange(other.n_slots, 0)),
-			largest_free_slot(std::exchange(other.largest_free_slot, 0))
+			m_largest_free_slot(std::exchange(other.m_largest_free_slot, 0))
 		{ }
 
 		inline memory_pool& operator=(memory_pool&& other) noexcept
 		{
-			this->~memory_pool();
-			_memory = std::exchange(other._memory, VK_NULL_HANDLE);
-			_size = std::exchange(other._size, 0);
+			INTERNAL_ASSERT(!other.slots, "Other resource pool not freed");
+			
+			m_memory = std::exchange(other.m_memory, VK_NULL_HANDLE);
+			m_size = std::exchange(other.m_size, 0);
 			slots = std::exchange(other.slots, nullptr);
 			n_slots = std::exchange(other.n_slots, 0);
-			largest_free_slot = std::exchange(other.largest_free_slot, 0);
+			m_largest_free_slot = std::exchange(other.m_largest_free_slot, 0);
 			return *this;
 		}
 
-		//inline VkDeviceMemory& memory() noexcept { return _memory; }
-		inline VkDeviceSize size() const noexcept { return _size; }
-		inline const memory_slot& operator[](std::uint32_t idx) const noexcept { return slots[idx]; }
+		virtual void realloc_slots(u32 new_count) = 0;
+		virtual void move_slots(u32 dst, u32 src, u32 count) = 0;
 
-	protected:
-		memory_pool(VkDeviceSize size, bool per_frame_allocation = false);
-
-		virtual void realloc_slots(std::uint32_t new_count) = 0;
-		virtual void move_slots(std::uint32_t dst, std::uint32_t src, std::uint32_t count) = 0;
-
-		VkDeviceMemory _memory = VK_NULL_HANDLE;
-		VkDeviceSize _size = 0;
+		VkDeviceMemory m_memory = VK_NULL_HANDLE;
+		VkDeviceSize m_size = 0;
 
 		memory_slot* slots = nullptr;
-		std::uint32_t n_slots = 0;
+		u32 n_slots = 0;
 
-		mutable std::uint32_t largest_free_slot = 0;
-
-		bool per_frame_allocation = false;
+		mutable u32 m_largest_free_slot = 0;
+		//TODO is this needed as a member variable?
+		bool m_per_frame_allocation = false;
 	};
 
 	class buffer_pool : public memory_pool
 	{
 	public:
 		buffer_pool() = default;
-		buffer_pool(VkDevice device, device_heap_manager& heap_manager,
-			VkDeviceSize size, VkBufferUsageFlags usage, device_heap_manager::heap h,
-			bool per_frame_allocation = false);
+		buffer_pool(VkDevice device, device_heap_manager& heap_manager, VkDeviceSize size, VkBufferUsageFlags usage) :
+			buffer_pool(device, heap_manager, size, usage, device_heap_manager::heap::MAIN, false)
+		{ }
 
-		void buffer_pool::free(VkDevice device, device_heap_manager& heap_manager);
+		void free(VkDevice device, device_heap_manager& heap_manager);
 
 		buffer_pool(buffer_pool&& other) noexcept :
 			memory_pool(std::move(other)),
-			_buffer(std::exchange(other._buffer, VK_NULL_HANDLE))
+			m_buffer(std::exchange(other.m_buffer, VK_NULL_HANDLE))
 		{ }
 
 		inline buffer_pool& operator=(buffer_pool&& other) noexcept
 		{
+			m_buffer = std::exchange(other.m_buffer, VK_NULL_HANDLE);
 			memory_pool::operator=(std::move(other));
-			_buffer = std::exchange(other._buffer, VK_NULL_HANDLE);
 			return *this;
 		}
 
-		inline VkBuffer& buffer() noexcept { return _buffer; }
+		inline VkBuffer& buffer() noexcept { return m_buffer; }
 
 	protected:
-		void realloc_slots(std::uint32_t new_count) override;
-		void move_slots(std::uint32_t dst, std::uint32_t src, std::uint32_t count) override;
+		buffer_pool(VkDevice device, device_heap_manager& heap_manager,
+			VkDeviceSize size, VkBufferUsageFlags usage, device_heap_manager::heap heap,
+			bool per_frame_allocation);
 
-		VkBuffer _buffer = VK_NULL_HANDLE;
+		void realloc_slots(u32 new_count) override;
+		void move_slots(u32 dst, u32 src, u32 count) override;
+
+		VkBuffer m_buffer = VK_NULL_HANDLE;
 	};
 
 	class dynamic_buffer_pool : public buffer_pool
@@ -103,64 +109,73 @@ namespace ENGINE_NAMESPACE
 	public:
 		dynamic_buffer_pool() = default;
 		dynamic_buffer_pool(VkDevice device, device_heap_manager& heap_manager,
-			VkDeviceSize size, VkBufferUsageFlags usage, device_heap_manager::heap h) :
-			buffer_pool(device, heap_manager, size, usage, h, true), _host_ptr(nullptr)
+			VkDeviceSize size, VkBufferUsageFlags usage) :
+			buffer_pool(device, heap_manager, size, usage, device_heap_manager::heap::DYNAMIC, true), m_host_ptr(nullptr)
 		{ }
 
 		dynamic_buffer_pool(dynamic_buffer_pool&& other) noexcept :
 			buffer_pool(std::move(other)),
-			_host_ptr(std::exchange(other._host_ptr, nullptr))
+			m_host_ptr(std::exchange(other.m_host_ptr, nullptr))
 		{ }
 
 		inline dynamic_buffer_pool& operator=(dynamic_buffer_pool&& other) noexcept
 		{
+			m_host_ptr = std::exchange(other.m_host_ptr, nullptr);
 			buffer_pool::operator=(std::move(other));
-			_host_ptr = std::exchange(other._host_ptr, nullptr);
 			return *this;
 		}
 
-		void map(VkDevice device, std::uint8_t current_frame);
+		void map(VkDevice device, u8 current_frame);
 		void unmap(VkDevice device);
 
-		static void flush(VkDevice device, std::uint8_t current_frame, 
-			const std::vector<const std::vector<dynamic_buffer_pool>*>& pools); //TODO the amount of vectors is known at compile time
+		static void push_flush_ranges(std::vector<VkMappedMemoryRange>& ranges, u8 current_frame,
+			const std::vector<dynamic_buffer_pool>& pools);
 
-		inline void*& host_ptr() noexcept { return _host_ptr; }
+		inline void*& host_ptr() noexcept { return m_host_ptr; }
 
 	private:
-		inline VkMappedMemoryRange mapped_range(std::uint8_t current_frame) const noexcept
+		inline VkMappedMemoryRange mapped_range(u8 current_frame) const noexcept
 		{
-			return { VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, nullptr, _memory, _size * current_frame, _size };
+			return { .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, .pNext = nullptr, .memory = m_memory, 
+				.offset = m_size * current_frame, .size = m_size };
 		}
 
-		void* _host_ptr = nullptr;
+		void* m_host_ptr = nullptr;
 	};
 
-	struct texture
+	struct texture //TODO rename to texture_slot
 	{
 		VkImage image;
 		VkImageView view;
+
+		VkDeviceSize size;
+		VkExtent3D dims;
+		VkImageLayout layout; // layout of the image at the start of the frame
 	};
 
-	texture create_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements* out_memory_requirements);
+	texture create_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements& out_memory_requirements);
 
 	class texture_pool : public memory_pool //maybe use templated texture_memory_pool
 	{
 	public:
 		texture_pool() = default;
 		texture_pool(VkDevice device, device_heap_manager& heap_manager, VkDeviceSize size,
-			std::uint32_t memory_type_bits, VkMemoryPropertyFlags heap_properties);
+			u32 memory_type_bits, device_heap_manager::heap preferred_heap);
 
-		bool search(VkDeviceSize size, VkDeviceSize alignment, std::uint32_t memory_type_bits,
-			std::uint32_t* out_slot_idx, VkDeviceSize* out_size_needed);
-		void fill_slot(VkDevice device, texture&& tex, std::uint32_t slot_idx, VkDeviceSize size, VkDeviceSize alignment);
+		void free(VkDevice device, device_heap_manager& heap_manager);
+
+		bool search(VkDeviceSize size, VkDeviceSize alignment, u32 memory_type_bits,
+			u32& out_slot_idx, VkDeviceSize& out_size_needed, VkDeviceSize& out_offset) const;
+		void fill_slot(VkDevice device, texture&& tex, u32 slot_idx, VkDeviceSize size, VkDeviceSize alignment);
+
+		const texture& tex_at(u32 idx) const noexcept { return texture_slots[idx]; }
 
 	protected:
-		void realloc_slots(std::uint32_t new_count) override;
-		void move_slots(std::uint32_t dst, std::uint32_t src, std::uint32_t count) override;
+		void realloc_slots(u32 new_count) override;
+		void move_slots(u32 dst, u32 src, u32 count) override;
 
 	private:
-		std::uint32_t memory_type_idx = std::numeric_limits<std::uint32_t>::max();
+		u32 memory_type_idx = std::numeric_limits<u32>::max();
 		texture* texture_slots = nullptr;
 	};
 

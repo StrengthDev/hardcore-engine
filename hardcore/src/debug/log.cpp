@@ -16,12 +16,12 @@ namespace ENGINE_NAMESPACE
 		class log_entry
 		{
 		public:
-			inline log_entry(std::string message, std::string time, std::uint8_t caller_idx, std::uint8_t type_idx, 
+			inline log_entry(std::string message, std::string time, u8 caller_idx, u8 type_idx, 
 				setting_t arg) : 
 				message(message), time(time), caller_idx(caller_idx), type_idx(type_idx), multi_args(false), arg0(arg)
 			{}
 
-			inline log_entry(std::string message, std::string time, std::uint8_t caller_idx, std::uint8_t type_idx, 
+			inline log_entry(std::string message, std::string time, u8 caller_idx, u8 type_idx, 
 				setting_t arg0, setting_t arg1, setting_t arg2) : 
 				message(message), time(time), caller_idx(caller_idx), type_idx(type_idx),
 				multi_args(true), arg0(arg0), arg1(arg1), arg2(arg2)
@@ -30,8 +30,8 @@ namespace ENGINE_NAMESPACE
 			std::string message;
 			std::string time;
 
-			std::uint8_t caller_idx;
-			std::uint8_t type_idx;
+			u8 caller_idx;
+			u8 type_idx;
 
 			bool multi_args;
 			setting_t arg0;
@@ -181,13 +181,13 @@ namespace ENGINE_NAMESPACE
 			return std::string(buf);
 		}
 
-		inline void log(const char* message, std::uint8_t caller_idx, std::uint8_t type_idx, setting_t arg)
+		inline void log(const char* message, u8 caller_idx, u8 type_idx, setting_t arg)
 		{
 			log_entry entry(message, log_format_flags & TIMESTAMP_BIT ? timestamp() : "", caller_idx, type_idx, arg);
 			queue.push(std::move(entry));
 		}
 
-		inline void log(const char* message, std::uint8_t caller_idx, std::uint8_t type_idx, 
+		inline void log(const char* message, u8 caller_idx, u8 type_idx, 
 			setting_t arg0, setting_t arg1, setting_t arg2)
 		{
 			log_entry entry(message, log_format_flags & TIMESTAMP_BIT ? timestamp() : "", caller_idx, type_idx, 

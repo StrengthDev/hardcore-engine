@@ -28,9 +28,9 @@ private:
 
 	struct
 	{
-		std::uint32_t func = n_funcs - 1;
-		std::uint32_t n = 1;
-		std::uint32_t pad[2];
+		hc::u32 func = n_funcs - 1;
+		hc::u32 n = 1;
+		hc::u32 pad[2];
 		float frame = 0;
 	} f_inputs;
 
@@ -40,6 +40,6 @@ private:
 	bool animate = false;
 	float time = 0;
 
-	static const std::uint32_t n_funcs = 6;
-	static const std::uint32_t max_iterations = 10;
+	static const hc::u32 n_funcs = 6;
+	static const hc::u32 max_iterations = 10;
 };

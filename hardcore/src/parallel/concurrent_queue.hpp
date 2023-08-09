@@ -63,8 +63,8 @@ namespace ENGINE_NAMESPACE
 					T* t = t_malloc<T>(new_capacity);
 
 					index_t n_copies = item_capacity - first_item_idx;
-					std::memcpy(t, &items[first_item_idx], n_copies * sizeof(T));
-					std::memcpy(&t[n_copies], items, first_item_idx * sizeof(T));
+					std::memcpy(t, &items[first_item_idx], n_copies * sizeof(*t));
+					std::memcpy(&t[n_copies], items, first_item_idx * sizeof(*t));
 					std::free(items);
 					items = t;
 					item_capacity = new_capacity;
@@ -87,8 +87,8 @@ namespace ENGINE_NAMESPACE
 					T* t = t_malloc<T>(new_capacity);
 
 					index_t n_copies = item_capacity - first_item_idx;
-					std::memcpy(t, &items[first_item_idx], n_copies * sizeof(T));
-					std::memcpy(&t[n_copies], items, first_item_idx * sizeof(T));
+					std::memcpy(t, &items[first_item_idx], n_copies * sizeof(*t));
+					std::memcpy(&t[n_copies], items, first_item_idx * sizeof(*t));
 					std::free(items);
 					items = t;
 					item_capacity = new_capacity;

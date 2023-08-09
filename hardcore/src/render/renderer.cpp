@@ -15,7 +15,7 @@ namespace ENGINE_NAMESPACE
 		VkInstance instance;
 		VkSurfaceKHR surface;
 		std::vector<device> devices;
-		std::uint32_t present_device_idx;
+		u32 present_device_idx;
 
 		VkDebugUtilsMessengerEXT debug_messenger;
 
@@ -158,7 +158,7 @@ namespace ENGINE_NAMESPACE
 
 		inline void init_devices()
 		{
-			std::uint32_t n_devices = 0;
+			u32 n_devices = 0;
 			vkEnumeratePhysicalDevices(instance, &n_devices, nullptr);
 			if (n_devices == 0)
 			{
@@ -167,13 +167,13 @@ namespace ENGINE_NAMESPACE
 			VkPhysicalDevice* physical_devices = t_malloc<VkPhysicalDevice>(n_devices);
 			vkEnumeratePhysicalDevices(instance, &n_devices, physical_devices);
 			devices.reserve(n_devices);
-			for (std::uint32_t i = 0; i < n_devices; i++)
+			for (u32 i = 0; i < n_devices; i++)
 				devices.push_back(device(std::move(physical_devices[i]), surface));
 			std::free(physical_devices);
 		
 			present_device_idx = 0;
 			std::size_t max_score = 0;
-			for (std::uint32_t i = 0; i < n_devices; i++)
+			for (u32 i = 0; i < n_devices; i++)
 			{
 				std::size_t score = devices[i].score();
 				if (score > max_score)

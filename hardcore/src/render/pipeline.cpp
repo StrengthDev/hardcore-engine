@@ -6,7 +6,7 @@
 
 namespace ENGINE_NAMESPACE
 {
-	volatile_pipeline_task_ref<pipeline_t::RENDER>& volatile_pipeline_task_ref<pipeline_t::RENDER>::set_instances(std::uint32_t num)
+	volatile_pipeline_task_ref<pipeline_t::RENDER>& volatile_pipeline_task_ref<pipeline_t::RENDER>::set_instances(u32 num)
 	{
 		graphics_pipeline& pipeline = *static_cast<graphics_pipeline*>(pipeline_p);
 		pipeline.set_instances(task_id, num);
@@ -14,7 +14,7 @@ namespace ENGINE_NAMESPACE
 	}
 
 #define SET_DESCRIPTOR(Return, Arg)																										\
-volatile_pipeline_task_ref<Return>& volatile_pipeline_task_ref<Return>::set_descriptor(std::uint32_t descriptor_idx, const Arg& buffer)	\
+volatile_pipeline_task_ref<Return>& volatile_pipeline_task_ref<Return>::set_descriptor(u32 descriptor_idx, const Arg& buffer)	\
 {																																		\
 	return t_set_descriptor(descriptor_idx, buffer);																					\
 }
@@ -35,7 +35,7 @@ SET_DESCRIPTOR(Return, dynamic_storage_vector)
 	template<>
 	template<typename Resource, std::enable_if_t<std::is_base_of<resource, Resource>::value && std::is_final<Resource>::value, bool>>
 	volatile_pipeline_task_ref<pipeline_t::RENDER>& volatile_pipeline_task_ref<pipeline_t::RENDER>::t_set_descriptor(
-		std::uint32_t descriptor_idx, const Resource& buffer)
+		u32 descriptor_idx, const Resource& buffer)
 	{
 		graphics_pipeline& pipeline = *static_cast<graphics_pipeline*>(pipeline_p);
 		pipeline.set_descriptor(task_id, descriptor_idx, buffer);
@@ -51,7 +51,7 @@ SET_DESCRIPTOR(Return, dynamic_storage_vector)
 	}
 
 	render_pipeline::render_pipeline(const shader& vertex, const shader& fragment)
-		: pipeline(std::numeric_limits<std::uint32_t>::max(), pipeline_t::RENDER, pipeline_s::PASSIVE)
+		: pipeline(std::numeric_limits<u32>::max(), pipeline_t::RENDER, pipeline_s::PASSIVE)
 	{
 		id = renderer::get_device().add_graphics_pipeline(vertex, fragment);
 	}
@@ -62,14 +62,14 @@ SET_DESCRIPTOR(Return, dynamic_storage_vector)
 		return volatile_pipeline_task_ref<pipeline_t::RENDER>(&pipeline, pipeline.add(object));
 	}
 
-	render_pipeline::vptr_t render_pipeline::set_instances(const mesh& object, std::uint32_t num)
+	render_pipeline::vptr_t render_pipeline::set_instances(const mesh& object, u32 num)
 	{
 		graphics_pipeline& pipeline = renderer::get_device().get_graphics_pipeline(id);
 		return volatile_pipeline_task_ref<pipeline_t::RENDER>(&pipeline, pipeline.set_instances(object, num));
 	}
 
 #define SET_DESCRIPTOR(Arg)																										\
-render_pipeline::vptr_t render_pipeline::set_descriptor(const mesh& object, std::uint32_t descriptor_idx, const Arg& buffer)	\
+render_pipeline::vptr_t render_pipeline::set_descriptor(const mesh& object, u32 descriptor_idx, const Arg& buffer)	\
 {																																\
 	graphics_pipeline& pipeline = renderer::get_device().get_graphics_pipeline(id);										\
 	return volatile_pipeline_task_ref<pipeline_t::RENDER>(&pipeline, pipeline.set_descriptor(object, descriptor_idx, buffer));	\

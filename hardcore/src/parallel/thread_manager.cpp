@@ -34,7 +34,7 @@ namespace ENGINE_NAMESPACE
 		task_queue_t immediate_tasks;
 		task_queue_t background_tasks;
 
-		typedef std::uint32_t thread_idx_t;
+		typedef u32 thread_idx_t;
 
 		thread_idx_t n_immediate_workers = 1;
 		std::thread* immediate_workers;

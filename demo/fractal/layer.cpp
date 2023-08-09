@@ -17,7 +17,7 @@ fractal_layer::fractal_layer()
 	vert_layout.set_type(0, hc::data_layout::type::VEC3, hc::data_layout::component_type::FLOAT32);
 	obj = hc::mesh(verts, sizeof(verts), idx, sizeof(idx), hc::mesh::index_format::UINT16, vert_layout);
 	vertex_input = hc::uniform(hc::data_layout::create<float, float, float, float>(), 1);
-	frag_input = hc::uniform(hc::data_layout::create<std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, float>(), 1);
+	frag_input = hc::uniform(hc::data_layout::create<hc::u32, hc::u32, hc::u32, hc::u32, float>(), 1);
 	pipeline = hc::render_pipeline(hc::shader_library::get("resources/shaders/shader.vert.spv"),
 		hc::shader_library::get("resources/shaders/shader.frag.spv"));
 

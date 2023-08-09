@@ -22,4 +22,6 @@ private:
 	hc::mesh resource;
 	hc::dynamic_storage_vector instances;
 	hc::render_pipeline pipeline;
+
+	hc::texture_resource tex;
 };

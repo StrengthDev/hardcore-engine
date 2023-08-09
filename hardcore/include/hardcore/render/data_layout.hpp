@@ -6,7 +6,7 @@
 
 #define SET_TYPE_S(t1, t2, t3)									\
 template<>														\
-inline void set_type_s<t1>(std::uint8_t index) noexcept			\
+inline void set_type_s<t1>(u8 index) noexcept			\
 {																\
 	set_type(index, t2, t3);									\
 }
@@ -16,7 +16,7 @@ namespace ENGINE_NAMESPACE
 	class ENGINE_API data_layout
 	{
 	public:
-		enum class type : std::uint8_t
+		enum class type : u8
 		{
 			SCALAR = 0,
 			VEC2,
@@ -33,7 +33,7 @@ namespace ENGINE_NAMESPACE
 			MAT4x3
 		};
 
-		enum class component_type : std::uint8_t
+		enum class component_type : u8
 		{
 			FLOAT32 = 0,
 			FLOAT64,
@@ -51,7 +51,7 @@ namespace ENGINE_NAMESPACE
 		//empty layout constructor
 		data_layout() = default;
 
-		data_layout(std::uint8_t reserve) : n_values(reserve)
+		data_layout(u8 reserve) : n_values(reserve)
 		{
 			values = t_malloc<value>(reserve);
 		}
@@ -63,27 +63,27 @@ namespace ENGINE_NAMESPACE
 			values = nullptr;
 		}
 
-		inline void set_type(std::uint8_t index, type t, component_type ct) noexcept
+		inline void set_type(u8 index, type t, component_type ct) noexcept
 		{
 			INTERNAL_ASSERT(index < n_values, "Index out of bounds");
 			values[index] = { t, ct };
 		}
 
 		template<typename Type>
-		inline void set_type_s(std::uint8_t index) noexcept
+		inline void set_type_s(u8 index) noexcept
 		{
 			static_assert(force_eval<Type>::value, "Type incompatible with data layout");
 		}
 
 		//scalars
-		SET_TYPE_S(std::int8_t, type::SCALAR, component_type::INT8)
-		SET_TYPE_S(std::int16_t, type::SCALAR, component_type::INT16)
-		SET_TYPE_S(std::int32_t, type::SCALAR, component_type::INT32)
-		SET_TYPE_S(std::int64_t, type::SCALAR, component_type::INT64)
-		SET_TYPE_S(std::uint8_t, type::SCALAR, component_type::UINT8)
-		SET_TYPE_S(std::uint16_t, type::SCALAR, component_type::UINT16)
-		SET_TYPE_S(std::uint32_t, type::SCALAR, component_type::UINT32)
-		SET_TYPE_S(std::uint64_t, type::SCALAR, component_type::UINT64)
+		SET_TYPE_S(i8, type::SCALAR, component_type::INT8)
+		SET_TYPE_S(i16, type::SCALAR, component_type::INT16)
+		SET_TYPE_S(i32, type::SCALAR, component_type::INT32)
+		SET_TYPE_S(i64, type::SCALAR, component_type::INT64)
+		SET_TYPE_S(u8, type::SCALAR, component_type::UINT8)
+		SET_TYPE_S(u16, type::SCALAR, component_type::UINT16)
+		SET_TYPE_S(u32, type::SCALAR, component_type::UINT32)
+		SET_TYPE_S(u64, type::SCALAR, component_type::UINT64)
 		SET_TYPE_S(float, type::SCALAR, component_type::FLOAT32)
 		SET_TYPE_S(double, type::SCALAR, component_type::FLOAT64)
 /*
@@ -96,7 +96,7 @@ namespace ENGINE_NAMESPACE
 
 #endif // using glm
 */
-		template<std::uint8_t Index, typename Type, typename... Types>
+		template<u8 Index, typename Type, typename... Types>
 		inline void set_types_s()
 		{
 			set_type_s<Type>(Index);
@@ -119,7 +119,7 @@ namespace ENGINE_NAMESPACE
 
 		data_layout(const data_layout& other) : n_values(other.n_values), values(t_malloc<value>(other.n_values))
 		{
-			std::memcpy(values, other.values, n_values * sizeof(value));
+			std::memcpy(values, other.values, n_values * sizeof(*values));
 		}
 
 		data_layout(data_layout&& other) noexcept 
@@ -138,7 +138,7 @@ namespace ENGINE_NAMESPACE
 				{
 					values = t_malloc<value>(other.n_values);
 				}
-				std::memcpy(values, other.values, n_values * sizeof(value));
+				std::memcpy(values, other.values, n_values * sizeof(*values));
 			}
 			return *this;
 		}
@@ -155,7 +155,7 @@ namespace ENGINE_NAMESPACE
 		{
 			if (this->n_values == rhs.n_values)
 			{
-				for (std::uint8_t i = 0; i < this->n_values; i++)
+				for (u8 i = 0; i < this->n_values; i++)
 				{
 					if (!(this->values[i] == rhs.values[i])) return false;
 				}
@@ -174,11 +174,11 @@ namespace ENGINE_NAMESPACE
 			if (layout.n_values == 0) return data_layout();
 
 			data_layout converted(layout.vector_count());
-			std::uint8_t c = 0;
-			for (std::uint8_t i = 0; i < layout.n_values; i++)
+			u8 c = 0;
+			for (u8 i = 0; i < layout.n_values; i++)
 			{
 				data_layout::type converted_type;
-				std::uint32_t iterations;
+				u32 iterations;
 				switch (layout[i].t)
 				{
 				case data_layout::type::MAT2:	iterations = 2; converted_type = data_layout::type::VEC2; break;
@@ -196,7 +196,7 @@ namespace ENGINE_NAMESPACE
 					break;
 				}
 
-				for (std::uint8_t k = 0; k < iterations; k++)
+				for (u8 k = 0; k < iterations; k++)
 				{
 					converted.set_type(c, converted_type, layout[i].ct);
 				}
@@ -215,12 +215,12 @@ namespace ENGINE_NAMESPACE
 			return false;
 		}
 
-		inline std::uint8_t count() const noexcept { return n_values; }
+		inline u8 count() const noexcept { return n_values; }
 
-		inline std::uint8_t vector_count() const noexcept
+		inline u8 vector_count() const noexcept
 		{
-			std::uint8_t count = 0;
-			for (std::uint8_t i = 0; i < n_values; i++)
+			u8 count = 0;
+			for (u8 i = 0; i < n_values; i++)
 			{
 				switch (values[i].t)
 				{
@@ -250,7 +250,7 @@ namespace ENGINE_NAMESPACE
 		inline std::size_t size() const noexcept
 		{
 			std::size_t size = 0;
-			for (std::uint8_t i = 0; i < n_values; i++)
+			for (u8 i = 0; i < n_values; i++)
 			{
 				size += values[i].size();
 			}
@@ -263,10 +263,10 @@ namespace ENGINE_NAMESPACE
 			type t;
 			component_type ct;
 
-			inline std::uint32_t size() const noexcept
+			inline u32 size() const noexcept
 			{
-				std::uint32_t size = 0;
-				std::uint32_t m = 0;
+				u32 size = 0;
+				u32 m = 0;
 				switch (t)
 				{
 				case type::SCALAR:
@@ -364,14 +364,14 @@ namespace ENGINE_NAMESPACE
 			}
 		};
 
-		inline const value& operator[](std::uint8_t index) const noexcept
+		inline const value& operator[](u8 index) const noexcept
 		{
 			INTERNAL_ASSERT(index < n_values, "Index out of bounds");
 			return values[index];
 		}
 
 	private:
-		std::uint8_t n_values = 0;
+		u8 n_values = 0;
 		value* values = nullptr;
 
 		friend std::string to_string(const data_layout&);
@@ -382,7 +382,7 @@ namespace ENGINE_NAMESPACE
 	{
 		std::stringstream stream;
 		stream << '(';
-		for (std::uint8_t i = 0; i < layout.n_values; i++)
+		for (u8 i = 0; i < layout.n_values; i++)
 		{
 			stream << layout.values[i].to_string();
 			if (i < layout.n_values - 1) stream << ", ";

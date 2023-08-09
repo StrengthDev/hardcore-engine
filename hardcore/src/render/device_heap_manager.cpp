@@ -22,17 +22,17 @@ namespace ENGINE_NAMESPACE
 {
 	device_heap_manager::device_heap_manager(VkPhysicalDevice physical_device)
 	{
-		vkGetPhysicalDeviceMemoryProperties(physical_device, &_mem_properties);
+		vkGetPhysicalDeviceMemoryProperties(physical_device, &m_mem_properties);
 
-		constexpr std::uint32_t unassigned_idx = std::numeric_limits<std::uint32_t>::max();
-		main_type_idx = unassigned_idx;
-		dynamic_type_idx = unassigned_idx;
-		upload_type_idx = unassigned_idx;
-		download_type_idx = unassigned_idx;
+		constexpr u32 unassigned_idx = std::numeric_limits<u32>::max();
+		m_main_type_idx = unassigned_idx;
+		m_dynamic_type_idx = unassigned_idx;
+		m_upload_type_idx = unassigned_idx;
+		m_download_type_idx = unassigned_idx;
 
-		for (std::uint32_t i = 0; i < _mem_properties.memoryTypeCount; i++)
+		for (u32 i = 0; i < m_mem_properties.memoryTypeCount; i++)
 		{
-			VkMemoryPropertyFlags flags = _mem_properties.memoryTypes[i].propertyFlags;
+			VkMemoryPropertyFlags flags = m_mem_properties.memoryTypes[i].propertyFlags;
 
 			LOG_INTERNAL_INFO("[RENDERER] Memory type " << i << " properties: "
 				<< '(' << std::bitset<sizeof(VkMemoryPropertyFlags) * 8>(flags) << ") => "
@@ -43,66 +43,66 @@ namespace ENGINE_NAMESPACE
 				<< (flags & VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT ? "LAZILY_ALLOCATED " : "")
 				<< (flags & VK_MEMORY_PROPERTY_PROTECTED_BIT ? "PROTECTED " : ""));
 		
-			if (main_type_idx == unassigned_idx || 
-				(main_type_idx != unassigned_idx && 
-					_mem_properties.memoryTypes[main_type_idx].propertyFlags != main_required_flags))
+			if (m_main_type_idx == unassigned_idx || 
+				(m_main_type_idx != unassigned_idx && 
+					m_mem_properties.memoryTypes[m_main_type_idx].propertyFlags != main_required_flags))
 			{
 				if (flags == main_required_flags)
 				{
-					main_type_idx = i;
+					m_main_type_idx = i;
 					continue;
 				}
 
-				if (main_type_idx == unassigned_idx && flags & main_required_flags && !(flags & main_unwanted_flags))
-					main_type_idx = i;
+				if (m_main_type_idx == unassigned_idx && flags & main_required_flags && !(flags & main_unwanted_flags))
+					m_main_type_idx = i;
 			}
 
-			if (dynamic_type_idx == unassigned_idx ||
-				(dynamic_type_idx != unassigned_idx &&
-					_mem_properties.memoryTypes[dynamic_type_idx].propertyFlags != 
+			if (m_dynamic_type_idx == unassigned_idx ||
+				(m_dynamic_type_idx != unassigned_idx &&
+					m_mem_properties.memoryTypes[m_dynamic_type_idx].propertyFlags != 
 					(dynamic_required_flags | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)))
 			{
 				if (flags == (dynamic_required_flags | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT))
 				{
-					dynamic_type_idx = i;
+					m_dynamic_type_idx = i;
 					continue;
 				}
 
-				if (dynamic_type_idx == unassigned_idx && flags & dynamic_required_flags && !(flags & dynamic_unwanted_flags))
-					dynamic_type_idx = i;
+				if (m_dynamic_type_idx == unassigned_idx && flags & dynamic_required_flags && !(flags & dynamic_unwanted_flags))
+					m_dynamic_type_idx = i;
 			}
 
-			if (upload_type_idx == unassigned_idx ||
-				(upload_type_idx != unassigned_idx &&
-					_mem_properties.memoryTypes[upload_type_idx].propertyFlags != upload_required_flags))
+			if (m_upload_type_idx == unassigned_idx ||
+				(m_upload_type_idx != unassigned_idx &&
+					m_mem_properties.memoryTypes[m_upload_type_idx].propertyFlags != upload_required_flags))
 			{
 				if (flags == upload_required_flags)
 				{
-					upload_type_idx = i;
+					m_upload_type_idx = i;
 					continue;
 				}
 
-				if (upload_type_idx == unassigned_idx && flags & upload_required_flags && !(flags & upload_unwanted_flags))
-					upload_type_idx = i;
+				if (m_upload_type_idx == unassigned_idx && flags & upload_required_flags && !(flags & upload_unwanted_flags))
+					m_upload_type_idx = i;
 			}
 
-			if (download_type_idx == unassigned_idx ||
-				(download_type_idx != unassigned_idx &&
-					_mem_properties.memoryTypes[download_type_idx].propertyFlags != download_required_flags))
+			if (m_download_type_idx == unassigned_idx ||
+				(m_download_type_idx != unassigned_idx &&
+					m_mem_properties.memoryTypes[m_download_type_idx].propertyFlags != download_required_flags))
 			{
 				if (flags == download_required_flags)
 				{
-					download_type_idx = i;
+					m_download_type_idx = i;
 					continue;
 				}
 
-				if (download_type_idx == unassigned_idx && flags & download_required_flags && !(flags & download_unwanted_flags))
-					download_type_idx = i;
+				if (m_download_type_idx == unassigned_idx && flags & download_required_flags && !(flags & download_unwanted_flags))
+					m_download_type_idx = i;
 			}
 		}
 
-		LOG_INTERNAL_INFO("[RENDERER] Heap type indexes: main = " << main_type_idx << " ; dynamic = " 
-			<< dynamic_type_idx << " ; upload = " << upload_type_idx << " ; download = " << download_type_idx);
+		LOG_INTERNAL_INFO("[RENDERER] Heap type indexes: main = " << m_main_type_idx << " ; dynamic = " 
+			<< m_dynamic_type_idx << " ; upload = " << m_upload_type_idx << " ; download = " << m_download_type_idx);
 
 		if (host_coherent_dynamic_heap())
 		{
@@ -112,14 +112,23 @@ namespace ENGINE_NAMESPACE
 		{
 			LOG_INTERNAL_INFO("[RENDERER] Dynamic heap is NOT host coherent");
 		}
+
+		if (host_coherent_upload_heap())
+		{
+			LOG_INTERNAL_INFO("[RENDERER] Upload heap is host coherent");
+		}
+		else
+		{
+			LOG_INTERNAL_INFO("[RENDERER] Upload heap is NOT host coherent");
+		}
 	}
 
-	std::uint32_t device_heap_manager::find_memory_type(std::uint32_t type_filter, VkMemoryPropertyFlags heap_properties)
+	u32 device_heap_manager::find_memory_type(u32 type_filter, VkMemoryPropertyFlags heap_properties)
 	{
 		//Exact type search
-		for (std::uint32_t i = 0; i < _mem_properties.memoryTypeCount; i++)
+		for (u32 i = 0; i < m_mem_properties.memoryTypeCount; i++)
 		{
-			if ((type_filter & (1 << i)) && _mem_properties.memoryTypes[i].propertyFlags == heap_properties)
+			if ((type_filter & (1 << i)) && m_mem_properties.memoryTypes[i].propertyFlags == heap_properties)
 			{
 				return i;
 			}
@@ -127,9 +136,9 @@ namespace ENGINE_NAMESPACE
 		LOG_INTERNAL_WARN("Failed to find exact memory type.");
 
 		//Relaxed search
-		for (std::uint32_t i = 0; i < _mem_properties.memoryTypeCount; i++)
+		for (u32 i = 0; i < m_mem_properties.memoryTypeCount; i++)
 		{
-			if ((type_filter & (1 << i)) && (_mem_properties.memoryTypes[i].propertyFlags & heap_properties) == heap_properties)
+			if ((type_filter & (1 << i)) && (m_mem_properties.memoryTypes[i].propertyFlags & heap_properties) == heap_properties)
 			{
 				return i;
 			}
@@ -140,19 +149,19 @@ namespace ENGINE_NAMESPACE
 			<< std::bitset<sizeof(type_filter) * 8>(type_filter) << " Property flags: "
 			<< std::bitset<sizeof(heap_properties) * 8>(heap_properties));
 		CRASH("Could not find suitable memory type");
-		return std::numeric_limits<std::uint32_t>::max();
+		return std::numeric_limits<u32>::max();
 	}
 
-	std::uint32_t device_heap_manager::get_memory_type_idx(heap h, std::uint32_t memory_type_bits) const
+	u32 device_heap_manager::get_memory_type_idx(heap heap, u32 memory_type_bits) const
 	{
-		std::uint32_t res = 0;
+		u32 res = 0;
 
-		switch (h)
+		switch (heap)
 		{
-		case heap::MAIN:		res = main_type_idx;		break;
-		case heap::DYNAMIC:		res = dynamic_type_idx;		break;
-		case heap::UPLOAD:		res = upload_type_idx;		break;
-		case heap::DOWNLOAD:	res = download_type_idx;	break;
+		case heap::MAIN:		res = m_main_type_idx;		break;
+		case heap::DYNAMIC:		res = m_dynamic_type_idx;	break;
+		case heap::UPLOAD:		res = m_upload_type_idx;	break;
+		case heap::DOWNLOAD:	res = m_download_type_idx;	break;
 		default:
 			CRASH("Invalid heap");
 			break;
@@ -165,7 +174,7 @@ namespace ENGINE_NAMESPACE
 
 	void device_heap_manager::alloc_buffer(VkDevice device,
 		VkDeviceMemory& memory, VkBuffer& buffer, VkDeviceSize size,
-		VkBufferUsageFlags usage, heap h)
+		VkBufferUsageFlags usage, heap heap)
 	{
 		VkBufferCreateInfo buffer_info = {};
 		buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -181,17 +190,17 @@ namespace ENGINE_NAMESPACE
 		VkMemoryAllocateInfo memory_info = {};
 		memory_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 		memory_info.allocationSize = memory_requirements.size;
-		memory_info.memoryTypeIndex = get_memory_type_idx(h, memory_requirements.memoryTypeBits);
+		memory_info.memoryTypeIndex = get_memory_type_idx(heap, memory_requirements.memoryTypeBits);
 
 		VK_CRASH_CHECK(vkAllocateMemory(device, &memory_info, nullptr, &memory), "Failed to allocate device memory");
 
 		vkBindBufferMemory(device, buffer, memory, 0);
 
-		_allocations++;
+		m_allocations++;
 	}
 
-	std::uint32_t device_heap_manager::alloc_texture_memory(VkDevice device, VkDeviceMemory& memory, VkDeviceSize size,
-		heap preferred_heap, std::uint32_t memory_type_bits)
+	u32 device_heap_manager::alloc_texture_memory(VkDevice device, VkDeviceMemory& memory, VkDeviceSize size,
+		heap preferred_heap, u32 memory_type_bits)
 	{
 		VkMemoryAllocateInfo memory_info = {};
 		memory_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -200,7 +209,7 @@ namespace ENGINE_NAMESPACE
 
 		VK_CRASH_CHECK(vkAllocateMemory(device, &memory_info, nullptr, &memory), "Failed to allocate device memory");
 
-		_allocations++;
+		m_allocations++;
 
 		return memory_info.memoryTypeIndex;
 	}
@@ -211,40 +220,7 @@ namespace ENGINE_NAMESPACE
 		//the number of allocations will be counted for debugging and profiling, may aswell do it like this
 		//it also falls more inline with the purpose of the heap manager
 		vkFreeMemory(device, memory, nullptr);
-		_allocations--;
-	}
-
-	void alloc_image()
-	{
-		VkImageCreateInfo image_info = {};
-		image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		image_info.pNext = nullptr;
-		image_info.flags;
-		image_info.imageType;
-		image_info.format;
-		image_info.extent;
-		image_info.mipLevels;
-		image_info.arrayLayers;
-		image_info.samples;
-		image_info.tiling;
-		image_info.usage;
-		image_info.sharingMode;
-		image_info.queueFamilyIndexCount;
-		image_info.pQueueFamilyIndices;
-		image_info.initialLayout;
-
-		//vkCreateImage(radd.device, &image_info, nullptr, &image)
-
-		VkMemoryRequirements memory_requirements;
-		//vkGetImageMemoryRequirements(radd.device, image, &memory_requirements);
-
-		VkMemoryAllocateInfo memory_info = {};
-		memory_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-		memory_info.allocationSize = memory_requirements.size;
-		//memory_info.memoryTypeIndex = find_memory_type(memory_requirements.memoryTypeBits, heap_properties);
-
-		//VK_CRASH_CHECK(vkAllocateMemory(device, &memory_info, nullptr, &memory), "Failed to allocate device memory");
-
-		//vkBindImageMemory(radd.device, image, memory, 0);
+		memory = VK_NULL_HANDLE;
+		m_allocations--;
 	}
 }

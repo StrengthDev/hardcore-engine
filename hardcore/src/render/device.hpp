@@ -24,11 +24,11 @@ namespace ENGINE_NAMESPACE
 
 		inline device_memory& get_memory() noexcept { return memory; }
 
-		std::uint32_t add_graphics_pipeline(const shader& vertex, const shader& fragment);
+		u32 add_graphics_pipeline(const shader& vertex, const shader& fragment);
 		void add_instanced_graphics_pipeline();
 		void add_indirect_graphics_pipeline();
 
-		inline graphics_pipeline& get_graphics_pipeline(std::uint32_t idx) { return graphics_pipelines[idx]; }
+		inline graphics_pipeline& get_graphics_pipeline(u32 idx) { return graphics_pipelines[idx]; }
 
 		device(const device&) = delete;
 		device& operator=(const device&) = delete;
@@ -65,7 +65,7 @@ namespace ENGINE_NAMESPACE
 		VkPhysicalDeviceFeatures features;
 		VkDevice handle = VK_NULL_HANDLE;
 
-		typedef std::uint32_t queue_idx_t;
+		typedef u32 queue_idx_t;
 		static constexpr queue_idx_t invalid_queue_idx = std::numeric_limits<queue_idx_t>::max();
 
 		//Queue families
@@ -89,7 +89,7 @@ namespace ENGINE_NAMESPACE
 		device_memory memory;
 
 		//Frame data
-		std::uint8_t current_frame = 0;
+		u8 current_frame = 0;
 		std::array<VkSemaphore, max_frames_in_flight> image_available_semaphores;
 		std::array<VkSemaphore, max_frames_in_flight> render_finished_semaphores;
 		std::array<VkFence, max_frames_in_flight> frame_fences;
@@ -102,21 +102,21 @@ namespace ENGINE_NAMESPACE
 		struct old_framebuffer_set
 		{
 			VkFramebuffer* framebuffers;
-			std::uint32_t n_framebuffers;
-			std::uint8_t deletion_frame;
+			u32 n_framebuffers;
+			u8 deletion_frame;
 		};
 
 		std::queue<old_framebuffer_set> old_framebuffers;
 
 		VkCommandPool* graphics_command_pools = nullptr;
-		std::uint32_t command_parallelism;
+		u32 command_parallelism;
 		std::vector<std::vector<graphics_pipeline*>> pipeline_stacks;
 
 		VkCommandBuffer* graphics_command_buffers = nullptr;
 
 		std::vector<graphics_pipeline> graphics_pipelines;
 
-		void record_secondary_graphics(VkCommandBuffer& buffer, std::uint32_t image_index,
+		void record_secondary_graphics(VkCommandBuffer& buffer, u32 image_index,
 			std::vector<graphics_pipeline*>& graphics_pipelines);
 
 		inline void reset_ownerships()
