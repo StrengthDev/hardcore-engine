@@ -2,7 +2,7 @@
 
 #include "render_core.hpp"
 #include "device_heap_manager.hpp"
-#include "memory_pool.hpp"
+#include "resource_pool.hpp"
 #include "staging_pool.hpp"
 
 #include <render/memory_ref.hpp>

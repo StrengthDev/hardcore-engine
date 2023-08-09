@@ -71,18 +71,6 @@ namespace ENGINE_NAMESPACE
 		m_pending_copies.clear();
 		m_pending_size = 0;
 	}
-	/*
-	void upload_pool::push_flush_ranges(std::vector<VkMappedMemoryRange>& ranges, u8 current_frame,
-		const std::vector<upload_pool>& pools)
-	{
-		for (const auto& pool : pools)
-		{
-			if (!pool.m_pending_size)
-				continue;
-
-			ranges.push_back(pool.mapped_range(current_frame));
-		}
-	}*/
 
 	inline VkImageMemoryBarrier layout_transition(VkImage image, VkImageLayout old_layout, VkImageLayout new_layout,
 		VkImageAspectFlags aspect, u32 queue_idx)
