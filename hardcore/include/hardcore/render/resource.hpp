@@ -33,17 +33,17 @@ namespace ENGINE_NAMESPACE
 		}
 
 		inline const data_layout& layout() const noexcept { return element_layout; }
-		inline std::uint32_t count() const noexcept { return n_elements; }
+		inline u32 count() const noexcept { return n_elements; }
 		inline std::size_t size() const noexcept { return element_layout.size() * n_elements; }
  
 	protected:
 		resource() = default;
 
-		resource(memory_ref&& ref, const data_layout& layout, std::uint32_t count) noexcept :
+		resource(memory_ref&& ref, const data_layout& layout, u32 count) noexcept :
 			ref(std::move(ref)), element_layout(layout), n_elements(count)
 		{ }
 
-		void init(memory_ref&& ref, const data_layout& layout, std::uint32_t count) noexcept
+		void init(memory_ref&& ref, const data_layout& layout, u32 count) noexcept
 		{
 			this->ref = std::move(ref);
 			this->element_layout = layout;
@@ -52,7 +52,7 @@ namespace ENGINE_NAMESPACE
 
 		memory_ref ref;
 		data_layout element_layout;
-		std::uint32_t n_elements = 0;
+		u32 n_elements = 0;
 
 	private:
 		friend struct std::hash<resource>;
@@ -64,7 +64,7 @@ namespace ENGINE_NAMESPACE
 		/**
 		 * @brief 
 		*/
-		enum class index_format : std::uint8_t
+		enum class index_format : u8
 		{
 			NONE = 0,
 			UINT8, // requires extension
@@ -130,8 +130,8 @@ namespace ENGINE_NAMESPACE
 		}
 
 		inline index_format index_type() const noexcept { return index_t; }
-		inline std::uint32_t index_count() const noexcept { return n_indexes; }
-		inline std::uint32_t draw_count() const noexcept { return index_t == index_format::NONE ? n_elements : n_indexes; }
+		inline u32 index_count() const noexcept { return n_indexes; }
+		inline u32 draw_count() const noexcept { return index_t == index_format::NONE ? n_elements : n_indexes; }
 		inline std::size_t index_size() const noexcept { return static_cast<std::size_t>(n_indexes) * index_size(index_t); }
 
 	protected:
@@ -139,9 +139,9 @@ namespace ENGINE_NAMESPACE
 
 	private:
 		index_format index_t = index_format::NONE;
-		std::uint32_t n_indexes = 0;
+		u32 n_indexes = 0;
 
-		static inline std::uint32_t index_size(index_format format) noexcept
+		static inline u32 index_size(index_format format) noexcept
 		{
 			switch (format)
 			{
@@ -153,7 +153,7 @@ namespace ENGINE_NAMESPACE
 				INTERNAL_ASSERT(false, "Invalid vertex type");
 				break;
 			}
-			return std::numeric_limits<std::uint32_t>::max();
+			return std::numeric_limits<u32>::max();
 		}
 	};
 
@@ -163,7 +163,7 @@ namespace ENGINE_NAMESPACE
 		unmapped_resource() = default;
 
 	public:
-		void update(void* data, std::size_t size, std::size_t offset);
+		virtual void update(void* data, std::size_t size, std::size_t offset) = 0;
 	};
 
 	class ENGINE_API resource_ref;
@@ -234,7 +234,7 @@ namespace ENGINE_NAMESPACE
 	{
 	protected:
 		resizable_resource() = default;
-		resizable_resource(memory_ref&& ref, const data_layout& layout, std::uint32_t count);
+		resizable_resource(memory_ref&& ref, const data_layout& layout, u32 count);
 
 		inline resizable_resource& operator=(resizable_resource&& other) noexcept
 		{
@@ -242,14 +242,14 @@ namespace ENGINE_NAMESPACE
 			return *this;
 		}
 
-		virtual void resize(std::uint32_t new_size) = 0;
+		virtual void resize(u32 new_size) = 0;
 	};
 
 	class ENGINE_API uniform final : public mapped_resource
 	{
 	public:
 		uniform() = default;
-		uniform(const data_layout& layout, std::uint32_t count = 1);
+		uniform(const data_layout& layout, u32 count = 1);
 
 		//inline uniform& operator=(uniform&& other) noexcept
 		//{
@@ -265,21 +265,25 @@ namespace ENGINE_NAMESPACE
 	{
 	public:
 		unmapped_uniform() = default;
-		unmapped_uniform(const data_layout& layout, std::uint32_t count = 1);
+		unmapped_uniform(const data_layout& layout, u32 count = 1);
+
+		void update(void* data, std::size_t size, std::size_t offset) override;
 	};
 
 	class ENGINE_API storage_array final : public unmapped_resource
 	{
 	public:
 		storage_array() = default;
-		storage_array(const data_layout& layout, std::uint32_t count);
+		storage_array(const data_layout& layout, u32 count);
+
+		void update(void* data, std::size_t size, std::size_t offset) override;
 	};
 
 	class ENGINE_API dynamic_storage_array final : public mapped_resource
 	{
 	public:
 		dynamic_storage_array() = default;
-		dynamic_storage_array(const data_layout& layout, std::uint32_t count);
+		dynamic_storage_array(const data_layout& layout, u32 count);
 
 	protected:
 		void update_map() override;
@@ -289,7 +293,7 @@ namespace ENGINE_NAMESPACE
 	{
 	public:
 		storage_vector() = default;
-		storage_vector(const data_layout& layout, std::uint32_t count);
+		storage_vector(const data_layout& layout, u32 count);
 
 		inline storage_vector& operator=(storage_vector&& other) noexcept
 		{
@@ -297,14 +301,16 @@ namespace ENGINE_NAMESPACE
 			return *this;
 		}
 
-		void resize(std::uint32_t new_count) override;
+		void update(void* data, std::size_t size, std::size_t offset) override;
+
+		void resize(u32 new_count) override;
 	};
 
 	class ENGINE_API dynamic_storage_vector final : public mapped_resource, public resizable_resource
 	{
 	public:
 		dynamic_storage_vector() = default;
-		dynamic_storage_vector(const data_layout& layout, std::uint32_t count);
+		dynamic_storage_vector(const data_layout& layout, u32 count);
 
 		inline dynamic_storage_vector& operator=(dynamic_storage_vector&& other) noexcept
 		{
@@ -313,7 +319,7 @@ namespace ENGINE_NAMESPACE
 			return *this;
 		}
 
-		void resize(std::uint32_t new_count) override;
+		void resize(u32 new_count) override;
 
 	protected:
 		void update_map() override;
@@ -322,10 +328,14 @@ namespace ENGINE_NAMESPACE
 	class ENGINE_API texture_resource : public resource
 	{
 	public:
-
+		texture_resource() = default;
+		texture_resource(const void* data, u32 w, u32 h);
 
 		texture_resource(const texture_resource&) = delete;
 		texture_resource& operator=(const texture_resource&) = delete;
+
+		texture_resource(texture_resource&&) = default;
+		texture_resource& operator=(texture_resource&&) = default;
 
 	private:
 

@@ -4,117 +4,137 @@
 
 namespace ENGINE_NAMESPACE
 {
-	const std::uint32_t initial_pool_slot_size = 16;
-
-	memory_pool::memory_pool(VkDeviceSize size, bool per_frame_allocation) : _size(size)
+	const u32 initial_pool_slot_size = 16;
+	//TODO rename to resource_pool
+	memory_pool::memory_pool(VkDeviceSize size, bool per_frame_allocation) : m_size(size)
 	{
 		n_slots = initial_pool_slot_size;
 		slots = t_malloc<memory_slot>(initial_pool_slot_size);
 		slots[0].in_use = false;
 		slots[0].offset = 0;
 		slots[0].size = size;
-		largest_free_slot = 0;
+		m_largest_free_slot = 0;
 
-		for (std::uint32_t i = 1; i < n_slots; i++)
+		for (u32 i = 1; i < n_slots; i++)
 		{
 			slots[i].in_use = false;
 			slots[i].offset = size;
 			slots[i].size = 0;
 		}
 
-		this->per_frame_allocation = per_frame_allocation;
+		this->m_per_frame_allocation = per_frame_allocation;
 	}
 
 	memory_pool::~memory_pool()
 	{
-		INTERNAL_ASSERT(!slots, "Memory pool not freed");
+		INTERNAL_ASSERT(!slots, "Resource pool not freed");
 	}
 
 	void memory_pool::free(VkDevice device, device_heap_manager& heap_manager)
 	{
 		if (slots)
 		{
-			heap_manager.free(device, _memory);
+			heap_manager.free(device, m_memory);
 			std::free(slots);
 			slots = nullptr;
 		}
 	}
 
+	//TODO could try making allocations more efficient my reducing the size of the alignment padding
 	bool memory_pool::search(VkDeviceSize size, VkDeviceSize alignment, 
-		std::uint32_t* out_slot_idx, VkDeviceSize* out_size_needed) const
+		u32& out_slot_idx, VkDeviceSize& out_size_needed, VkDeviceSize& out_offset) const
 	{
-		if (_size < size) return false;
+		if (m_size < size)
+			return false;
 
-		//largest free slot is unknown, must check everything, look for smallest possible fit
-		//if possible, update largest free slot to save some performance
-		if (slots[largest_free_slot].in_use)
+		const u32 invalid_idx = std::numeric_limits<u32>::max();
+
+		// largest free slot is unknown, must check everything, look for smallest possible fit
+		// if possible, update largest free slot to reduce cost of future calls
+		if (slots[m_largest_free_slot].in_use)
 		{
 			VkDeviceSize largest_fit = 0;
-			std::uint32_t largest_idx = 0;
+			u32 largest_idx = invalid_idx;
 			VkDeviceSize smallest_fit = std::numeric_limits<VkDeviceSize>::max();
-			std::uint32_t smallest_idx = std::numeric_limits<std::uint32_t>::max();
-			for (std::uint32_t slot_idx = 0; slot_idx < n_slots; slot_idx++)
+			u32 smallest_idx = invalid_idx;
+			VkDeviceSize smallest_offset = 0;
+			
+			VkDeviceSize offset = 0;
+			for (u32 i = 0; i < n_slots; i++)
 			{
-				if (!slots[slot_idx].in_use)
+				offset += slots[i].offset;
+
+				if (!slots[i].in_use)
 				{
-					if (largest_fit < slots[slot_idx].size)
+					if (largest_fit < slots[i].size)
 					{
-						largest_fit = slots[slot_idx].size;
-						largest_idx = slot_idx;
+						largest_fit = slots[i].size;
+						largest_idx = i;
 					}
-					if ((size + alignment_pad(slots[slot_idx].offset, alignment)) <= slots[slot_idx].size 
-						&& smallest_fit > slots[slot_idx].size)
+					if (smallest_fit > slots[i].size && size + alignment_pad(slots[i].offset, alignment) <= slots[i].size)
 					{
-						smallest_fit = slots[slot_idx].size;
-						smallest_idx = slot_idx;
+						smallest_fit = slots[i].size;
+						smallest_idx = i;
+						smallest_offset = offset;
 					}
 				}
 			}
-			VkDeviceSize size_needed = (size + alignment_pad(slots[smallest_idx].offset, alignment));
-			if (size_needed <= smallest_fit)
+			
+			if (smallest_idx != invalid_idx)
 			{
-				*out_slot_idx = smallest_idx;
-				*out_size_needed = size_needed;
-				if (!(largest_idx == smallest_idx))
-					largest_free_slot = largest_idx;
+				if (largest_idx != invalid_idx && largest_idx != smallest_idx)
+					m_largest_free_slot = largest_idx;
+
+				out_slot_idx = smallest_idx;
+				out_size_needed = size + alignment_pad(slots[smallest_idx].offset, alignment);
+				out_offset = smallest_offset;
 				return true;
 			}
 			else
 			{
-				largest_free_slot = largest_idx;
+				if (largest_idx != invalid_idx)
+					m_largest_free_slot = largest_idx;
+
 				return false;
 			}
 		}
 
-		//largest free slot is known, so if it is large enough, assign a slot in this pool, otherwise move on to next pool
+		// largest free slot is known, so if it is large enough, assign a slot in this pool, 
+		// otherwise move on to next pool
 		else
 		{
-			if (slots[largest_free_slot].size < size)
+			if (slots[m_largest_free_slot].size < size)
 				return false;
 
 			VkDeviceSize smallest_fit = std::numeric_limits<VkDeviceSize>::max();
-			std::uint32_t smallest_idx = std::numeric_limits<std::uint32_t>::max();
-			for (std::uint32_t slot_idx = 0; slot_idx < n_slots; slot_idx++)
+			u32 smallest_idx = invalid_idx;
+			VkDeviceSize smallest_offset = 0;
+
+			VkDeviceSize offset = 0;
+			for (u32 i = 0; i < n_slots; i++)
 			{
-				if (!slots[slot_idx].in_use 
-					&& (size + alignment_pad(slots[slot_idx].offset, alignment)) <= slots[slot_idx].size 
-					&& smallest_fit > slots[slot_idx].size)
+				offset += slots[i].offset;
+
+				if (!slots[i].in_use 
+					&& smallest_fit > slots[i].size
+					&& size + alignment_pad(slots[i].offset, alignment) <= slots[i].size)
 				{
-					smallest_fit = slots[slot_idx].size;
-					smallest_idx = slot_idx;
+					smallest_fit = slots[i].size;
+					smallest_idx = i;
+					smallest_offset = offset;
 				}
 			}
 
-			if (smallest_fit == std::numeric_limits<VkDeviceSize>::max()) return false;
-
-			*out_slot_idx = smallest_idx;
-			*out_size_needed = size + alignment_pad(slots[smallest_idx].offset, alignment);
+			out_slot_idx = smallest_idx;
+			out_size_needed = size + alignment_pad(slots[smallest_idx].offset, alignment);
+			out_offset = smallest_offset;
 			return true;
 		}
+
 		return false;
 	}
 
-	void memory_pool::fill_slot(std::uint32_t slot_idx, VkDeviceSize size)
+	void memory_pool::fill_slot(u32 slot_idx, VkDeviceSize size)
 	{
 		INTERNAL_ASSERT(slot_idx < n_slots, "Slot index out of bounds");
 		INTERNAL_ASSERT(size <= slots[slot_idx].size, "Allocation size greater than slot size");
@@ -122,7 +142,7 @@ namespace ENGINE_NAMESPACE
 
 		if (size < slots[slot_idx].size)
 		{
-			const std::uint32_t old_size = n_slots;
+			const u32 old_size = n_slots;
 			bool selected_last = slot_idx == (n_slots - 1);
 
 			//resize needed
@@ -130,7 +150,7 @@ namespace ENGINE_NAMESPACE
 			{
 				n_slots += initial_pool_slot_size; //TODO check if this is the best way to increment
 				realloc_slots(n_slots);
-				for (std::uint32_t i = old_size; i < n_slots; i++)
+				for (u32 i = old_size; i < n_slots; i++)
 				{
 					slots[i].in_use = false;
 					slots[i].offset = slots[old_size - 1].offset + slots[old_size - 1].size;
@@ -144,8 +164,8 @@ namespace ENGINE_NAMESPACE
 			//shift remaining slots one position and add new slot with the remaining unused memory
 			if (slots[slot_idx + 1].in_use)
 			{
-				std::uint32_t last_in_use = 0;
-				for (std::uint32_t i = old_size - 1; i > slot_idx; i--)
+				u32 last_in_use = 0;
+				for (u32 i = old_size - 1; i > slot_idx; i--)
 				{
 					if (slots[i].in_use)
 					{
@@ -165,74 +185,77 @@ namespace ENGINE_NAMESPACE
 		slots[slot_idx].size = size;
 	}
 
+	u32 memory_pool::find_slot(VkDeviceSize offset) const noexcept
+	{
+		VkDeviceSize total_offset = 0;
+		u32 i = 0;
+		for (; i < n_slots && total_offset < offset; i++)
+			total_offset += slots[i].offset;
+
+		if (total_offset == offset)
+			return i;
+		else
+			return std::numeric_limits<u32>::max();
+	}
+
 	buffer_pool::buffer_pool(VkDevice device, device_heap_manager& heap_manager,
-		VkDeviceSize size, VkBufferUsageFlags usage, device_heap_manager::heap h, 
-		bool per_frame_allocation) :
+		VkDeviceSize size, VkBufferUsageFlags usage, device_heap_manager::heap heap, bool per_frame_allocation) :
 		memory_pool(size, per_frame_allocation)
 	{
-		heap_manager.alloc_buffer(device, _memory, _buffer, 
+		heap_manager.alloc_buffer(device, m_memory, m_buffer, 
 			per_frame_allocation ? size * max_frames_in_flight : size, 
-			usage, h);
+			usage, heap);
 	}
 
 	void buffer_pool::free(VkDevice device, device_heap_manager& heap_manager)
 	{
 		if (slots)
 		{
-			vkDestroyBuffer(device, _buffer, nullptr);
+			vkDestroyBuffer(device, m_buffer, nullptr);
 			memory_pool::free(device, heap_manager);
 		}
 	}
 
-	void buffer_pool::realloc_slots(std::uint32_t new_count)
+	void buffer_pool::realloc_slots(u32 new_count)
 	{
 		slots = t_realloc<memory_slot>(slots, new_count);
 	}
 
-	void buffer_pool::move_slots(std::uint32_t dst, std::uint32_t src, std::uint32_t count)
+	void buffer_pool::move_slots(u32 dst, u32 src, u32 count)
 	{
-		std::memmove(&slots[dst], &slots[src], sizeof(memory_slot) * count);
+		std::memmove(&slots[dst], &slots[src], sizeof(*slots) * count);
 	}
 
-	void dynamic_buffer_pool::map(VkDevice device, std::uint8_t current_frame)
+	void dynamic_buffer_pool::map(VkDevice device, u8 current_frame)
 	{
-		VK_CRASH_CHECK(vkMapMemory(device, _memory, _size * current_frame, _size, 0, &_host_ptr), "Failed to map memory");
+		VK_CRASH_CHECK(vkMapMemory(device, m_memory, m_size * current_frame, m_size, 0, &m_host_ptr), 
+			"Failed to map memory");
 	}
 
 	void dynamic_buffer_pool::unmap(VkDevice device)
 	{
-		INTERNAL_ASSERT(_host_ptr != nullptr, "Memmory not mapped");
-		vkUnmapMemory(device, _memory);
-		_host_ptr = nullptr;
+		INTERNAL_ASSERT(m_host_ptr != nullptr, "Memmory not mapped");
+		vkUnmapMemory(device, m_memory);
+		m_host_ptr = nullptr;
 	}
 
-	void dynamic_buffer_pool::flush(VkDevice device, std::uint8_t current_frame,
-		const std::vector<const std::vector<dynamic_buffer_pool>*>& pools)
+	void dynamic_buffer_pool::push_flush_ranges(std::vector<VkMappedMemoryRange>& ranges, u8 current_frame,
+		const std::vector<dynamic_buffer_pool>& pools)
 	{
-		std::size_t size = 0;
-		for (std::size_t i = 0; i < pools.size(); i++)
-			size += pools[i]->size();
-
-		std::vector<VkMappedMemoryRange> ranges(size);
-		
-		std::size_t i = 0;
-		for (std::size_t j = 0; j < pools.size(); j++)
+		for (const dynamic_buffer_pool& pool : pools)
 		{
-			for (std::size_t k = 0; k < pools[j]->size(); k++)
-			{
-				ranges[i] = pools[j]->at(k).mapped_range(current_frame);
-				i++;
-			}
+			//TODO skip pools with no allocations, need to track allocations somehow
+
+			ranges.push_back(pool.mapped_range(current_frame));
 		}
-		VK_CRASH_CHECK(vkFlushMappedMemoryRanges(device, ranges.size(), ranges.data()), "Failed to flush memory ranges");
 	}
 
-	texture create_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements* out_memory_requirements)
+	texture create_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements& out_memory_requirements)
 	{
 		VkImage image;
 		VK_CRASH_CHECK(vkCreateImage(device, &image_info, nullptr, &image), "Failed to create image");
 
-		vkGetImageMemoryRequirements(device, image, out_memory_requirements);
+		vkGetImageMemoryRequirements(device, image, &out_memory_requirements);
 
 		VkImageView image_view;
 
@@ -261,7 +284,8 @@ namespace ENGINE_NAMESPACE
 			"Number of image layers must be a multiple of 6 if image is a cube");
 
 		const bool is_array = is_cube ? 1 < image_info.arrayLayers / 6 : 1 < image_info.arrayLayers;
-		INTERNAL_ASSERT((is_array && image_info.imageType == VK_IMAGE_TYPE_3D), "3D image arrays are invalid");
+		INTERNAL_ASSERT(!is_array || (is_array && image_info.imageType != VK_IMAGE_TYPE_3D), 
+			"3D image arrays are invalid");
 
 		switch (image_info.imageType)
 		{
@@ -280,65 +304,78 @@ namespace ENGINE_NAMESPACE
 			break;
 		}
 
-		VK_CRASH_CHECK(vkCreateImageView(device, &view_info, nullptr, &image_view), "Failed to create image view");
+		//VK_CRASH_CHECK(vkCreateImageView(device, &view_info, nullptr, &image_view), "Failed to create image view");
 
-		return { image, image_view };
+		return {
+			.image = image,
+			.view = VK_NULL_HANDLE,// image_view,
+			.size = out_memory_requirements.size,
+			.dims = image_info.extent,
+			.layout = image_info.initialLayout 
+		};
 	}
 
 	texture_pool::texture_pool(VkDevice device, device_heap_manager& heap_manager, VkDeviceSize size,
-		std::uint32_t memory_type_bits, VkMemoryPropertyFlags heap_properties) :
+		u32 memory_type_bits, device_heap_manager::heap preferred_heap) :
 		memory_pool(size)
 	{
-		memory_type_idx = heap_manager.alloc_texture_memory(device, _memory, size, 
-			device_heap_manager::heap::MAIN, memory_type_bits);
+		memory_type_idx = heap_manager.alloc_texture_memory(device, m_memory, size, preferred_heap, memory_type_bits);
+		texture_slots = t_malloc<texture>(initial_pool_slot_size);
 	}
 
-	bool texture_pool::search(VkDeviceSize size, VkDeviceSize alignment, std::uint32_t memory_type_bits,
-		std::uint32_t* out_slot_idx, VkDeviceSize* out_size_needed)
+	void texture_pool::free(VkDevice device, device_heap_manager& heap_manager)
 	{
-		if (memory_type_bits & (1U << memory_type_idx))
-			return memory_pool::search(size, alignment, out_slot_idx, out_size_needed);
+		memory_pool::free(device, heap_manager);
+		std::free(texture_slots);
+	}
+
+	bool texture_pool::search(VkDeviceSize size, VkDeviceSize alignment, u32 memory_type_bits,
+		u32& out_slot_idx, VkDeviceSize& out_size_needed, VkDeviceSize& out_offset) const
+	{
+		if (memory_type_bits & (1ULL << memory_type_idx))
+			return memory_pool::search(size, alignment, out_slot_idx, out_size_needed, out_offset);
 
 		return false;
 	}
 
-	void texture_pool::fill_slot(VkDevice device, texture&& tex, std::uint32_t slot_idx, 
-		VkDeviceSize size, VkDeviceSize alignment)
+	void texture_pool::fill_slot(VkDevice device, texture&& tex, u32 slot_idx, VkDeviceSize size, VkDeviceSize alignment)
 	{
 		memory_pool::fill_slot(slot_idx, size);
 
-		//memory_pool::fill_slot should perform any reallocation if necessary, so the slot should always exist
+		// memory_pool::fill_slot should perform any reallocation if necessary, so the slot should always exist
 
-		VK_CRASH_CHECK(vkBindImageMemory(device, texture_slots[slot_idx].image, _memory,
-			aligned_offset(slots[slot_idx].offset, alignment)), "Failed to bind image to memory");
 		texture_slots[slot_idx] = std::move(tex);
+
+		VK_CRASH_CHECK(vkBindImageMemory(device, texture_slots[slot_idx].image, m_memory,
+			aligned_offset(slots[slot_idx].offset, alignment)), "Failed to bind image to memory");
 	}
 
-	void texture_pool::realloc_slots(std::uint32_t new_count)
+	void texture_pool::realloc_slots(u32 new_count)
 	{
 		slots = t_realloc<memory_slot>(slots, new_count);
 		texture_slots = t_realloc<texture>(texture_slots, new_count);
 	}
 
-	void texture_pool::move_slots(std::uint32_t dst, std::uint32_t src, std::uint32_t count)
+	void texture_pool::move_slots(u32 dst, u32 src, u32 count)
 	{
-		std::memmove(&slots[dst], &slots[src], sizeof(memory_slot) * count);
-		std::memmove(&texture_slots[dst], &texture_slots[src], sizeof(texture) * count);
+		std::memmove(&slots[dst], &slots[src], sizeof(*slots) * count);
+		std::memmove(&texture_slots[dst], &texture_slots[src], sizeof(*texture_slots) * count);
 	}
 
 	struct dynamic_texture
 	{
 		VkImage image;
+		VkImageLayout layout;
 		std::array<VkImageView, max_frames_in_flight> views;
 	};
 
-	dynamic_texture create_dynamic_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements* out_memory_requirements)
+	dynamic_texture create_dynamic_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements& out_memory_requirements)
 	{
 		dynamic_texture res = {};
 		
 		VK_CRASH_CHECK(vkCreateImage(device, &image_info, nullptr, &res.image), "Failed to create image");
 
-		vkGetImageMemoryRequirements(device, res.image, out_memory_requirements);
+		vkGetImageMemoryRequirements(device, res.image, &out_memory_requirements);
 
 		VkImageViewCreateInfo view_info = {};
 		view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -354,7 +391,7 @@ namespace ENGINE_NAMESPACE
 
 		INTERNAL_ASSERT(image_info.arrayLayers % max_frames_in_flight == 0,
 			"Number of layers indivisible by number of frames in flight");
-		const std::uint32_t frame_layers = image_info.arrayLayers / max_frames_in_flight;
+		const u32 frame_layers = image_info.arrayLayers / max_frames_in_flight;
 
 		view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		view_info.subresourceRange.baseMipLevel = 0;
@@ -383,7 +420,7 @@ namespace ENGINE_NAMESPACE
 			break;
 		}
 
-		for(std::uint8_t i = 0; i < max_frames_in_flight; i++)
+		for(u8 i = 0; i < max_frames_in_flight; i++)
 			VK_CRASH_CHECK(vkCreateImageView(device, &view_info, nullptr, &res.views[i]), "Failed to create image view");
 
 		return res;

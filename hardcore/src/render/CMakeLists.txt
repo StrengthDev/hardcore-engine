@@ -3,6 +3,7 @@ ${CMAKE_CURRENT_SOURCE_DIR}/renderer.cpp
 ${CMAKE_CURRENT_SOURCE_DIR}/device.cpp
 ${CMAKE_CURRENT_SOURCE_DIR}/device_heap_manager.cpp
 ${CMAKE_CURRENT_SOURCE_DIR}/memory_pool.cpp
+${CMAKE_CURRENT_SOURCE_DIR}/staging_pool.cpp
 ${CMAKE_CURRENT_SOURCE_DIR}/memory.cpp
 ${CMAKE_CURRENT_SOURCE_DIR}/swapchain.cpp
 ${CMAKE_CURRENT_SOURCE_DIR}/graphics_pipeline.cpp

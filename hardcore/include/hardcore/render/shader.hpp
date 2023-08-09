@@ -30,7 +30,7 @@ namespace ENGINE_NAMESPACE
 		static const char CONFIG[] = ".conf";
 	}
 
-	enum class shader_t : std::uint8_t
+	enum class shader_t : u8
 	{
 		NONE = 0,
 		VERTEX, FRAGMENT,
@@ -80,7 +80,7 @@ namespace ENGINE_NAMESPACE
 		const data_layout* inputs(std::size_t& out_size) const noexcept;
 
 		//uniform types
-		enum descriptor_t : std::uint8_t
+		enum descriptor_t : u8
 		{
 			NONE = 0,
 			UNIFORM,
@@ -99,16 +99,16 @@ namespace ENGINE_NAMESPACE
 		//same pipeline
 		struct descriptor_data
 		{
-			std::uint32_t set;
-			std::uint32_t binding;
+			u32 set;
+			u32 binding;
 			descriptor_t type;
-			std::uint32_t count;
+			u32 count;
 			//data_layout layout;
 		};
 
 	//this is protected to help with some operations in shader_internal
 	protected:
-		std::uint32_t* data = nullptr;
+		u32* data = nullptr;
 		std::size_t size = 0; //data size in bytes
 		shader_t stage = shader_t::NONE;
 		char* entry_point = nullptr;

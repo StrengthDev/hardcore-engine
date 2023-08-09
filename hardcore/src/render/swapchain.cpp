@@ -12,7 +12,7 @@ namespace ENGINE_NAMESPACE
 	VkSurfaceFormatKHR get_format(VkPhysicalDevice physical_device, VkSurfaceKHR surface)
 	{
 		VkSurfaceFormatKHR res = { VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
-		std::uint32_t n_formats;
+		u32 n_formats;
 		vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &n_formats, nullptr);
 		if (n_formats != 0)
 		{
@@ -25,7 +25,7 @@ namespace ENGINE_NAMESPACE
 			else
 			{
 				res = available_formats[0];
-				for (std::uint32_t i = 1; i < n_formats; i++)
+				for (u32 i = 1; i < n_formats; i++)
 				{
 					if (available_formats[i].format == VK_FORMAT_B8G8R8A8_UNORM && 
 						available_formats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
@@ -43,14 +43,14 @@ namespace ENGINE_NAMESPACE
 	VkPresentModeKHR get_present_mode(VkPhysicalDevice physical_device, VkSurfaceKHR& surface)
 	{
 		VkPresentModeKHR res = VK_PRESENT_MODE_FIFO_KHR; //default
-		std::uint32_t n_present_modes;
+		u32 n_present_modes;
 		vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &n_present_modes, nullptr);
 		if (n_present_modes != 0)
 		{
 			VkPresentModeKHR* available_present_modes = t_malloc<VkPresentModeKHR>(n_present_modes);
 			vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &n_present_modes, available_present_modes);
 			res = available_present_modes[0];
-			for (std::uint32_t i = 0; i < n_present_modes; i++)
+			for (u32 i = 0; i < n_present_modes; i++)
 			{
 				if (available_present_modes[i] == VK_PRESENT_MODE_MAILBOX_KHR)
 				{
@@ -78,8 +78,8 @@ namespace ENGINE_NAMESPACE
 			int width, height;
 			window::get_dimensions(&width, &height);
 			_extent = {
-				static_cast<std::uint32_t>(width),
-				static_cast<std::uint32_t>(height)
+				static_cast<u32>(width),
+				static_cast<u32>(height)
 			};
 
 			_extent.width = std::max(capabilities.minImageExtent.width, 
@@ -102,7 +102,7 @@ namespace ENGINE_NAMESPACE
 	}
 
 	void swapchain::init(VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface,
-		std::uint32_t graphics_queue_idx, std::uint32_t present_queue_idx)
+		u32 graphics_queue_idx, u32 present_queue_idx)
 	{
 		//TODO ideally you can choose your preferred format ex: if you want to use HDR or not
 		surface_format = get_format(physical_device, surface);
@@ -134,7 +134,7 @@ namespace ENGINE_NAMESPACE
 
 		update_dimensions(capabilities);
 
-		n_images = std::max(capabilities.minImageCount, static_cast<std::uint32_t>(max_frames_in_flight));
+		n_images = std::max(capabilities.minImageCount, static_cast<u32>(max_frames_in_flight));
 		if (capabilities.maxImageCount > 0 && n_images > capabilities.maxImageCount)
 		{
 			n_images = capabilities.maxImageCount;
@@ -155,7 +155,7 @@ namespace ENGINE_NAMESPACE
 		if (queue_indexes[render_copy] != queue_indexes[present])
 		{
 			create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-			create_info.queueFamilyIndexCount = static_cast<std::uint32_t>(queue_indexes.size());
+			create_info.queueFamilyIndexCount = static_cast<u32>(queue_indexes.size());
 			create_info.pQueueFamilyIndices = queue_indexes.data();
 		}
 		else
@@ -174,12 +174,12 @@ namespace ENGINE_NAMESPACE
 		VK_CRASH_CHECK(vkCreateSwapchainKHR(device, &create_info, nullptr, &handle), "Failed to create swapchain");
 		
 		vkGetSwapchainImagesKHR(device, handle, &n_images, nullptr);
-		LOG_INTERNAL_INFO("Main swapchain frames: " << n_images << " ; max_frames_in_flight = " << static_cast<std::uint32_t>(max_frames_in_flight));
+		LOG_INTERNAL_INFO("Main swapchain frames: " << n_images << " ; max_frames_in_flight = " << static_cast<u32>(max_frames_in_flight));
 		images = t_malloc<VkImage>(n_images);
 		vkGetSwapchainImagesKHR(device, handle, &n_images, images);
 
 		image_views = t_malloc<VkImageView>(n_images);
-		for (std::uint32_t i = 0; i < n_images; i++)
+		for (u32 i = 0; i < n_images; i++)
 		{
 			VkImageViewCreateInfo view_create_info = {};
 			view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -207,13 +207,13 @@ namespace ENGINE_NAMESPACE
 		{
 			old_swapchain& old = old_swapchains.front();
 			vkDestroySwapchainKHR(device, old.handle, nullptr);
-			for (std::uint32_t i = 0; i < old.n_images; i++)
+			for (u32 i = 0; i < old.n_images; i++)
 				vkDestroyImageView(device, old.image_views[i], nullptr);
 			std::free(old.image_views);
 			old_swapchains.pop();
 		}
 
-		for (std::uint32_t i = 0; i < n_images; i++) vkDestroyImageView(device, image_views[i], nullptr);
+		for (u32 i = 0; i < n_images; i++) vkDestroyImageView(device, image_views[i], nullptr);
 
 		std::free(image_views);
 		std::free(images);
@@ -223,7 +223,7 @@ namespace ENGINE_NAMESPACE
 	}
 
 	void swapchain::recreate(VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface,
-		std::uint8_t current_frame)
+		u8 current_frame)
 	{
 		old_swapchain old = {};
 		old.handle = handle;
@@ -251,7 +251,7 @@ namespace ENGINE_NAMESPACE
 		if (queue_indexes[render_copy] != queue_indexes[present])
 		{
 			create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-			create_info.queueFamilyIndexCount = static_cast<std::uint32_t>(queue_indexes.size());
+			create_info.queueFamilyIndexCount = static_cast<u32>(queue_indexes.size());
 			create_info.pQueueFamilyIndices = queue_indexes.data();
 		}
 		else
@@ -269,7 +269,7 @@ namespace ENGINE_NAMESPACE
 
 		VK_CRASH_CHECK(vkCreateSwapchainKHR(device, &create_info, nullptr, &handle), "Failed to recreate swapchain");
 
-		std::uint32_t new_n_images = 0;
+		u32 new_n_images = 0;
 		vkGetSwapchainImagesKHR(device, handle, &new_n_images, nullptr);
 		if (new_n_images != n_images)
 		{
@@ -281,7 +281,7 @@ namespace ENGINE_NAMESPACE
 		vkGetSwapchainImagesKHR(device, handle, &n_images, images);
 
 		image_views = t_malloc<VkImageView>(n_images);
-		for (std::uint32_t i = 0; i < n_images; i++)
+		for (u32 i = 0; i < n_images; i++)
 		{
 			VkImageViewCreateInfo view_create_info = {};
 			view_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -305,7 +305,7 @@ namespace ENGINE_NAMESPACE
 		old_swapchains.push(std::move(old));
 	}
 
-	void swapchain::check_destroy_old(VkDevice device, std::uint8_t current_frame)
+	void swapchain::check_destroy_old(VkDevice device, u8 current_frame)
 	{
 		if (!old_swapchains.empty())
 		{
@@ -313,7 +313,7 @@ namespace ENGINE_NAMESPACE
 			if (old.deletion_frame == current_frame)
 			{
 				vkDestroySwapchainKHR(device, old.handle, nullptr);
-				for (std::uint32_t i = 0; i < old.n_images; i++)
+				for (u32 i = 0; i < old.n_images; i++)
 					vkDestroyImageView(device, old.image_views[i], nullptr);
 				std::free(old.image_views);
 				old_swapchains.pop();

@@ -51,7 +51,7 @@ namespace ENGINE_NAMESPACE
 	{
 		const std::size_t size = std::strlen(name) + 1;
 		char* res = t_malloc<char>(size);
-		std::memcpy(res, name, size * sizeof(char));
+		std::memcpy(res, name, size * sizeof(*res));
 		return res;
 	}
 
@@ -80,14 +80,14 @@ namespace ENGINE_NAMESPACE
 	}
 
 	inline void compile_shader(const char* code, std::size_t code_size, const char* entry_point, shader_t stage, 
-		const char* error_name, std::uint32_t** out_data, std::size_t* out_datasize)
+		const char* error_name, u32** out_data, std::size_t* out_datasize)
 	{
 		shaderc_compiler_t compiler = shaderc_compiler_initialize();
 
 		shaderc_compile_options_t options = shaderc_compile_options_initialize();
 		//TODO: add options, maybe
 
-		shaderc_compilation_result_t result = shaderc_compile_into_spv(compiler, code, code_size / sizeof(char), to_shaderc(stage),
+		shaderc_compilation_result_t result = shaderc_compile_into_spv(compiler, code, code_size, to_shaderc(stage),
 			error_name, entry_point, options);
 
 		shaderc_compile_options_release(options);
@@ -142,7 +142,7 @@ namespace ENGINE_NAMESPACE
 		}
 
 		std::size_t datasize = shaderc_result_get_length(result);
-		*out_data = static_cast<std::uint32_t*>(ex_malloc(datasize));
+		*out_data = static_cast<u32*>(ex_malloc(datasize));
 		memcpy(*out_data, shaderc_result_get_bytes(result), datasize);
 		*out_datasize = datasize;
 
@@ -206,15 +206,14 @@ namespace ENGINE_NAMESPACE
 		if (extension != shader_ext::SPIRV)
 		{
 			//TODO implement read text file and change the read function depending if there is a need to compile
-			compile_shader(static_cast<char*>(filedata), filesize / sizeof(char), entry_point, this->stage, filename,
-				&data, &size);
+			compile_shader(static_cast<char*>(filedata), filesize, entry_point, this->stage, filename, &data, &size);
 
 			std::free(filedata);
 		}
 		else
 		{
 			size = filesize;
-			data = static_cast<std::uint32_t*>(filedata);
+			data = static_cast<u32*>(filedata);
 		}
 
 		reflect();
@@ -223,7 +222,7 @@ namespace ENGINE_NAMESPACE
 	shader::shader(const char* name, const char* entry_point, shader_t stage, const char* code) :
 		_name(create_cstr(name)), entry_point(create_cstr(entry_point)), stage(stage)
 	{
-		compile_shader(code, (std::strlen(name) + 1) / sizeof(char), entry_point, this->stage, name, &data, &size);
+		compile_shader(code, std::strlen(code), entry_point, this->stage, name, &data, &size);
 		reflect();
 	}
 
@@ -249,13 +248,13 @@ namespace ENGINE_NAMESPACE
 		std::vector<std::vector<input_resource>> inputs_vector;
 		for (const spirv_cross::Resource& input : resources.stage_inputs)
 		{
-			std::uint32_t binding = reflection.get_decoration(input.id, spv::DecorationBinding);
+			u32 binding = reflection.get_decoration(input.id, spv::DecorationBinding);
 
 			const std::size_t min_binding_size = static_cast<std::size_t>(binding + 1);
 			if (inputs_vector.size() < min_binding_size) inputs_vector.resize(min_binding_size);
 
 			auto& binding_vector = inputs_vector[binding];
-			std::uint32_t location = reflection.get_decoration(input.id, spv::DecorationLocation);
+			u32 location = reflection.get_decoration(input.id, spv::DecorationLocation);
 
 			const std::size_t min_location_size = static_cast<std::size_t>(location + 1);
 			if (binding_vector.size() < min_location_size) binding_vector.resize(min_location_size);
@@ -265,11 +264,11 @@ namespace ENGINE_NAMESPACE
 
 		std::vector<data_layout> inputs(inputs_vector.size());
 
-		std::uint32_t i = 0;
+		u32 i = 0;
 		for (const auto& binding : inputs_vector)
 		{
-			std::uint32_t k = 0;
-			inputs[i] = data_layout(static_cast<std::uint8_t>(binding.size()));
+			u32 k = 0;
+			inputs[i] = data_layout(static_cast<u8>(binding.size()));
 			for (const auto& location : binding)
 			{
 				const auto [vt, ct] = cross_to_internal_type(location.type);
@@ -324,7 +323,7 @@ namespace ENGINE_NAMESPACE
 			const spirv_cross::SPIRType& type = reflection.get_type(var.type_id);
 			if (!type.array.empty())
 			{
-				for (std::uint32_t i = 0; i < type.array.size(); i++)
+				for (std::size_t i = 0; i < type.array.size(); i++)
 				{
 					if (type.array_size_literal[i]) v.count *= type.array[i];
 					//TODO handle specialisation constant defined sizes 
@@ -337,7 +336,7 @@ namespace ENGINE_NAMESPACE
 
 	void shader::reflect()
 	{
-		spirv_cross::Compiler reflection(data, size / sizeof(std::uint32_t));
+		spirv_cross::Compiler reflection(data, size / sizeof(*data));
 		spirv_cross::ShaderResources resources = reflection.get_shader_resources();
 		
 		_inputs = reflect_inputs(reflection, resources);

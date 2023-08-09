@@ -259,7 +259,7 @@ namespace ENGINE_NAMESPACE
 #endif // DISABLE_MODULO_CORRECTION
 		}
 
-		inline static std::int8_t cmp(const duration& l, const duration& r) noexcept
+		inline static i8 cmp(const duration& l, const duration& r) noexcept
 		{
 			if (l.seconds == r.seconds)
 			{
@@ -290,7 +290,7 @@ namespace ENGINE_NAMESPACE
 		}
 
 		template<typename Type, std::enable_if_t<std::is_integral<Type>::value, bool> = true>
-		inline static std::int8_t cmp(const duration& l, const Type r) noexcept
+		inline static i8 cmp(const duration& l, const Type r) noexcept
 		{
 			if (l.seconds == r)
 			{
@@ -317,7 +317,7 @@ namespace ENGINE_NAMESPACE
 		}
 
 		template<typename Type, std::enable_if_t<std::is_floating_point<Type>::value, bool> = true>
-		inline static std::int8_t cmp(const duration& l, const Type r) noexcept
+		inline static i8 cmp(const duration& l, const Type r) noexcept
 		{
 			const second_t r_seconds = static_cast<second_t>(r);
 			const time_t r_decimal = static_cast<time_t>(r) - r_seconds;

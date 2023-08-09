@@ -10,16 +10,16 @@ namespace ENGINE_NAMESPACE
 	{
 	public:
 		void init(VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface,
-			std::uint32_t graphics_queue_idx, std::uint32_t present_queue_idx);
+			u32 graphics_queue_idx, u32 present_queue_idx);
 		void terminate(VkDevice device);
 		void recreate(VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface,
-			std::uint8_t current_frame);
-		void check_destroy_old(VkDevice device, std::uint8_t current_frame);
+			u8 current_frame);
+		void check_destroy_old(VkDevice device, u8 current_frame);
 
 		~swapchain();
 
 		inline const VkSwapchainKHR& vk_handle() const noexcept { return handle; }
-		inline std::uint32_t size() const noexcept { return n_images; }
+		inline u32 size() const noexcept { return n_images; }
 		inline VkFormat image_format() const noexcept { return surface_format.format; }
 		inline const VkImageView* views() const noexcept { return image_views; }
 
@@ -37,20 +37,20 @@ namespace ENGINE_NAMESPACE
 		VkViewport _viewport;
 		VkRect2D _scissor;
 
-		std::array<std::uint32_t, 2> queue_indexes;
-		static const std::uint32_t render_copy = 0;
-		static const std::uint32_t present = 1;
+		std::array<u32, 2> queue_indexes;
+		static const u32 render_copy = 0;
+		static const u32 present = 1;
 
 		VkImage* images = nullptr;
-		std::uint32_t n_images;
+		u32 n_images;
 		VkImageView* image_views = nullptr;
 
 		struct old_swapchain
 		{
 			VkSwapchainKHR handle;
-			std::uint32_t n_images;
+			u32 n_images;
 			VkImageView* image_views;
-			std::uint8_t deletion_frame;
+			u8 deletion_frame;
 		};
 
 		std::queue<old_swapchain> old_swapchains;

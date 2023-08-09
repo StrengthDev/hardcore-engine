@@ -1,7 +1,9 @@
 #pragma once
 
 #include "render_core.hpp"
+#include "device_heap_manager.hpp"
 #include "memory_pool.hpp"
+#include "staging_pool.hpp"
 
 #include <render/memory_ref.hpp>
 #include <render/resource.hpp>
@@ -14,18 +16,7 @@ namespace ENGINE_NAMESPACE
 	{
 		VkDevice device; // the device handle should never change throughout memory's lifetime, so it can be a local copy
 		const VkPhysicalDeviceLimits* limits;
-		const std::uint8_t* current_frame;
-	};
-
-	struct transfer_memory
-	{
-		VkDeviceMemory device;
-		VkBuffer buffer;
-		void* host = nullptr;
-		VkSemaphore semaphore;
-		VkFence fence;
-		bool ready;
-		VkDeviceSize offset;
+		const u8* current_frame;
 	};
 
 	struct buffer_binding_args
@@ -39,72 +30,84 @@ namespace ENGINE_NAMESPACE
 	class device_memory
 	{
 	public:
-		void init(VkPhysicalDevice physical_device, VkDevice device, std::uint32_t transfer_queue_idx, 
-			const VkPhysicalDeviceLimits* limits, const std::uint8_t* current_frame);
-		void terminate(VkDevice device, std::uint8_t current_frame);
+		void init(VkPhysicalDevice physical_device, VkDevice device, u32 transfer_queue_idx, 
+			const VkPhysicalDeviceLimits* limits, const u8* current_frame);
+		void terminate(VkDevice device, u8 current_frame);
 
 		device_memory() = default;
+
+		device_memory(const device_memory&) = delete;
+		device_memory& operator=(const device_memory&) = delete;
 
 		device_memory(device_memory&& other) noexcept :
 			radd(std::exchange(other.radd, {})),
 			heap_manager(std::move(other.heap_manager)),
 			cmd_pool(std::exchange(other.cmd_pool, VK_NULL_HANDLE)), cmd_buffers(std::move(other.cmd_buffers)),
-			device_in(std::move(other.device_in)), device_out(std::move(other.device_out)),
 			vertex_pools(std::move(other.vertex_pools)), index_pools(std::move(other.index_pools)),
 			uniform_pools(std::move(other.uniform_pools)), storage_pools(std::move(other.storage_pools)),
 			d_vertex_pools(std::move(other.d_vertex_pools)), d_index_pools(std::move(other.d_index_pools)),
 			d_uniform_pools(std::move(other.d_uniform_pools)), d_storage_pools(std::move(other.d_storage_pools)),
-			vp_pending_copies(std::move(other.vp_pending_copies)), ip_pending_copies(std::move(other.ip_pending_copies)),
-			up_pending_copies(std::move(other.up_pending_copies)), sp_pending_copies(std::move(other.sp_pending_copies))
+			m_upload_semaphores(std::move(other.m_upload_semaphores)), m_upload_fences(std::move(other.m_upload_fences)),
+			m_upload_pools(std::move(other.m_upload_pools)), m_tex_upload_pools(std::move(other.m_tex_upload_pools)),
+			m_uploads_pending(std::exchange(other.m_uploads_pending, false))
 		{}
 		
-		inline void update_refs(VkDevice device, const VkPhysicalDeviceLimits* limits, const std::uint8_t* current_frame) noexcept 
+		inline void update_refs(VkDevice device, const VkPhysicalDeviceLimits* limits, const u8* current_frame) noexcept 
 		{ radd.device = device, radd.limits = limits, radd.current_frame = current_frame; }
 
 		//void update_largest_slots();
 		//void tick(); could maybe replace the above function and performa all updates and cleanup
 
-		bool flush_in(VkDevice device, VkQueue transfer_queue, std::uint8_t current_frame);
-		//void flush_out();
+		bool upload(VkDevice device, VkQueue transfer_queue, u32 transfer_queue_idx, u8 current_frame);
+		//void flush_downloads();
 
-		void map_ranges(VkDevice device, std::uint8_t current_frame);
-		void unmap_ranges(VkDevice device, std::uint8_t current_frame);
+		void map_ranges(VkDevice device, u8 current_frame);
+		void unmap_ranges(VkDevice device, u8 current_frame);
+		void flush_ranges(VkDevice device, u8 current_frame);
 
-		void synchronize(VkDevice device, std::uint8_t current_frame);
+		void sync(VkDevice device, u8 current_frame);
 
-		inline VkSemaphore get_device_in_semaphore(std::uint8_t current_frame) { return device_in[current_frame].semaphore; }
+		inline VkSemaphore upload_semaphore(u8 current_frame) { return m_upload_semaphores[current_frame]; }
 
-		memory_ref alloc_vertices(const VkDeviceSize size);
-		memory_ref alloc_vertices(const void* data, const VkDeviceSize size);
-		memory_ref alloc_indexes(const VkDeviceSize size);
-		memory_ref alloc_indexes(const void* data, const VkDeviceSize size);
-		memory_ref alloc_uniform(const VkDeviceSize size);
-		memory_ref alloc_uniform(const void* data, const VkDeviceSize size);
-		memory_ref alloc_storage(const VkDeviceSize size);
-		memory_ref alloc_storage(const void* data, const VkDeviceSize size);
+		memory_ref alloc_vertices(VkDeviceSize size);
+		memory_ref alloc_vertices(const void* data, VkDeviceSize size);
+		memory_ref alloc_indexes(VkDeviceSize size);
+		memory_ref alloc_indexes(const void* data, VkDeviceSize size);
+		memory_ref alloc_uniform(VkDeviceSize size);
+		memory_ref alloc_uniform(const void* data, VkDeviceSize size);
+		memory_ref alloc_storage(VkDeviceSize size);
+		memory_ref alloc_storage(const void* data, VkDeviceSize size);
 
-		memory_ref alloc_dynamic_vertices(const VkDeviceSize size);
-		memory_ref alloc_dynamic_vertices(const void* data, const VkDeviceSize size);
-		memory_ref alloc_dynamic_indexes(const VkDeviceSize size);
-		memory_ref alloc_dynamic_indexes(const void* data, const VkDeviceSize size);
-		memory_ref alloc_dynamic_uniform(const VkDeviceSize size);
-		memory_ref alloc_dynamic_uniform(const void* data, const VkDeviceSize size);
-		memory_ref alloc_dynamic_storage(const VkDeviceSize size);
-		memory_ref alloc_dynamic_storage(const void* data, const VkDeviceSize size);
+		memory_ref alloc_dynamic_vertices(VkDeviceSize size);
+		memory_ref alloc_dynamic_vertices(const void* data, VkDeviceSize size);
+		memory_ref alloc_dynamic_indexes(VkDeviceSize size);
+		memory_ref alloc_dynamic_indexes(const void* data, VkDeviceSize size);
+		memory_ref alloc_dynamic_uniform(VkDeviceSize size);
+		memory_ref alloc_dynamic_uniform(const void* data, VkDeviceSize size);
+		memory_ref alloc_dynamic_storage(VkDeviceSize size);
+		memory_ref alloc_dynamic_storage(const void* data, VkDeviceSize size);
 		
-		//memory_ref alloc_texture();
+		memory_ref alloc_texture(u32 w, u32 h);
 
-		void submit_upload(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset);
+		void upload_texture(const memory_ref& ref, const void* data)
+		{
+			submit_texture_upload(ref, data);
+		}
 
-		void memcpy_vertices(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset = 0);
-		void memcpy_indexes(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset = 0);
-		void memcpy_uniform(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset = 0);
-		void memcpy_storage(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset = 0);
+		void upload_vertices(const memory_ref& ref, const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
+		void upload_indexes(const memory_ref& ref, const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
+		void upload_uniform(const memory_ref& ref, const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
+		void upload_storage(const memory_ref& ref, const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
 
-		void vertex_map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept;
-		void index_map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept;
-		void uniform_map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept;
-		void storage_map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept;
+		void memcpy_vertices(const memory_ref& ref, const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
+		void memcpy_indexes(const memory_ref& ref, const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
+		void memcpy_uniform(const memory_ref& ref, const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
+		void memcpy_storage(const memory_ref& ref, const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
+
+		void vertex_map(const memory_ref& ref, void**& out_map_ptr, std::size_t& out_offset) noexcept;
+		void index_map(const memory_ref& ref, void**& out_map_ptr, std::size_t& out_offset) noexcept;
+		void uniform_map(const memory_ref& ref, void**& out_map_ptr, std::size_t& out_offset) noexcept;
+		void storage_map(const memory_ref& ref, void**& out_map_ptr, std::size_t& out_offset) noexcept;
 
 		buffer_binding_args binding_args(const mesh& object) noexcept;
 		buffer_binding_args index_binding_args(const mesh& object) noexcept;
@@ -115,31 +118,18 @@ namespace ENGINE_NAMESPACE
 		buffer_binding_args binding_args(const storage_vector& vector) noexcept;
 		buffer_binding_args binding_args(const dynamic_storage_vector& vector) noexcept;
 
-		enum buffer_t : std::uint8_t
+		enum buffer_t : u8
 		{
+			NONE = 0,
 			VERTEX,
 			INDEX,
 			UNIFORM,
 			STORAGE,
 			UNIVERSAL, //writable
-			NONE,
+			TEXTURE,
 		};
 
 	private:
-		
-		typedef std::pair<std::uint32_t, std::uint32_t> copy_path_t;
-
-		//not part of the engine API, so it's unnecessary to implement the std version of hash
-		struct hash
-		{
-			inline std::size_t operator()(const copy_path_t& key) const noexcept
-			{
-				return static_cast<std::size_t>((static_cast<std::uint64_t>(key.first) << 32) | key.second);
-			}
-		};
-
-		typedef std::unordered_map<copy_path_t, std::vector<VkBufferCopy>, hash> pending_copies_t;
-		
 		//there are some template functions used by other member functions, 
 		//they are private so it's not a problem that they aren't defined in the header
 
@@ -160,22 +150,6 @@ namespace ENGINE_NAMESPACE
 		template<> inline std::vector<dynamic_buffer_pool>& dynamic_pools<UNIFORM>() noexcept { return d_uniform_pools; }
 		template<> inline std::vector<dynamic_buffer_pool>& dynamic_pools<STORAGE>() noexcept { return d_storage_pools; }
 
-		template<buffer_t BType>
-		inline pending_copies_t& pending_copies(std::uint8_t current_frame) 
-		{ static_assert(force_eval<BType>::value, "Unimplemented buffer type"); }
-		template<>
-		inline pending_copies_t& pending_copies<VERTEX>(std::uint8_t current_frame) noexcept
-		{ return vp_pending_copies[current_frame]; }
-		template<>
-		inline pending_copies_t& pending_copies<INDEX>(std::uint8_t current_frame) noexcept
-		{ return ip_pending_copies[current_frame]; }
-		template<>
-		inline pending_copies_t& pending_copies<UNIFORM>(std::uint8_t current_frame) noexcept
-		{ return up_pending_copies[current_frame]; }
-		template<>
-		inline pending_copies_t& pending_copies<STORAGE>(std::uint8_t current_frame) noexcept
-		{ return sp_pending_copies[current_frame]; }
-
 		template<buffer_t BType> inline VkDeviceSize offset_alignment() const noexcept
 		{ return 0; }
 		template<> inline VkDeviceSize offset_alignment<device_memory::UNIFORM>() const noexcept
@@ -192,13 +166,13 @@ namespace ENGINE_NAMESPACE
 		memory_ref alloc_buffer(const void* data, VkDeviceSize size);
 
 		template<buffer_t BType>
-		void submit_upload(std::uint32_t pool_idx, VkDeviceSize offset, const void* data, const VkDeviceSize size);
+		void submit_upload(const memory_ref& ref, const void* data, VkDeviceSize size, VkDeviceSize offset);
 
 		template<buffer_t BType>
-		void memcpy(const memory_ref& ref, const void* data, const VkDeviceSize size, const VkDeviceSize offset);
+		void memcpy(const memory_ref& ref, const void* data, VkDeviceSize size, VkDeviceSize offset);
 
 		template<buffer_t BType>
-		void map(const memory_ref& ref, void*** out_map_ptr, std::size_t* out_offset) noexcept;
+		void map(const memory_ref& ref, void**& out_map_ptr, std::size_t& out_offset) noexcept;
 
 		template<buffer_t BType>
 		buffer_binding_args binding_args(const resource&) noexcept;
@@ -206,7 +180,9 @@ namespace ENGINE_NAMESPACE
 		buffer_binding_args dynamic_binding_args(const resource&) noexcept;
 
 		template<bool Dynamic>
-		memory_ref alloc_texture(VkDeviceSize size);
+		memory_ref alloc_texture(VkExtent3D extent, u32 layers, u32 mip_levels);
+
+		void submit_texture_upload(const memory_ref& ref, const void* data);
 
 		random_access_device_data radd;
 
@@ -214,9 +190,6 @@ namespace ENGINE_NAMESPACE
 
 		VkCommandPool cmd_pool = VK_NULL_HANDLE;
 		std::array<VkCommandBuffer, max_frames_in_flight> cmd_buffers;
-
-		std::array<transfer_memory, max_frames_in_flight> device_in; //TODO: move all transfer memories to a single buffer and change offset depending on frame
-		std::array<transfer_memory, max_frames_in_flight> device_out;
 
 		// "read-only" resources
 
@@ -238,11 +211,12 @@ namespace ENGINE_NAMESPACE
 		std::vector<dynamic_buffer_pool> d_uniform_pools;
 		std::vector<dynamic_buffer_pool> d_storage_pools;
 
-		std::vector<std::vector<texture_pool>> texture_pools;
+		std::vector<texture_pool> texture_pools;
 
-		std::array<pending_copies_t, max_frames_in_flight> vp_pending_copies; //TODO only 1 pending copies is needed
-		std::array<pending_copies_t, max_frames_in_flight> ip_pending_copies;
-		std::array<pending_copies_t, max_frames_in_flight> up_pending_copies;
-		std::array<pending_copies_t, max_frames_in_flight> sp_pending_copies;
+		std::array<VkSemaphore, max_frames_in_flight> m_upload_semaphores;
+		std::array<VkFence, max_frames_in_flight> m_upload_fences;
+		std::vector<upload_pool> m_upload_pools;
+		std::vector<texture_upload_pool> m_tex_upload_pools;
+		bool m_uploads_pending = false;
 	};
 }

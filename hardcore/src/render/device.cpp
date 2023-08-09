@@ -8,18 +8,18 @@
 namespace ENGINE_NAMESPACE
 {
 	inline void calc_queue_indices(VkPhysicalDevice& physical_handle, VkSurfaceKHR& surface,
-		std::uint32_t* out_graphics_idx, std::uint32_t* out_present_idx, std::uint32_t* out_compute_idx, std::uint32_t* out_transfer_idx,
-		std::uint32_t invalid_idx)
+		u32* out_graphics_idx, u32* out_present_idx, u32* out_compute_idx, u32* out_transfer_idx,
+		u32 invalid_idx)
 	{
-		std::uint32_t graphics_idx = invalid_idx, present_idx = invalid_idx, compute_idx = invalid_idx, transfer_idx = invalid_idx,
+		u32 graphics_idx = invalid_idx, present_idx = invalid_idx, compute_idx = invalid_idx, transfer_idx = invalid_idx,
 			graphics_score = 0, present_score = 0, compute_score = 0, transfer_score = 0;
 
-		std::uint32_t queue_family_count = 0;
+		u32 queue_family_count = 0;
 		vkGetPhysicalDeviceQueueFamilyProperties(physical_handle, &queue_family_count, nullptr);
 		VkQueueFamilyProperties* queue_families = t_calloc<VkQueueFamilyProperties>(queue_family_count);
 		vkGetPhysicalDeviceQueueFamilyProperties(physical_handle, &queue_family_count, queue_families);
 
-		for (std::uint32_t i = 0; i < queue_family_count; i++)
+		for (u32 i = 0; i < queue_family_count; i++)
 		{
 			if (queue_families[i].queueCount)
 			{
@@ -100,14 +100,14 @@ namespace ENGINE_NAMESPACE
 
 	inline void create_logical_device(VkPhysicalDevice& physical_handle, VkDevice& handle,
 		VkQueue* graphics_queue, VkQueue* present_queue, VkQueue* compute_queue, VkQueue* transfer_queue,
-		std::uint32_t graphics_idx, std::uint32_t present_idx, std::uint32_t compute_idx, std::uint32_t transfer_idx, 
-		std::uint32_t invalid_idx)
+		u32 graphics_idx, u32 present_idx, u32 compute_idx, u32 transfer_idx, 
+		u32 invalid_idx)
 	{
-		std::set<std::uint32_t> unique_queue_families = { graphics_idx, present_idx, compute_idx, transfer_idx };
+		std::set<u32> unique_queue_families = { graphics_idx, present_idx, compute_idx, transfer_idx };
 		VkDeviceQueueCreateInfo* queue_create_infos = t_calloc<VkDeviceQueueCreateInfo>(unique_queue_families.size());
-		std::uint32_t count = 0;
+		u32 count = 0;
 		float queue_priority = 1.0f;
-		for (std::uint32_t index : unique_queue_families)
+		for (u32 index : unique_queue_families)
 		{
 			if (index != invalid_idx)
 			{
@@ -154,8 +154,8 @@ namespace ENGINE_NAMESPACE
 			vkGetDeviceQueue(handle, transfer_idx, 0, transfer_queue);
 	}
 
-	inline void create_command_buffers(VkDevice& handle,  std::uint32_t command_parallelism, 
-		std::uint32_t graphics_idx, VkCommandPool** graphics_command_pools, VkCommandBuffer** graphics_command_buffers)
+	inline void create_command_buffers(VkDevice& handle,  u32 command_parallelism, 
+		u32 graphics_idx, VkCommandPool** graphics_command_pools, VkCommandBuffer** graphics_command_buffers)
 	{
 		*graphics_command_pools = t_malloc<VkCommandPool>(command_parallelism);
 		VkCommandPoolCreateInfo poolInfo = {};
@@ -163,13 +163,13 @@ namespace ENGINE_NAMESPACE
 		poolInfo.queueFamilyIndex = graphics_idx;
 		poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-		for (std::uint32_t i = 0; i < command_parallelism; i++)
+		for (u32 i = 0; i < command_parallelism; i++)
 			VK_CRASH_CHECK(vkCreateCommandPool(handle, &poolInfo, nullptr, &(*graphics_command_pools)[i]), 
 				"Failed to create graphics command pool");
 		
-		const std::uint32_t buffers_per_frame = command_parallelism + 1;
+		const u32 buffers_per_frame = command_parallelism + 1;
 		*graphics_command_buffers = t_malloc<VkCommandBuffer>(static_cast<std::size_t>(max_frames_in_flight) * buffers_per_frame);
-		for (std::uint32_t f = 0; f < max_frames_in_flight; f++)
+		for (u32 f = 0; f < max_frames_in_flight; f++)
 		{
 			//Primary buffer allocation
 			VkCommandBufferAllocateInfo mainAllocInfo = {};
@@ -182,7 +182,7 @@ namespace ENGINE_NAMESPACE
 				"Failed to allocate main graphics command buffer");
 
 			//Secondary buffer allocation
-			for (std::uint32_t i = 0; i < command_parallelism; i++)
+			for (u32 i = 0; i < command_parallelism; i++)
 			{
 				VkCommandBufferAllocateInfo subAllocInfo = {};
 				subAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -376,7 +376,7 @@ namespace ENGINE_NAMESPACE
 		}
 	}
 
-	void device::record_secondary_graphics(VkCommandBuffer& buffer, std::uint32_t image_index, 
+	void device::record_secondary_graphics(VkCommandBuffer& buffer, u32 image_index, 
 		std::vector<graphics_pipeline*>& graphics_pipelines)
 	{
 		VK_CRASH_CHECK(vkResetCommandBuffer(buffer, 0), "Failed to reset secondary graphics command buffer");
@@ -412,13 +412,16 @@ namespace ENGINE_NAMESPACE
 
 	bool device::draw()
 	{
-		const std::uint8_t next_frame = (current_frame + 1) % max_frames_in_flight;
-		const std::uint8_t previous_frame = (current_frame - 1 + max_frames_in_flight) % max_frames_in_flight;
+		const u8 next_frame = (current_frame + 1) % max_frames_in_flight;
+		const u8 previous_frame = (current_frame - 1 + max_frames_in_flight) % max_frames_in_flight;
 
 		vkWaitForFences(handle, 1, &frame_fences[current_frame], VK_TRUE, UINT64_MAX);
 		for (auto& pipeline : graphics_pipelines) pipeline.update_descriptor_sets(previous_frame, current_frame, next_frame); //TODO consider parallelizing this
-		const bool memory_flushed = memory.flush_in(handle, transfer_queue, current_frame);
+		
+		memory.flush_ranges(handle, current_frame);
 		memory.unmap_ranges(handle, current_frame);
+		const bool uploaded = memory.upload(handle, transfer_queue, transfer_idx, current_frame);
+		
 		main_swapchain.check_destroy_old(handle, current_frame);
 		if (!old_framebuffers.empty())
 		{
@@ -432,7 +435,7 @@ namespace ENGINE_NAMESPACE
 			}
 		}
 
-		std::uint32_t imageIndex;
+		u32 imageIndex;
 		VkResult result = vkAcquireNextImageKHR(handle, main_swapchain.vk_handle(), UINT64_MAX, image_available_semaphores[current_frame], VK_NULL_HANDLE, &imageIndex);
 		if (result == VK_ERROR_OUT_OF_DATE_KHR)
 		{
@@ -467,7 +470,7 @@ namespace ENGINE_NAMESPACE
 		renderPassInfo.clearValueCount = 1;
 		renderPassInfo.pClearValues = &clearColor;
 
-		std::uint32_t index = 0;
+		u32 index = 0;
 		for (graphics_pipeline& pipeline : graphics_pipelines)
 		{
 			pipeline_stacks[index].push_back(&pipeline);
@@ -475,7 +478,7 @@ namespace ENGINE_NAMESPACE
 		}
 
 		vkCmdBeginRenderPass(primary_buffer, &renderPassInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);// VK_SUBPASS_CONTENTS_INLINE);
-		for (std::uint32_t i = 0; i < command_parallelism; i++)
+		for (u32 i = 0; i < command_parallelism; i++)
 		{
 			record_secondary_graphics(graphics_command_buffers[(command_parallelism + 1) * current_frame + i + 1], 
 				imageIndex, pipeline_stacks[i]);
@@ -491,12 +494,12 @@ namespace ENGINE_NAMESPACE
 		std::vector<VkSemaphore> pre_render_semaphores;
 		pre_render_semaphores.reserve(2);
 		pre_render_semaphores.push_back(image_available_semaphores[current_frame]);
-		if (memory_flushed) pre_render_semaphores.push_back(memory.get_device_in_semaphore(current_frame));
+		if (uploaded) pre_render_semaphores.push_back(memory.upload_semaphore(current_frame));
 
 		VkSubmitInfo submitInfo = {};
 		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 		VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT };
-		submitInfo.waitSemaphoreCount = static_cast<std::uint32_t>(pre_render_semaphores.size());
+		submitInfo.waitSemaphoreCount = static_cast<u32>(pre_render_semaphores.size());
 		submitInfo.pWaitSemaphores = pre_render_semaphores.data();
 		submitInfo.pWaitDstStageMask = waitStages;
 		submitInfo.commandBufferCount = 1;
@@ -529,17 +532,17 @@ namespace ENGINE_NAMESPACE
 			return false;
 		}
 		current_frame = next_frame;
-		memory.synchronize(handle, current_frame); //wait for the next frame's data transfers to finish, so nothing can be overwritten by the client
+		memory.sync(handle, current_frame); //wait for the "next" frame's data transfers to finish, so nothing can be overwritten by the client
 		memory.map_ranges(handle, current_frame);
 		return true;
 	}
 
-	std::uint32_t device::add_graphics_pipeline(const shader& vertex, const shader& fragment)
+	u32 device::add_graphics_pipeline(const shader& vertex, const shader& fragment)
 	{
 
 		const std::vector<const shader*> shaders = { &vertex, &fragment };
 		graphics_pipelines.push_back(graphics_pipeline(*this, shaders));
-		return static_cast<std::uint32_t>(graphics_pipelines.size() - 1);
+		return static_cast<u32>(graphics_pipelines.size() - 1);
 	}
 
 	void device::add_instanced_graphics_pipeline()
