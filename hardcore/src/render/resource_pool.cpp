@@ -6,42 +6,40 @@ namespace ENGINE_NAMESPACE
 {
 	const u32 initial_pool_slot_size = 16;
 	
-	memory_pool::memory_pool(VkDeviceSize size, bool per_frame_allocation) : m_size(size)
+	resource_pool::resource_pool(VkDeviceSize size, bool per_frame_allocation) : 
+		m_size(size), m_slots(initial_pool_slot_size)
 	{
-		n_slots = initial_pool_slot_size;
-		slots = t_malloc<memory_slot>(initial_pool_slot_size);
-		slots[0].in_use = false;
-		slots[0].offset = 0;
-		slots[0].size = size;
+		m_slots[0].in_use = false;
+		m_slots[0].offset = 0;
+		m_slots[0].size = size;
 		m_largest_free_slot = 0;
 
-		for (u32 i = 1; i < n_slots; i++)
+		for (u32 i = 1; i < m_slots.size(); i++)
 		{
-			slots[i].in_use = false;
-			slots[i].offset = size;
-			slots[i].size = 0;
+			m_slots[i].in_use = false;
+			m_slots[i].offset = size;
+			m_slots[i].size = 0;
 		}
 
 		this->m_per_frame_allocation = per_frame_allocation;
 	}
 
-	memory_pool::~memory_pool()
+	resource_pool::~resource_pool()
 	{
-		INTERNAL_ASSERT(!slots, "Resource pool not freed");
+		INTERNAL_ASSERT(m_memory == VK_NULL_HANDLE, "Resource pool not freed");
 	}
 
-	void memory_pool::free(VkDevice device, device_heap_manager& heap_manager)
+	void resource_pool::free(VkDevice device, device_heap_manager& heap_manager)
 	{
-		if (slots)
+		if (m_memory != VK_NULL_HANDLE)
 		{
 			heap_manager.free(device, m_memory);
-			std::free(slots);
-			slots = nullptr;
+			m_slots.clear();
 		}
 	}
 
 	//TODO could try making allocations more efficient my reducing the size of the alignment padding
-	bool memory_pool::search(VkDeviceSize size, VkDeviceSize alignment, 
+	bool resource_pool::search(VkDeviceSize size, VkDeviceSize alignment, 
 		u32& out_slot_idx, VkDeviceSize& out_size_needed, VkDeviceSize& out_offset) const
 	{
 		if (m_size < size)
@@ -51,7 +49,7 @@ namespace ENGINE_NAMESPACE
 
 		// largest free slot is unknown, must check everything, look for smallest possible fit
 		// if possible, update largest free slot to reduce cost of future calls
-		if (slots[m_largest_free_slot].in_use)
+		if (m_slots[m_largest_free_slot].in_use)
 		{
 			VkDeviceSize largest_fit = 0;
 			u32 largest_idx = invalid_idx;
@@ -60,20 +58,21 @@ namespace ENGINE_NAMESPACE
 			VkDeviceSize smallest_offset = 0;
 			
 			VkDeviceSize offset = 0;
-			for (u32 i = 0; i < n_slots; i++)
+			for (u32 i = 0; i < m_slots.size(); i++)
 			{
-				offset += slots[i].offset;
+				offset += m_slots[i].offset;
 
-				if (!slots[i].in_use)
+				if (!m_slots[i].in_use)
 				{
-					if (largest_fit < slots[i].size)
+					if (largest_fit < m_slots[i].size)
 					{
-						largest_fit = slots[i].size;
+						largest_fit = m_slots[i].size;
 						largest_idx = i;
 					}
-					if (smallest_fit > slots[i].size && size + alignment_pad(slots[i].offset, alignment) <= slots[i].size)
+					if (smallest_fit > m_slots[i].size && 
+						size + alignment_pad(m_slots[i].offset, alignment) <= m_slots[i].size)
 					{
-						smallest_fit = slots[i].size;
+						smallest_fit = m_slots[i].size;
 						smallest_idx = i;
 						smallest_offset = offset;
 					}
@@ -86,7 +85,7 @@ namespace ENGINE_NAMESPACE
 					m_largest_free_slot = largest_idx;
 
 				out_slot_idx = smallest_idx;
-				out_size_needed = size + alignment_pad(slots[smallest_idx].offset, alignment);
+				out_size_needed = size + alignment_pad(m_slots[smallest_idx].offset, alignment);
 				out_offset = smallest_offset;
 				return true;
 			}
@@ -103,7 +102,7 @@ namespace ENGINE_NAMESPACE
 		// otherwise move on to next pool
 		else
 		{
-			if (slots[m_largest_free_slot].size < size)
+			if (m_slots[m_largest_free_slot].size < size)
 				return false;
 
 			VkDeviceSize smallest_fit = std::numeric_limits<VkDeviceSize>::max();
@@ -111,22 +110,22 @@ namespace ENGINE_NAMESPACE
 			VkDeviceSize smallest_offset = 0;
 
 			VkDeviceSize offset = 0;
-			for (u32 i = 0; i < n_slots; i++)
+			for (u32 i = 0; i < m_slots.size(); i++)
 			{
-				offset += slots[i].offset;
+				offset += m_slots[i].offset;
 
-				if (!slots[i].in_use 
-					&& smallest_fit > slots[i].size
-					&& size + alignment_pad(slots[i].offset, alignment) <= slots[i].size)
+				if (!m_slots[i].in_use 
+					&& smallest_fit > m_slots[i].size
+					&& size + alignment_pad(m_slots[i].offset, alignment) <= m_slots[i].size)
 				{
-					smallest_fit = slots[i].size;
+					smallest_fit = m_slots[i].size;
 					smallest_idx = i;
 					smallest_offset = offset;
 				}
 			}
 
 			out_slot_idx = smallest_idx;
-			out_size_needed = size + alignment_pad(slots[smallest_idx].offset, alignment);
+			out_size_needed = size + alignment_pad(m_slots[smallest_idx].offset, alignment);
 			out_offset = smallest_offset;
 			return true;
 		}
@@ -134,40 +133,36 @@ namespace ENGINE_NAMESPACE
 		return false;
 	}
 
-	void memory_pool::fill_slot(u32 slot_idx, VkDeviceSize size)
+	void resource_pool::fill_slot(u32 slot_idx, VkDeviceSize size)
 	{
-		INTERNAL_ASSERT(slot_idx < n_slots, "Slot index out of bounds");
-		INTERNAL_ASSERT(size <= slots[slot_idx].size, "Allocation size greater than slot size");
-		INTERNAL_ASSERT(slot_idx == 0 ? true : slots[slot_idx - 1].in_use, "Slot before a selected slot must be in use.");
+		INTERNAL_ASSERT(slot_idx < m_slots.size(), "Slot index out of bounds");
+		INTERNAL_ASSERT(size <= m_slots[slot_idx].size, "Allocation size greater than slot size");
+		INTERNAL_ASSERT(slot_idx == 0 ? true : m_slots[slot_idx - 1].in_use, "Slot before a selected slot must be in use.");
 
-		if (size < slots[slot_idx].size)
+		if (size < m_slots[slot_idx].size)
 		{
-			const u32 old_size = n_slots;
-			bool selected_last = slot_idx == (n_slots - 1);
+			const u32 old_size = m_slots.size();
+			bool selected_last = slot_idx == (m_slots.size() - 1);
 
 			//resize needed
-			if (selected_last || (slots[slot_idx + 1].in_use && slots[n_slots - 1].in_use))
+			if (selected_last || (m_slots[slot_idx + 1].in_use && m_slots[m_slots.size() - 1].in_use))
 			{
-				n_slots += initial_pool_slot_size; //TODO check if this is the best way to increment
-				realloc_slots(n_slots);
-				for (u32 i = old_size; i < n_slots; i++)
-				{
-					slots[i].in_use = false;
-					slots[i].offset = slots[old_size - 1].offset + slots[old_size - 1].size;
-					slots[i].size = 0;
-				}
+				push_back_empty();
+				m_slots[old_size].in_use = false;
+				m_slots[old_size].offset = m_slots[old_size - 1].offset + m_slots[old_size - 1].size;
+				m_slots[old_size].size = 0;
 			}
 
-			INTERNAL_ASSERT(slots[slot_idx + 1].in_use || !slots[slot_idx + 1].size,
+			INTERNAL_ASSERT(m_slots[slot_idx + 1].in_use || !m_slots[slot_idx + 1].size,
 				"Slot after the selected slot must be either empty or in use");
 
 			//shift remaining slots one position and add new slot with the remaining unused memory
-			if (slots[slot_idx + 1].in_use)
+			if (m_slots[slot_idx + 1].in_use)
 			{
 				u32 last_in_use = 0;
 				for (u32 i = old_size - 1; i > slot_idx; i--)
 				{
-					if (slots[i].in_use)
+					if (m_slots[i].in_use)
 					{
 						last_in_use = i;
 						break;
@@ -176,21 +171,21 @@ namespace ENGINE_NAMESPACE
 				move_slots(slot_idx + 2, slot_idx + 1, last_in_use - slot_idx);
 			}
 
-			slots[slot_idx + 1].in_use = false;
-			slots[slot_idx + 1].offset = slots[slot_idx].offset + size;
-			slots[slot_idx + 1].size = slots[slot_idx].size - size;
+			m_slots[slot_idx + 1].in_use = false;
+			m_slots[slot_idx + 1].offset = m_slots[slot_idx].offset + size;
+			m_slots[slot_idx + 1].size = m_slots[slot_idx].size - size;
 		}
 
-		slots[slot_idx].in_use = true;
-		slots[slot_idx].size = size;
+		m_slots[slot_idx].in_use = true;
+		m_slots[slot_idx].size = size;
 	}
 
-	u32 memory_pool::find_slot(VkDeviceSize offset) const noexcept
+	u32 resource_pool::find_slot(VkDeviceSize offset) const noexcept
 	{
 		VkDeviceSize total_offset = 0;
 		u32 i = 0;
-		for (; i < n_slots && total_offset < offset; i++)
-			total_offset += slots[i].offset;
+		for (; i < m_slots.size() && total_offset < offset; i++)
+			total_offset += m_slots[i].offset;
 
 		if (total_offset == offset)
 			return i;
@@ -200,7 +195,7 @@ namespace ENGINE_NAMESPACE
 
 	buffer_pool::buffer_pool(VkDevice device, device_heap_manager& heap_manager,
 		VkDeviceSize size, VkBufferUsageFlags usage, device_heap_manager::heap heap, bool per_frame_allocation) :
-		memory_pool(size, per_frame_allocation)
+		resource_pool(size, per_frame_allocation)
 	{
 		heap_manager.alloc_buffer(device, m_memory, m_buffer, 
 			per_frame_allocation ? size * max_frames_in_flight : size, 
@@ -209,21 +204,21 @@ namespace ENGINE_NAMESPACE
 
 	void buffer_pool::free(VkDevice device, device_heap_manager& heap_manager)
 	{
-		if (slots)
+		if (m_memory != VK_NULL_HANDLE)
 		{
 			vkDestroyBuffer(device, m_buffer, nullptr);
-			memory_pool::free(device, heap_manager);
+			resource_pool::free(device, heap_manager);
 		}
 	}
 
-	void buffer_pool::realloc_slots(u32 new_count)
+	void buffer_pool::push_back_empty()
 	{
-		slots = t_realloc<memory_slot>(slots, new_count);
+		m_slots.push_back({});
 	}
 
 	void buffer_pool::move_slots(u32 dst, u32 src, u32 count)
 	{
-		std::memmove(&slots[dst], &slots[src], sizeof(*slots) * count);
+		std::memmove(&m_slots.data()[dst], &m_slots.data()[src], sizeof(*m_slots.data()) * count);
 	}
 
 	void dynamic_buffer_pool::map(VkDevice device, u8 current_frame)
@@ -317,49 +312,48 @@ namespace ENGINE_NAMESPACE
 
 	texture_pool::texture_pool(VkDevice device, device_heap_manager& heap_manager, VkDeviceSize size,
 		u32 memory_type_bits, device_heap_manager::heap preferred_heap) :
-		memory_pool(size)
+		resource_pool(size), m_texture_slots(initial_pool_slot_size)
 	{
-		memory_type_idx = heap_manager.alloc_texture_memory(device, m_memory, size, preferred_heap, memory_type_bits);
-		texture_slots = t_malloc<texture_slot>(initial_pool_slot_size);
+		m_memory_type_idx = heap_manager.alloc_texture_memory(device, m_memory, size, preferred_heap, memory_type_bits);
 	}
 
 	void texture_pool::free(VkDevice device, device_heap_manager& heap_manager)
 	{
-		memory_pool::free(device, heap_manager);
-		std::free(texture_slots);
+		resource_pool::free(device, heap_manager);
+		m_texture_slots.clear();
 	}
 
 	bool texture_pool::search(VkDeviceSize size, VkDeviceSize alignment, u32 memory_type_bits,
 		u32& out_slot_idx, VkDeviceSize& out_size_needed, VkDeviceSize& out_offset) const
 	{
-		if (memory_type_bits & (1ULL << memory_type_idx))
-			return memory_pool::search(size, alignment, out_slot_idx, out_size_needed, out_offset);
+		if (memory_type_bits & (1ULL << m_memory_type_idx))
+			return resource_pool::search(size, alignment, out_slot_idx, out_size_needed, out_offset);
 
 		return false;
 	}
 
 	void texture_pool::fill_slot(VkDevice device, texture_slot&& tex, u32 slot_idx, VkDeviceSize size, VkDeviceSize alignment)
 	{
-		memory_pool::fill_slot(slot_idx, size);
+		resource_pool::fill_slot(slot_idx, size);
 
-		// memory_pool::fill_slot should perform any reallocation if necessary, so the slot should always exist
+		// resource_pool::fill_slot should perform any reallocation if necessary, so the slot should always exist
 
-		texture_slots[slot_idx] = std::move(tex);
+		m_texture_slots[slot_idx] = std::move(tex);
 
-		VK_CRASH_CHECK(vkBindImageMemory(device, texture_slots[slot_idx].image, m_memory,
-			aligned_offset(slots[slot_idx].offset, alignment)), "Failed to bind image to memory");
+		VK_CRASH_CHECK(vkBindImageMemory(device, m_texture_slots[slot_idx].image, m_memory,
+			aligned_offset(m_slots[slot_idx].offset, alignment)), "Failed to bind image to memory");
 	}
 
-	void texture_pool::realloc_slots(u32 new_count)
+	void texture_pool::push_back_empty()
 	{
-		slots = t_realloc<memory_slot>(slots, new_count);
-		texture_slots = t_realloc<texture_slot>(texture_slots, new_count);
+		m_slots.push_back({});
+		m_texture_slots.push_back({});
 	}
 
 	void texture_pool::move_slots(u32 dst, u32 src, u32 count)
 	{
-		std::memmove(&slots[dst], &slots[src], sizeof(*slots) * count);
-		std::memmove(&texture_slots[dst], &texture_slots[src], sizeof(*texture_slots) * count);
+		std::memmove(&m_slots.data()[dst], &m_slots.data()[src], sizeof(*m_slots.data()) * count);
+		std::memmove(&m_texture_slots.data()[dst], &m_texture_slots.data()[src], sizeof(*m_texture_slots.data()) * count);
 	}
 
 	struct dynamic_texture
