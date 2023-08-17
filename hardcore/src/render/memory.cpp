@@ -95,7 +95,7 @@ namespace ENGINE_NAMESPACE
 		static inline internal_ref extract(const memory_ref& ref) noexcept
 		{
 			const mem_ref_internal& iref = static_cast<const mem_ref_internal&>(ref);
-			return { iref.pool_type, iref.pool, iref.offset, iref.size };
+			return { iref.m_pool_type, iref.m_pool, iref.m_offset, iref.m_size };
 		}
 
 	private:
@@ -132,14 +132,14 @@ namespace ENGINE_NAMESPACE
 	}
 
 	template<typename Pool>
-	inline bool search_pools(const std::vector<Pool>& pools, VkDeviceSize size, VkDeviceSize alignment,
+	inline bool search_buffer_pools(const std::vector<Pool>& pools, VkDeviceSize size, VkDeviceSize alignment,
 		u32& out_pool_idx, u32& out_slot_idx, VkDeviceSize& out_size_needed, VkDeviceSize& out_offset)
 	{
-		static_assert(std::is_base_of<memory_pool, Pool>::value, "Invalid pool type");
+		static_assert(std::is_base_of<buffer_pool, Pool>::value, "Invalid pool type");
 
 		u32 selected_pool_idx = 0;
 		u32 selected_slot_idx = std::numeric_limits<u32>::max();
-		for (const memory_pool& pool : pools)
+		for (const buffer_pool& pool : pools)
 		{
 			if (pool.search(size, alignment, selected_slot_idx, out_size_needed, out_offset))
 				break;
@@ -474,7 +474,7 @@ namespace ENGINE_NAMESPACE
 		VkDeviceSize size_needed = 0;
 		VkDeviceSize offset = 0;
 
-		if (!search_pools(*pools, size, alignment, selected_pool_idx, selected_slot_idx, size_needed, offset))
+		if (!search_buffer_pools(*pools, size, alignment, selected_pool_idx, selected_slot_idx, size_needed, offset))
 		{
 			if (pool_size < size)
 				pool_size = increase_to_fit(pool_size, size);

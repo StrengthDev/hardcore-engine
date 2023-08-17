@@ -12,7 +12,7 @@ namespace ENGINE_NAMESPACE
 		VkDeviceSize size;
 	};
 
-	class memory_pool
+	class resource_pool
 	{
 	public:
 		void free(VkDevice device, device_heap_manager& heap_manager);
@@ -20,56 +20,53 @@ namespace ENGINE_NAMESPACE
 		bool search(VkDeviceSize size, VkDeviceSize alignment, 
 			u32& out_slot_idx, VkDeviceSize& out_size_needed, VkDeviceSize& out_offset) const;
 		void fill_slot(u32 slot_idx, VkDeviceSize size);
-
+		// TODO cleanup function to remove excessive amount of empty slots maybe
 		u32 find_slot(VkDeviceSize offset) const noexcept;
 
 		inline VkDeviceSize size() const noexcept { return m_size; }
-		inline const memory_slot& operator[](u32 idx) const noexcept { return slots[idx]; }
+		inline const memory_slot& operator[](u32 idx) const noexcept { return m_slots[idx]; }
 
 	protected:
-		memory_pool() = default;
-		~memory_pool();
+		resource_pool() = default;
+		~resource_pool();
 
-		memory_pool(VkDeviceSize size, bool per_frame_allocation = false);
+		resource_pool(VkDeviceSize size, bool per_frame_allocation = false);
 
-		memory_pool(const memory_pool&) = delete;
-		memory_pool& operator=(const memory_pool&) = delete;
+		resource_pool(const resource_pool&) = delete;
+		resource_pool& operator=(const resource_pool&) = delete;
 
-		memory_pool(memory_pool&& other) noexcept :
+		resource_pool(resource_pool&& other) noexcept :
 			m_memory(std::exchange(other.m_memory, VK_NULL_HANDLE)),
 			m_size(std::exchange(other.m_size, 0)),
-			slots(std::exchange(other.slots, nullptr)),
-			n_slots(std::exchange(other.n_slots, 0)),
+			m_slots(std::move(other.m_slots)),
 			m_largest_free_slot(std::exchange(other.m_largest_free_slot, 0))
 		{ }
 
-		inline memory_pool& operator=(memory_pool&& other) noexcept
+		inline resource_pool& operator=(resource_pool&& other) noexcept
 		{
-			INTERNAL_ASSERT(!other.slots, "Other resource pool not freed");
+			INTERNAL_ASSERT(other.m_memory == VK_NULL_HANDLE, "Other resource pool not freed");
 			
 			m_memory = std::exchange(other.m_memory, VK_NULL_HANDLE);
 			m_size = std::exchange(other.m_size, 0);
-			slots = std::exchange(other.slots, nullptr);
-			n_slots = std::exchange(other.n_slots, 0);
+			m_slots = std::move(other.m_slots);
 			m_largest_free_slot = std::exchange(other.m_largest_free_slot, 0);
 			return *this;
 		}
 
-		virtual void realloc_slots(u32 new_count) = 0;
+		virtual void push_back_empty() = 0;
 		virtual void move_slots(u32 dst, u32 src, u32 count) = 0;
 
 		VkDeviceMemory m_memory = VK_NULL_HANDLE;
 		VkDeviceSize m_size = 0;
 
-		memory_slot* slots = nullptr;
-		u32 n_slots = 0;
+		std::vector<memory_slot> m_slots;
 
 		mutable u32 m_largest_free_slot = 0;
 		//TODO is this needed as a member variable?
 		bool m_per_frame_allocation = false;
 	};
 
-	class buffer_pool : public memory_pool
+	class buffer_pool : public resource_pool
 	{
 	public:
 		buffer_pool() = default;
@@ -80,14 +77,14 @@ namespace ENGINE_NAMESPACE
 		void free(VkDevice device, device_heap_manager& heap_manager);
 
 		buffer_pool(buffer_pool&& other) noexcept :
-			memory_pool(std::move(other)),
+			resource_pool(std::move(other)),
 			m_buffer(std::exchange(other.m_buffer, VK_NULL_HANDLE))
 		{ }
 
 		inline buffer_pool& operator=(buffer_pool&& other) noexcept
 		{
 			m_buffer = std::exchange(other.m_buffer, VK_NULL_HANDLE);
-			memory_pool::operator=(std::move(other));
+			resource_pool::operator=(std::move(other));
 			return *this;
 		}
 
@@ -98,7 +95,7 @@ namespace ENGINE_NAMESPACE
 			VkDeviceSize size, VkBufferUsageFlags usage, device_heap_manager::heap heap,
 			bool per_frame_allocation);
 
-		void realloc_slots(u32 new_count) override;
+		void push_back_empty() override;
 		void move_slots(u32 dst, u32 src, u32 count) override;
 
 		VkBuffer m_buffer = VK_NULL_HANDLE;
@@ -155,7 +152,7 @@ namespace ENGINE_NAMESPACE
 
 	texture_slot create_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements& out_memory_requirements);
 
-	class texture_pool : public memory_pool //maybe use templated texture_memory_pool
+	class texture_pool : public resource_pool //maybe use templated texture_memory_pool
 	{
 	public:
 		texture_pool() = default;
@@ -168,15 +165,15 @@ namespace ENGINE_NAMESPACE
 			u32& out_slot_idx, VkDeviceSize& out_size_needed, VkDeviceSize& out_offset) const;
 		void fill_slot(VkDevice device, texture_slot&& tex, u32 slot_idx, VkDeviceSize size, VkDeviceSize alignment);
 
-		const texture_slot& tex_at(u32 idx) const noexcept { return texture_slots[idx]; }
+		const texture_slot& tex_at(u32 idx) const noexcept { return m_texture_slots[idx]; }
 
 	protected:
-		void realloc_slots(u32 new_count) override;
+		void push_back_empty() override;
 		void move_slots(u32 dst, u32 src, u32 count) override;
 
 	private:
-		u32 memory_type_idx = std::numeric_limits<u32>::max();
-		texture_slot* texture_slots = nullptr;
+		u32 m_memory_type_idx = std::numeric_limits<u32>::max();
+		std::vector<texture_slot> m_texture_slots;
 	};
 
 	/**
