@@ -1,0 +1,13 @@
+[package]
+name = "hardcore-sys"
+version = "0.1.0"
+edition = "2021"
+links = "hardcore"
+exclude = ["/hardcore/build"]
+
+[dependencies]
+
+
+[build-dependencies]
+bindgen = "0.69.4"
+cmake = "0.1.50"

@@ -1,0 +1,3 @@
+[submodule "hardcore-sys/hardcore/thirdparty/glfw"]
+	path = hardcore-sys/hardcore/thirdparty/glfw
+	url = https://github.com/glfw/glfw.git
