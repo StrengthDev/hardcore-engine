@@ -125,7 +125,7 @@ namespace ENGINE_NAMESPACE
 
 	u32 device_heap_manager::find_memory_type(u32 type_filter, VkMemoryPropertyFlags heap_properties)
 	{
-		//Exact type search
+		// Exact type search
 		for (u32 i = 0; i < m_mem_properties.memoryTypeCount; i++)
 		{
 			if ((type_filter & (1 << i)) && m_mem_properties.memoryTypes[i].propertyFlags == heap_properties)
@@ -135,7 +135,7 @@ namespace ENGINE_NAMESPACE
 		}
 		LOG_INTERNAL_WARN("Failed to find exact memory type.");
 
-		//Relaxed search
+		// Relaxed search
 		for (u32 i = 0; i < m_mem_properties.memoryTypeCount; i++)
 		{
 			if ((type_filter & (1 << i)) && (m_mem_properties.memoryTypes[i].propertyFlags & heap_properties) == heap_properties)
@@ -144,7 +144,7 @@ namespace ENGINE_NAMESPACE
 			}
 		}
 
-		//not sure how to deal with this
+		// TODO not sure how to deal with this
 		LOG_INTERNAL_ERROR("Failed to find suitable memory type. Type bit mask: "
 			<< std::bitset<sizeof(type_filter) * 8>(type_filter) << " Property flags: "
 			<< std::bitset<sizeof(heap_properties) * 8>(heap_properties));
@@ -166,7 +166,7 @@ namespace ENGINE_NAMESPACE
 			CRASH("Invalid heap");
 			break;
 		}
-		//TODO this really shouldnt be just an assert, im assuming the chosen heap always meets the requirements
+		// TODO this really shouldnt be just an assert, im assuming the chosen heap always meets the requirements
 		INTERNAL_ASSERT(memory_type_bits & 1U << res, "Memory requirements not met");
 
 		return res;
@@ -216,9 +216,9 @@ namespace ENGINE_NAMESPACE
 
 	void device_heap_manager::free(VkDevice device, VkDeviceMemory& memory)
 	{
-		//having to call free from the heap manager instead of freeing the memory directly is a bit silly, but since
-		//the number of allocations will be counted for debugging and profiling, may aswell do it like this
-		//it also falls more inline with the purpose of the heap manager
+		// Having to call free from the heap manager instead of freeing the memory directly is a bit silly, but since
+		// the number of allocations will be counted for debugging and profiling, may aswell do it like this
+		// it also falls more inline with the purpose of the heap manager
 		vkFreeMemory(device, memory, nullptr);
 		memory = VK_NULL_HANDLE;
 		m_allocations--;

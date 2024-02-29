@@ -8,7 +8,7 @@ namespace ENGINE_NAMESPACE
 	struct memory_slot
 	{
 		bool in_use;
-		VkDeviceSize offset; //relative to previous slot
+		VkDeviceSize offset; // Relative to previous slot
 		VkDeviceSize size;
 	};
 
@@ -62,7 +62,7 @@ namespace ENGINE_NAMESPACE
 		std::vector<memory_slot> m_slots;
 
 		mutable u32 m_largest_free_slot = 0;
-		//TODO is this needed as a member variable?
+		// TODO is this needed as a member variable?
 		bool m_per_frame_allocation = false;
 	};
 
@@ -147,12 +147,12 @@ namespace ENGINE_NAMESPACE
 
 		VkDeviceSize size;
 		VkExtent3D dims;
-		VkImageLayout layout; // layout of the image at the start of the frame
+		VkImageLayout layout; // Layout of the image at the start of the frame
 	};
 
 	texture_slot create_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements& out_memory_requirements);
 
-	class texture_pool : public resource_pool //maybe use templated texture_memory_pool
+	class texture_pool : public resource_pool
 	{
 	public:
 		texture_pool() = default;

@@ -38,7 +38,7 @@ namespace ENGINE_NAMESPACE
 		}
 	}
 
-	//TODO could try making allocations more efficient my reducing the size of the alignment padding
+	// TODO could try making allocations more efficient my reducing the size of the alignment padding
 	bool resource_pool::search(VkDeviceSize size, VkDeviceSize alignment, 
 		u32& out_slot_idx, VkDeviceSize& out_size_needed, VkDeviceSize& out_offset) const
 	{
@@ -47,7 +47,7 @@ namespace ENGINE_NAMESPACE
 
 		constexpr u32 invalid_idx = std::numeric_limits<u32>::max();
 
-		// largest free slot is unknown, must check everything, look for smallest possible fit
+		// Largest free slot is unknown, must check everything, look for smallest possible fit
 		// if possible, update largest free slot to reduce cost of future calls
 		if (m_slots[m_largest_free_slot].in_use)
 		{
@@ -98,7 +98,7 @@ namespace ENGINE_NAMESPACE
 			}
 		}
 
-		// largest free slot is known, so if it is large enough, assign a slot in this pool, 
+		// Largest free slot is known, so if it is large enough, assign a slot in this pool, 
 		// otherwise move on to next pool
 		else
 		{
@@ -144,7 +144,7 @@ namespace ENGINE_NAMESPACE
 			const u32 old_size = m_slots.size();
 			bool selected_last = slot_idx == (m_slots.size() - 1);
 
-			//resize needed
+			// Resize needed
 			if (selected_last || (m_slots[slot_idx + 1].in_use && m_slots[m_slots.size() - 1].in_use))
 			{
 				push_back_empty();
@@ -156,7 +156,7 @@ namespace ENGINE_NAMESPACE
 			INTERNAL_ASSERT(m_slots[slot_idx + 1].in_use || !m_slots[slot_idx + 1].size,
 				"Slot after the selected slot must be either empty or in use");
 
-			//shift remaining slots one position and add new slot with the remaining unused memory
+			// Shift remaining slots one position and add new slot with the remaining unused memory
 			if (m_slots[slot_idx + 1].in_use)
 			{
 				u32 last_in_use = 0;
@@ -239,7 +239,7 @@ namespace ENGINE_NAMESPACE
 	{
 		for (const dynamic_buffer_pool& pool : pools)
 		{
-			//TODO skip pools with no allocations, need to track allocations somehow
+			// TODO skip pools with no allocations, need to track allocations somehow
 
 			ranges.push_back(pool.mapped_range(current_frame));
 		}
@@ -260,7 +260,7 @@ namespace ENGINE_NAMESPACE
 		view_info.image = image;
 		view_info.format = image_info.format;
 
-		//setting all components to identity so no swizzling occurs
+		// Setting all components to identity so no swizzling occurs
 		view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 		view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 		view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -377,7 +377,7 @@ namespace ENGINE_NAMESPACE
 		view_info.image = res.image;
 		view_info.format = image_info.format;
 
-		//setting all components to identity so no swizzling occurs
+		// Setting all components to identity so no swizzling occurs
 		view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 		view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 		view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;

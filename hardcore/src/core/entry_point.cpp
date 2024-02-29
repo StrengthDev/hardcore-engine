@@ -10,8 +10,10 @@
 #ifdef _MSC_VER
 
 #define _CRTDBG_MAP_ALLOC
+
 #include <stdlib.h>
 #include <crtdbg.h>
+
 #else
 #endif // _MSC_VER
 
@@ -42,29 +44,21 @@
 
 #endif // NDEBUG
 
-namespace ENGINE_NAMESPACE
-{
-	namespace internal
-	{
-		void init()
-		{
-			ENABLE_MEM_CHECKING;
-			parallel::launch_threads();
-			ENGINE_NAMESPACE::log::init();
-		}
+namespace ENGINE_NAMESPACE::internal {
+    void init() {
+        ENABLE_MEM_CHECKING;
+        parallel::launch_threads();
+        ENGINE_NAMESPACE::log::init();
+    }
 
-		void terminate()
-		{
-			parallel::terminate_threads();
-			ENGINE_NAMESPACE::log::flush();
-			ENGINE_NAMESPACE::log::shutdown();
-			parallel::logger_wait();
-			END;
-		}
+    void terminate() {
+        parallel::terminate_threads();
+        ENGINE_NAMESPACE::log::flush();
+        ENGINE_NAMESPACE::log::shutdown();
+        parallel::logger_wait();
+    }
 
-		void exception_crash(const std::exception& e)
-		{
-			LOG_INTERNAL_CRIT(e.what());
-		}
-	}
+    void exception_crash(const std::exception &e) {
+        LOG_INTERNAL_CRIT(e.what());
+    }
 }
