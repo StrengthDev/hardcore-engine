@@ -1,7 +1,11 @@
 [workspace]
 resolver = "2"
 members = [
-    "hardcore-sys"
+    "hardcore-sys",
+    "hardcore",
+    "tests",
+    "demo",
 ]
 
 [workspace.dependencies]
+

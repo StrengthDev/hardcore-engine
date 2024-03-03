@@ -82,10 +82,10 @@ function(add_shader TARGET SHADER)
 endfunction(add_shader)
 
 project(hardcore VERSION 0.1 LANGUAGES CXX DESCRIPTION "Hardcore engine project")
-add_subdirectory(hardcore)
+add_subdirectory(hardcorec)
 
 project(client VERSION 0.1 LANGUAGES CXX DESCRIPTION "Engine test client")
 add_subdirectory(client)
 
 project(demo VERSION 0.1 LANGUAGES CXX DESCRIPTION "Project containing several demo programs using the engine")
-add_subdirectory(demo)
+add_subdirectory(democ)

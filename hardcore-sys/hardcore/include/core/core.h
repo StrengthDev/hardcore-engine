@@ -2,7 +2,7 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif
+#endif // __cplusplus
 
 /**
  * @brief Initialise the library.
@@ -17,7 +17,7 @@ int hc_init();
 /**
  * @brief Terminate the library.
  *
- * Once this function is called, hc_init() must be called once again before other library functions.
+ * Once this function is called, `hc_init()` must be called once again before other library functions.
  *
  * @return 0 on success, a negative code on if an error occurs and a code larger than 0 on success, but with some
  * warning.
@@ -26,4 +26,4 @@ int hc_term();
 
 #ifdef __cplusplus
 }
-#endif
+#endif // __cplusplus

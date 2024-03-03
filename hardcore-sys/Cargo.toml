@@ -1,13 +1,19 @@
 [package]
 name = "hardcore-sys"
 version = "0.1.0"
+description = "Automatically generated Rust bindings to Hardcore's native module."
 edition = "2021"
+authors = ["Pedro Valente <pedro.amaral.valente@gmail.com>"]
+repository = "https://github.com/StrengthDev/hardcore-engine"
+license-file = "../LICENSE"
 links = "hardcore"
 exclude = ["/hardcore/build"]
+publish = true
 
 [dependencies]
-
+link-cplusplus = "1.0.9"
 
 [build-dependencies]
 bindgen = "0.69.4"
 cmake = "0.1.50"
+regex = "1.10.3"

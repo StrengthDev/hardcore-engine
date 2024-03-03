@@ -1,7 +1,10 @@
 use std::env;
 use std::path::PathBuf;
 
+use bindgen::callbacks::ParseCallbacks;
+use bindgen::EnumVariation;
 use cmake::Config;
+use regex::Regex;
 
 fn main() {
     let native_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/hardcore");
@@ -18,10 +21,12 @@ fn main() {
                 .join("hardcore.h")
                 .to_string_lossy(),
         )
-        .parse_callbacks(Box::new(
-            bindgen::CargoCallbacks::new().rerun_on_header_files(false),
-        ))
         .allowlist_function("hc_.*")
+        .default_enum_style(EnumVariation::Rust {
+            non_exhaustive: true,
+        })
+        .parse_callbacks(Box::<StripPrefixCallback>::default())
+        .use_core()
         .generate()
         .expect("Unable to generate bindings");
 
@@ -29,4 +34,63 @@ fn main() {
     bindings
         .write_to_file(out_path.join("bindings.rs"))
         .expect("Couldn't write bindings!");
+}
+
+#[derive(Debug)]
+struct StripPrefixCallback {
+    fn_regex: Regex,
+    type_regex: Regex,
+    param_regex: Regex,
+}
+
+impl Default for StripPrefixCallback {
+    fn default() -> Self {
+        Self {
+            fn_regex: Regex::new(r"`hc_((?:\w|\d)*)(?:\(\))?`").unwrap(),
+            type_regex: Regex::new(r"`HC((?:\w|\d)*)`").unwrap(),
+            param_regex: Regex::new(r"@param ((?:\w|\d)*)(?:\s-)?\s").unwrap(),
+        }
+    }
+}
+
+impl ParseCallbacks for StripPrefixCallback {
+    fn item_name(&self, original_item_name: &str) -> Option<String> {
+        let prefixes = ["hc_", "HC"];
+        for prefix in prefixes {
+            let new_name = original_item_name.strip_prefix(prefix);
+            if new_name.is_some() {
+                return new_name.map(str::to_string);
+            }
+        }
+        None
+    }
+
+    fn process_comment(&self, comment: &str) -> Option<String> {
+        let mut rustified = if let Some(stripped) = comment.strip_prefix("!< ") {
+            stripped.to_string()
+        } else {
+            comment.to_string()
+        };
+
+        let substitutions = [("@brief ", ""), ("@return ", "# Returns\n")];
+        for (original, replacement) in substitutions {
+            rustified = rustified.replace(original, replacement);
+        }
+
+        rustified = self.fn_regex.replace_all(&rustified, "[`$1`]").to_string();
+        rustified = self
+            .type_regex
+            .replace_all(&rustified, "[`$1`]")
+            .to_string();
+
+        if let Some(idx) = rustified.find("@param") {
+            rustified.insert_str(idx, "# Arguments\n");
+            rustified = self
+                .param_regex
+                .replace_all(&rustified, "* `$1` - ")
+                .to_string();
+        }
+
+        Some(rustified)
+    }
 }
