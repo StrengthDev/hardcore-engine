@@ -1,6 +1,6 @@
 #include <pch.hpp>
 
-#ifndef HEADLESS
+#ifndef HC_HEADLESS
 
 #define GLFW_INCLUDE_NONE
 
@@ -22,4 +22,4 @@ void hc_destroy_window(HCWindow *window) {
     }
 }
 
-#endif // HEADLESS
+#endif // HC_HEADLESS

@@ -1,6 +1,6 @@
 #pragma once
 
-#ifndef HEADLESS
+#ifndef HC_HEADLESS
 
 #ifdef __cplusplus
 extern "C" {
@@ -16,14 +16,14 @@ struct HCWindow {
 /**
  * @brief Constructs a new `HCWindow`.
  *
- * @return The new created `HCWindow`. The returned object is invalid if some error has occurred.
+ * @return The newly created `HCWindow`. The returned object is invalid if some error has occurred.
  */
 struct HCWindow hc_new_window();
 
 /**
  * @brief Destroys a `HCWindow`.
  *
- * @param window - a pointer to the `HCWindow` to be destroyed
+ * @param window a pointer to the `HCWindow` to be destroyed
  */
 void hc_destroy_window(struct HCWindow *window);
 
@@ -31,5 +31,5 @@ void hc_destroy_window(struct HCWindow *window);
 }
 #endif // __cplusplus
 
-#endif // HEADLESS
+#endif // HC_HEADLESS
 

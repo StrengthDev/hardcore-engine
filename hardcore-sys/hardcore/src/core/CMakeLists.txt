@@ -1,5 +1,6 @@
 list(APPEND SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/core.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/log.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/window.cpp
 )
 

@@ -9,10 +9,42 @@ use regex::Regex;
 fn main() {
     let native_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/hardcore");
     let mut config = Config::new(native_dir);
+    config
+        .define("BUILD_SHARED_LIBS", "OFF")
+        .define("GLFW_BUILD_EXAMPLES", "OFF")
+        .define("GLFW_BUILD_TESTS", "OFF")
+        .define("GLFW_BUILD_DOCS", "OFF")
+        .define("GLFW_INSTALL", "ON");
+
+    #[cfg(feature = "headless")]
+    {
+        config.define("HARDCORE_HEADLESS", "ON");
+    }
+
+    #[cfg(feature = "no_logs")]
+    {
+        config.define("HARDCORE_LOGS", "OFF");
+    }
+
+    #[cfg(feature = "validation")]
+    {
+        config.define("HARDCORE_VALIDATION", "ON");
+    }
 
     let lib_path = config.build();
-    println!("cargo:rustc-link-search=native={}/lib", lib_path.display());
+    println!(
+        "cargo:rustc-link-search=native={}",
+        lib_path.join("lib").display()
+    );
     println!("cargo:rustc-link-lib=static=hardcore");
+    println!("cargo:rustc-link-lib=static=glfw3");
+
+    #[cfg(target_family = "windows")]
+    {
+        println!("cargo:rustc-link-lib=dylib=gdi32");
+        println!("cargo:rustc-link-lib=dylib=shell32");
+        println!("cargo:rustc-link-lib=dylib=user32");
+    }
 
     let bindings = bindgen::Builder::default()
         .header(
