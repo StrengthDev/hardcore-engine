@@ -82,10 +82,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "demo"
-version = "0.1.0"
-
-[[package]]
 name = "either"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -311,10 +307,6 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
-
-[[package]]
-name = "tests"
-version = "0.1.0"
 
 [[package]]
 name = "unicode-ident"

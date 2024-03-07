@@ -31,18 +31,18 @@ namespace hc {
     hc::log(kind, str.c_str());    \
 }(0)
 
-#define TRACE(message) LOG_WRAPPER(HCLogKind::Trace, message)
-#define INFO(message) LOG_WRAPPER(HCLogKind::Info, message)
-#define DEBUG(message) LOG_WRAPPER(HCLogKind::Debug, message)
-#define WARN(message) LOG_WRAPPER(HCLogKind::Warn, message)
-#define ERROR(message) LOG_WRAPPER(HCLogKind::Error, message)
+#define HC_TRACE(message) LOG_WRAPPER(HCLogKind::Trace, message)
+#define HC_INFO(message) LOG_WRAPPER(HCLogKind::Info, message)
+#define HC_DEBUG(message) LOG_WRAPPER(HCLogKind::Debug, message)
+#define HC_WARN(message) LOG_WRAPPER(HCLogKind::Warn, message)
+#define HC_ERROR(message) LOG_WRAPPER(HCLogKind::Error, message)
 
 #else
 
-#define TRACE(message)
-#define INFO(message)
-#define DEBUG(message)
-#define WARN(message)
-#define ERROR(message)
+#define HC_TRACE(message)
+#define HC_INFO(message)
+#define HC_DEBUG(message)
+#define HC_WARN(message)
+#define HC_ERROR(message)
 
 #endif // HC_LOGGING

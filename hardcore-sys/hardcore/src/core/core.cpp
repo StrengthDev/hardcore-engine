@@ -21,7 +21,7 @@ int hc_init(HCInitParams params) {
     if (!glfwInit()) {
         const char *description;
         glfwGetError(&description);
-        ERROR("Error initialising GLFW's context: %s\n" << description);
+        HC_ERROR("Error initialising GLFW's context: %s\n" << description);
         return -1;
     }
 
