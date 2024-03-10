@@ -57,6 +57,7 @@ fn main() {
         .default_enum_style(EnumVariation::Rust {
             non_exhaustive: true,
         })
+        .rustified_enum("HCLogKind") // LogKind gets passed back through an extern function, so can't be non-exhaustive
         .parse_callbacks(Box::<StripPrefixCallback>::default())
         .use_core()
         .generate()

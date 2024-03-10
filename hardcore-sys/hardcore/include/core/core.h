@@ -6,8 +6,13 @@
 extern "C" {
 #endif // __cplusplus
 
+/**
+ * @brief Initialisation parameters for a new Hardcore context.
+ */
 struct HCInitParams {
-    HCLogFn log_fn;
+    HCLogFn log_fn; //!< The function the context should use for emitting log events.
+    HCStartSpanFn start_span_fn; //!< The function the context should use for starting spans.
+    HCEndSpanFn end_span_fn; //!< The function the context should use for ending spans.
 };
 
 /**

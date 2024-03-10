@@ -26,6 +26,8 @@ void default_log(HCLogKind kind, const char *message) {
 }
 
 HCLogFn log_fn = default_log; //!< The logging function to use for the whole library.
+HCStartSpanFn start_span_fn = nullptr; //!< The start span function to use for the whole library.
+HCEndSpanFn end_span_fn = nullptr; //!< The end span function to use for the whole library.
 
 namespace hc {
     void log(HCLogKind kind, const char *message) {
@@ -36,6 +38,27 @@ namespace hc {
 
     void set_log(HCLogFn fn_ptr) {
         log_fn = fn_ptr;
+    }
+
+    void set_span(HCStartSpanFn start_fn_ptr, HCEndSpanFn end_fn_ptr) {
+        start_span_fn = start_fn_ptr;
+        end_span_fn = end_fn_ptr;
+    }
+
+    Span::Span(HCLogKind kind, const char *name) {
+        if (start_span_fn) {
+            this->inner = start_span_fn(kind, name);
+        }
+    }
+
+    Span::~Span() {
+        if (this->inner) {
+            if (end_span_fn) {
+                end_span_fn(this->inner);
+            } else {
+                HC_ERROR("Span has leaked");
+            }
+        }
     }
 }
 

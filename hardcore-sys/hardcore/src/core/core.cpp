@@ -15,6 +15,9 @@ int hc_init(HCInitParams params) {
     if (params.log_fn) {
         hc::set_log(params.log_fn);
     }
+    if (params.start_span_fn && params.end_span_fn) {
+        hc::set_span(params.start_span_fn, params.end_span_fn);
+    }
 #endif // HC_LOGGING
 
 #ifndef HC_HEADLESS
