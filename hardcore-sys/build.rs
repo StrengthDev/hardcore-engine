@@ -54,6 +54,8 @@ fn main() {
                 .to_string_lossy(),
         )
         .allowlist_function("hc_.*")
+        .allowlist_type("HC.*")
+        .allowlist_var("HC_.*")
         .default_enum_style(EnumVariation::Rust {
             non_exhaustive: true,
         })
@@ -72,7 +74,7 @@ fn main() {
 #[derive(Debug)]
 struct StripPrefixCallback {
     fn_regex: Regex,
-    type_regex: Regex,
+    type_const_regex: Regex,
     param_regex: Regex,
 }
 
@@ -80,7 +82,7 @@ impl Default for StripPrefixCallback {
     fn default() -> Self {
         Self {
             fn_regex: Regex::new(r"`hc_((?:\w|\d)*)(?:\(\))?`").unwrap(),
-            type_regex: Regex::new(r"`HC((?:\w|\d)*)`").unwrap(),
+            type_const_regex: Regex::new(r"`HC_?((?:\w|\d)*(?:::(?:\w|\d)*)*)`").unwrap(),
             param_regex: Regex::new(r"@param ((?:\w|\d)*)(?:\s-)?\s").unwrap(),
         }
     }
@@ -88,7 +90,7 @@ impl Default for StripPrefixCallback {
 
 impl ParseCallbacks for StripPrefixCallback {
     fn item_name(&self, original_item_name: &str) -> Option<String> {
-        let prefixes = ["hc_", "HC"];
+        let prefixes = ["hc_", "HC_", "HC"];
         for prefix in prefixes {
             let new_name = original_item_name.strip_prefix(prefix);
             if new_name.is_some() {
@@ -112,7 +114,7 @@ impl ParseCallbacks for StripPrefixCallback {
 
         rustified = self.fn_regex.replace_all(&rustified, "[`$1`]").to_string();
         rustified = self
-            .type_regex
+            .type_const_regex
             .replace_all(&rustified, "[`$1`]")
             .to_string();
 

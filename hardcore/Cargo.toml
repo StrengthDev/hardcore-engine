@@ -10,11 +10,16 @@ license-file = "../LICENSE"
 publish = true
 
 [dependencies]
+async-trait = "0.1.77"
 hardcore-sys = { path = "../hardcore-sys" }
+parking_lot = { version = "0.12.1", features = ["send_guard"], optional = true }
+thiserror = "1.0.57"
+tokio = { version = "1.36.0", features = ["rt", "rt-multi-thread", "sync", "signal", "time"] }
 tracing = "0.1.40"
 
 [dev-dependencies]
+tokio = { version = "1.36.0", features = ["macros"] }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
 [features]
-parking_lot = ["tracing-subscriber/parking_lot"]
+parking_lot = ["dep:parking_lot", "tracing-subscriber/parking_lot", "tokio/parking_lot"]

@@ -1,10 +1,43 @@
-use std::thread::sleep;
-use std::time::Duration;
+use async_trait::async_trait;
+use tracing::{info, trace};
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
+use hardcore::event::{Event, WindowEvent};
+use hardcore::layer::{Context, Layer};
 use hardcore::window::Window;
-use hardcore::{init, terminate};
+use hardcore::{init, push_layer, run, stop, terminate};
+
+struct FractalLayer {
+    window: Window,
+}
+
+impl FractalLayer {
+    fn new() -> Self {
+        Self {
+            window: Window::new().expect("Failed to create window"),
+        }
+    }
+}
+
+#[async_trait]
+impl Layer for FractalLayer {
+    async fn tick(&mut self, context: &Context) {
+        // nothing
+    }
+
+    async fn handle_event(&mut self, event: &Event) -> bool {
+        trace!("Event: {event:?}");
+        if let Event::Window {
+            event: WindowEvent::Close,
+            ..
+        } = event
+        {
+            stop();
+        }
+        false
+    }
+}
 
 fn main() {
     let format = tracing_subscriber::fmt::format()
@@ -15,15 +48,13 @@ fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env()
-                .unwrap_or(EnvFilter::default().add_directive(LevelFilter::INFO.into())),
+                .unwrap_or(EnvFilter::default().add_directive(LevelFilter::TRACE.into())),
         )
         .event_format(format)
         .init();
 
-    init();
-    {
-        let _window = Window::new();
-        sleep(Duration::from_secs(1));
-    }
-    terminate();
+    init().expect("Failed to initialise library");
+    push_layer(FractalLayer::new()).expect("Failed to send fractal layer");
+    run().expect("Failed to run main loop");
+    terminate().expect("Failed to terminate library");
 }

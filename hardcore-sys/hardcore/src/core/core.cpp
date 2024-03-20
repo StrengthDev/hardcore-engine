@@ -10,6 +10,14 @@
 #include <core/core.h>
 #include "log.hpp"
 
+#ifndef HC_HEADLESS
+
+void glfw_error_callback(int error_code, const char *description) {
+    HC_ERROR("GLFW: " << description << "(code " << error_code << ')');
+}
+
+#endif // HC_HEADLESS
+
 int hc_init(HCInitParams params) {
 #ifdef HC_LOGGING
     if (params.log_fn) {
@@ -28,7 +36,7 @@ int hc_init(HCInitParams params) {
         return -1;
     }
 
-    //glfwSetErrorCallback(errorCallback); TODO
+    glfwSetErrorCallback(glfw_error_callback);
 #endif // HC_HEADLESS
 
     return 0;
@@ -41,3 +49,15 @@ int hc_term() {
 
     return 0;
 }
+
+int hc_render_tick() {
+    return 0;
+}
+
+#ifndef HC_HEADLESS
+
+void hc_poll_events() {
+    glfwPollEvents();
+}
+
+#endif // HC_HEADLESS
