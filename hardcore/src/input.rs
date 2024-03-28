@@ -1,7 +1,9 @@
+//! This module describes various kinds of input received from an application user.
+
 use std::fmt::{Debug, Formatter};
 
 /// A button input action.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum ButtonAction {
     /// Stop pressing a button.
     Release,
@@ -12,6 +14,7 @@ pub enum ButtonAction {
 }
 
 impl ButtonAction {
+    /// Create a new button action from a [`hardcore_sys`] counterpart.
     pub(crate) fn from(action: hardcore_sys::ButtonAction) -> Self {
         match action {
             hardcore_sys::ButtonAction::Release => ButtonAction::Release,
@@ -25,18 +28,15 @@ impl ButtonAction {
 }
 
 /// An identifier for a mouse button.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum MouseButton {
-    /// Mouse button 0, also known as the left mouse button.
-    Button0,
-
-    /// Mouse button 1, also known as the right mouse button.
+    /// Mouse button 1, also known as the left mouse button.
     Button1,
 
-    /// Mouse button 2, also known as the middle mouse button.
+    /// Mouse button 2, also known as the right mouse button.
     Button2,
 
-    /// Mouse button 3.
+    /// Mouse button 3, also known as the middle mouse button.
     Button3,
 
     /// Mouse button 4.
@@ -50,24 +50,27 @@ pub enum MouseButton {
 
     /// Mouse button 7.
     Button7,
+
+    /// Mouse button 8.
+    Button8,
 }
 
 impl MouseButton {
-    /// The left mouse button, an alias for mouse button 0.
+    /// The left mouse button, an alias for mouse button 1.
     #[allow(non_upper_case_globals)]
-    pub const Left: MouseButton = MouseButton::Button0;
+    pub const Left: MouseButton = MouseButton::Button1;
 
-    /// The right mouse button, an alias for mouse button 1.
+    /// The right mouse button, an alias for mouse button 2.
     #[allow(non_upper_case_globals)]
-    pub const Right: MouseButton = MouseButton::Button1;
+    pub const Right: MouseButton = MouseButton::Button2;
 
-    /// The middle mouse button, an alias for mouse button 2.
+    /// The middle mouse button, an alias for mouse button 3.
     #[allow(non_upper_case_globals)]
-    pub const Middle: MouseButton = MouseButton::Button2;
+    pub const Middle: MouseButton = MouseButton::Button3;
 
+    /// Create a new mouse button from a [`hardcore_sys`] counterpart.
     pub(crate) fn from(button: hardcore_sys::MouseButton) -> Self {
         match button {
-            hardcore_sys::MouseButton::Button0 => MouseButton::Button0,
             hardcore_sys::MouseButton::Button1 => MouseButton::Button1,
             hardcore_sys::MouseButton::Button2 => MouseButton::Button2,
             hardcore_sys::MouseButton::Button3 => MouseButton::Button3,
@@ -75,6 +78,7 @@ impl MouseButton {
             hardcore_sys::MouseButton::Button5 => MouseButton::Button5,
             hardcore_sys::MouseButton::Button6 => MouseButton::Button6,
             hardcore_sys::MouseButton::Button7 => MouseButton::Button7,
+            hardcore_sys::MouseButton::Button8 => MouseButton::Button8,
             _ => {
                 unimplemented!()
             }
@@ -82,12 +86,15 @@ impl MouseButton {
     }
 }
 
-#[derive(Eq, PartialEq)]
+/// The modifiers of a button input.
+#[derive(Eq, PartialEq, Copy, Clone)]
 pub struct Modifiers {
+    /// Integer value holding set bit flags representing each individual modifier.
     flags: i32,
 }
 
 impl Modifiers {
+    /// Create a new modifiers instance from an already existing flag bits value.
     pub(crate) fn from(flags: i32) -> Self {
         Self { flags }
     }
@@ -162,7 +169,7 @@ impl Debug for Modifiers {
 /// Keyboard key identifiers.
 ///
 /// The US keyboard layout is used.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum KeyboardKey {
     /// Space key.
     Space,
@@ -526,6 +533,7 @@ pub enum KeyboardKey {
 }
 
 impl KeyboardKey {
+    /// Create a new keyboard key from a [`hardcore_sys`] counterpart.
     pub(crate) fn from(key: hardcore_sys::KeyboardKey) -> Self {
         match key {
             hardcore_sys::KeyboardKey::Space => KeyboardKey::Space,

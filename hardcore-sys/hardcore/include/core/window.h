@@ -26,14 +26,14 @@ enum HCButtonAction {
  * The identifier of a mouse button.
  */
 enum HCMouseButton {
-    Button0, //!< Mouse button 0, also known as the left mouse button.
-    Button1, //!< Mouse button 1, also known as the right mouse button.
-    Button2, //!< Mouse button 2, also known as the middle mouse button.
-    Button3, //!< Mouse button 3.
+    Button1, //!< Mouse button 1, also known as the left mouse button.
+    Button2, //!< Mouse button 2, also known as the right mouse button.
+    Button3, //!< Mouse button 3, also known as the middle mouse button.
     Button4, //!< Mouse button 4.
     Button5, //!< Mouse button 5.
     Button6, //!< Mouse button 6.
     Button7, //!< Mouse button 7.
+    Button8, //!< Mouse button 8.
 };
 
 /**
@@ -279,7 +279,7 @@ typedef void (*HCWindowMaximizeCallback)(size_t window, bool maximized);
  *
  * This kind of function is typically called when a window is resized.
  *
- * This differs from `HCWindowSizeCallback` in some systems where something like DPI scaling is used, and gives
+ * This differs from `HCWindowSizeCallback` in some systems where something like DPI scaling is used, and always gives
  * appropriate dimensions for rendering.
  *
  * @param window - The window identifier.
@@ -302,12 +302,12 @@ typedef void (*HCWindowScaleCallback)(size_t window, float x_scale, float y_scal
 /**
  * @brief The type/signature of mouse button callback functions.
  *
- * This kind of function is typically called when a button is pressed or released.
+ * This kind of function is typically called when a mouse button is pressed or released.
  *
  * @param window - The window identifier.
  * @param button - The mouse button that was pressed or released.
  * @param action - Either `HCButtonAction::Press` or `HCButtonAction::Release`. Future releases may add more actions.
- * @param mods - Bit field describing which modifiers were held down.
+ * @param mods - Bit field describing which modifiers are active.
  */
 typedef void (*HCWindowMouseButtonCallback)(size_t window, enum HCMouseButton button, enum HCButtonAction action,
                                             int mods);
@@ -315,7 +315,7 @@ typedef void (*HCWindowMouseButtonCallback)(size_t window, enum HCMouseButton bu
 /**
  * @brief The type/signature of cursor position callback functions.
  *
- * This kind of function is typically called when the cursor is moved.
+ * This kind of function is typically called when the mouse cursor is moved.
  *
  * @param window - The window identifier.
  * @param x - The new cursor x-coordinate, relative to the left edge of the content area.
@@ -326,7 +326,7 @@ typedef void (*HCWindowCursorPositionCallback)(size_t window, double x, double y
 /**
  * @brief The type/signature of cursor enter/leave callback functions.
  *
- * This kind of function is typically called when the enters or leaves the content area.
+ * This kind of function is typically called when the mouse cursor enters or leaves the content area.
  *
  * @param window - The window identifier.
  * @param entered -  `true` if the cursor entered the window's content area, or `false` if it left it.
@@ -354,7 +354,7 @@ typedef void (*HCWindowScrollCallback)(size_t window, double x_offset, double y_
  * @param scan_code - The platform-specific scancode of the key.
  * @param action - `HCButtonAction::Press`, `HCButtonAction::Release` or `HCButtonAction::Repeat`. Future releases may
  * add more actions.
- * @param mods - Bit field describing which modifiers were held down.
+ * @param mods - Bit field describing which modifiers are active.
  */
 typedef void (*HCWindowKeyCallback)(size_t window, enum HCKeyboardKey key, int scan_code, enum HCButtonAction action,
                                     int mods);
@@ -380,14 +380,14 @@ typedef void (*HCWindowCharCallback)(size_t window, unsigned int code_point);
  *
  * @param window - The window identifier.
  * @param code_point - The Unicode code point of the character.
- * @param mods - Bit field describing which modifiers were held down.
+ * @param mods - Bit field describing which modifiers are active.
  */
 typedef void (*HCWindowCharModsCallback)(size_t window, unsigned int code_point, int mods);
 
 /**
  * @brief The type/signature of path drop callback functions.
  *
- * This kind of function is typically called when an item item is dropped inside the content area.
+ * This kind of function is typically called when a selection is dropped inside the content area.
  *
  * @param window - The window identifier.
  * @param path_count - The number of dropped paths.
@@ -439,38 +439,174 @@ struct HCWindow hc_new_window();
  */
 void hc_destroy_window(struct HCWindow *window);
 
+/**
+ * @brief Sets the window position callback.
+ *
+ * If the pointer to the new callback is null, unsets the callback and none is used.
+ *
+ * @param window a pointer to the `HCWindow` for which the callback is set.
+ * @param callback a pointer to the new callback function.
+ */
 void hc_set_window_position_callback(struct HCWindow *window, HCWindowPositionCallback callback);
 
+/**
+ * @brief Sets the window size callback.
+ *
+ * If the pointer to the new callback is null, unsets the callback and none is used.
+ *
+ * @param window a pointer to the `HCWindow` for which the callback is set.
+ * @param callback a pointer to the new callback function.
+ */
 void hc_set_window_size_callback(struct HCWindow *window, HCWindowSizeCallback callback);
 
+/**
+ * @brief Sets the window close callback.
+ *
+ * If the pointer to the new callback is null, unsets the callback and none is used.
+ *
+ * @param window a pointer to the `HCWindow` for which the callback is set.
+ * @param callback a pointer to the new callback function.
+ */
 void hc_set_window_close_callback(struct HCWindow *window, HCWindowCloseCallback callback);
 
+/**
+ * @brief Sets the window refresh callback.
+ *
+ * If the pointer to the new callback is null, unsets the callback and none is used.
+ *
+ * @param window a pointer to the `HCWindow` for which the callback is set.
+ * @param callback a pointer to the new callback function.
+ */
 void hc_set_window_refresh_callback(struct HCWindow *window, HCWindowRefreshCallback callback);
 
+/**
+ * @brief Sets the window focus callback.
+ *
+ * If the pointer to the new callback is null, unsets the callback and none is used.
+ *
+ * @param window a pointer to the `HCWindow` for which the callback is set.
+ * @param callback a pointer to the new callback function.
+ */
 void hc_set_window_focus_callback(struct HCWindow *window, HCWindowFocusCallback callback);
 
+/**
+ * @brief Sets the window minimize callback.
+ *
+ * If the pointer to the new callback is null, unsets the callback and none is used.
+ *
+ * @param window a pointer to the `HCWindow` for which the callback is set.
+ * @param callback a pointer to the new callback function.
+ */
 void hc_set_window_minimize_callback(struct HCWindow *window, HCWindowMinimizeCallback minimized);
 
+/**
+ * @brief Sets the window maximize callback.
+ *
+ * If the pointer to the new callback is null, unsets the callback and none is used.
+ *
+ * @param window a pointer to the `HCWindow` for which the callback is set.
+ * @param callback a pointer to the new callback function.
+ */
 void hc_set_window_maximize_callback(struct HCWindow *window, HCWindowMaximizeCallback maximized);
 
+/**
+ * @brief Sets the window framebuffer callback.
+ *
+ * If the pointer to the new callback is null, unsets the callback and none is used.
+ *
+ * @param window a pointer to the `HCWindow` for which the callback is set.
+ * @param callback a pointer to the new callback function.
+ */
 void hc_set_window_framebuffer_callback(struct HCWindow *window, HCWindowFramebufferCallback callback);
 
+/**
+ * @brief Sets the window scale callback.
+ *
+ * If the pointer to the new callback is null, unsets the callback and none is used.
+ *
+ * @param window a pointer to the `HCWindow` for which the callback is set.
+ * @param callback a pointer to the new callback function.
+ */
 void hc_set_window_scale_callback(struct HCWindow *window, HCWindowScaleCallback callback);
 
+/**
+ * @brief Sets the mouse button callback.
+ *
+ * If the pointer to the new callback is null, unsets the callback and none is used.
+ *
+ * @param window a pointer to the `HCWindow` for which the callback is set.
+ * @param callback a pointer to the new callback function.
+ */
 void hc_set_window_mouse_button_callback(struct HCWindow *window, HCWindowMouseButtonCallback callback);
 
+/**
+ * @brief Sets the cursor position callback.
+ *
+ * If the pointer to the new callback is null, unsets the callback and none is used.
+ *
+ * @param window a pointer to the `HCWindow` for which the callback is set.
+ * @param callback a pointer to the new callback function.
+ */
 void hc_set_window_cursor_position_callback(struct HCWindow *window, HCWindowCursorPositionCallback callback);
 
+/**
+ * @brief Sets the cursor enter callback.
+ *
+ * If the pointer to the new callback is null, unsets the callback and none is used.
+ *
+ * @param window a pointer to the `HCWindow` for which the callback is set.
+ * @param callback a pointer to the new callback function.
+ */
 void hc_set_window_cursor_enter_callback(struct HCWindow *window, HCWindowCursorEnterCallback callback);
 
+/**
+ * @brief Sets the scroll callback.
+ *
+ * If the pointer to the new callback is null, unsets the callback and none is used.
+ *
+ * @param window a pointer to the `HCWindow` for which the callback is set.
+ * @param callback a pointer to the new callback function.
+ */
 void hc_set_window_scroll_callback(struct HCWindow *window, HCWindowScrollCallback callback);
 
+/**
+ * @brief Sets the key callback.
+ *
+ * If the pointer to the new callback is null, unsets the callback and none is used.
+ *
+ * @param window a pointer to the `HCWindow` for which the callback is set.
+ * @param callback a pointer to the new callback function.
+ */
 void hc_set_window_key_callback(struct HCWindow *window, HCWindowKeyCallback callback);
 
+/**
+ * @brief Sets the character callback.
+ *
+ * If the pointer to the new callback is null, unsets the callback and none is used.
+ *
+ * @param window a pointer to the `HCWindow` for which the callback is set.
+ * @param callback a pointer to the new callback function.
+ */
 void hc_set_window_char_callback(struct HCWindow *window, HCWindowCharCallback callback);
 
+/**
+ * @brief Sets the character with modifiers callback.
+ *
+ * If the pointer to the new callback is null, unsets the callback and none is used.
+ *
+ * @param window a pointer to the `HCWindow` for which the callback is set.
+ * @param callback a pointer to the new callback function.
+ */
 void hc_set_window_char_mods_callback(struct HCWindow *window, HCWindowCharModsCallback callback);
 
+/**
+ * @brief Sets the window drop callback.
+ *
+ * If the pointer to the new callback is null, unsets the callback and none is used.
+ *
+ * @param window a pointer to the `HCWindow` for which the callback is set.
+ * @param callback a pointer to the new callback function.
+ */
 void hc_set_window_drop_callback(struct HCWindow *window, HCWindowDropCallback callback);
 
 //void hc_set_window_monitor_callback(struct HCWindow *window, HCWindowMonitorCallback callback);

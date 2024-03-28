@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use tracing::{info, trace};
+use tracing::trace;
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
@@ -9,20 +9,20 @@ use hardcore::window::Window;
 use hardcore::{init, push_layer, run, stop, terminate};
 
 struct FractalLayer {
-    window: Window,
+    _window: Window,
 }
 
 impl FractalLayer {
     fn new() -> Self {
         Self {
-            window: Window::new().expect("Failed to create window"),
+            _window: Window::new().expect("Failed to create window"),
         }
     }
 }
 
 #[async_trait]
 impl Layer for FractalLayer {
-    async fn tick(&mut self, context: &Context) {
+    async fn tick(&mut self, _context: &Context) {
         // nothing
     }
 

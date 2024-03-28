@@ -1,7 +1,5 @@
 //! Definitions for synchronisation types, based on enabled features.
 
-use std::ops::Deref;
-
 #[cfg(feature = "parking_lot")]
 pub(crate) type Mutex<T> = parking_lot::Mutex<T>;
 #[cfg(not(feature = "parking_lot"))]

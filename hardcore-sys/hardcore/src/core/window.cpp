@@ -14,21 +14,21 @@ namespace hc {
 #ifndef HC_UNSAFE_TYPE_CASTS
         switch (button) {
             case GLFW_MOUSE_BUTTON_1:
-                return HCMouseButton::Button0;
-            case GLFW_MOUSE_BUTTON_2:
                 return HCMouseButton::Button1;
-            case GLFW_MOUSE_BUTTON_3:
+            case GLFW_MOUSE_BUTTON_2:
                 return HCMouseButton::Button2;
-            case GLFW_MOUSE_BUTTON_4:
+            case GLFW_MOUSE_BUTTON_3:
                 return HCMouseButton::Button3;
-            case GLFW_MOUSE_BUTTON_5:
+            case GLFW_MOUSE_BUTTON_4:
                 return HCMouseButton::Button4;
-            case GLFW_MOUSE_BUTTON_6:
+            case GLFW_MOUSE_BUTTON_5:
                 return HCMouseButton::Button5;
-            case GLFW_MOUSE_BUTTON_7:
+            case GLFW_MOUSE_BUTTON_6:
                 return HCMouseButton::Button6;
-            case GLFW_MOUSE_BUTTON_8:
+            case GLFW_MOUSE_BUTTON_7:
                 return HCMouseButton::Button7;
+            case GLFW_MOUSE_BUTTON_8:
+                return HCMouseButton::Button8;
             default:
                 return HCMouseButton{};
         }
@@ -340,8 +340,6 @@ struct StaticWindow {
     HCWindowCharCallback char_callback;
     HCWindowCharModsCallback char_mod_callback;
     HCWindowDropCallback drop_callback;
-    HCWindowMonitorCallback monitor_callback;
-    HCWindowJoystickCallback joystick_callback;
 };
 
 std::shared_mutex window_mutex;

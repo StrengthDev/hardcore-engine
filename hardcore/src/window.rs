@@ -2,8 +2,6 @@
 
 // TODO add example
 
-#![warn(missing_docs)]
-
 use hardcore_sys::{
     destroy_window, new_window, set_window_char_callback, set_window_char_mods_callback,
     set_window_close_callback, set_window_cursor_enter_callback,
@@ -16,7 +14,7 @@ use hardcore_sys::{
 use std::ptr::addr_of_mut;
 use thiserror::Error;
 
-/// An error related to [`Window`].
+/// An error related to a [`Window`].
 #[derive(Error, Debug)]
 pub enum WindowError {
     /// Failed to initialise window, this may indicate that the context has not been initialised yet.
@@ -61,6 +59,13 @@ impl Window {
         };
 
         Ok(Self { handle })
+    }
+
+    /// Return this window's id.
+    ///
+    /// This can be useful to identify which window an event comes from.
+    pub fn id(&self) -> usize {
+        self.handle.id
     }
 }
 
@@ -167,6 +172,7 @@ mod callback {
         }
     }
 
+    #[allow(improper_ctypes_definitions)] // Doesn't matter here
     pub(super) unsafe extern "C" fn mouse_button(
         id: usize,
         button: hardcore_sys::MouseButton,
@@ -212,6 +218,7 @@ mod callback {
         }
     }
 
+    #[allow(improper_ctypes_definitions)] // Doesn't matter here
     pub(super) unsafe extern "C" fn key(
         id: usize,
         key: hardcore_sys::KeyboardKey,
