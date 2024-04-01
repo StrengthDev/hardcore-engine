@@ -1,3 +1,9 @@
 [submodule "hardcore-sys/hardcore/thirdparty/glfw"]
 	path = hardcore-sys/hardcore/thirdparty/glfw
 	url = https://github.com/glfw/glfw.git
+[submodule "hardcore-sys/hardcore/thirdparty/volk"]
+	path = hardcore-sys/hardcore/thirdparty/volk
+	url = https://github.com/zeux/volk.git
+[submodule "hardcore-sys/hardcore/thirdparty/Vulkan-Headers"]
+	path = hardcore-sys/hardcore/thirdparty/Vulkan-Headers
+	url = https://github.com/KhronosGroup/Vulkan-Headers.git
