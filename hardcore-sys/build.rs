@@ -37,7 +37,6 @@ fn main() {
         lib_path.join("lib").display()
     );
     println!("cargo:rustc-link-lib=static=hardcore");
-    println!("cargo:rustc-link-lib=static=glfw3");
 
     #[cfg(target_family = "windows")]
     {

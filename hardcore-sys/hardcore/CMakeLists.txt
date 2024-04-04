@@ -7,14 +7,14 @@ option(HARDCORE_LOGS "enable logging" ON)
 option(HARDCORE_VALIDATION "enable Vulkan validation layers" OFF)
 
 list(APPEND PRIVATE_INCLUDES "src")
-list(APPEND LIBRARIES)
+list(APPEND LIB_SOURCES)
 
 if (HARDCORE_HEADLESS)
     add_compile_definitions(HC_HEADLESS)
 else ()
     add_subdirectory(thirdparty/glfw)
     list(APPEND PRIVATE_INCLUDES "thirdparty/glfw/include")
-    list(APPEND LIBRARIES glfw)
+    list(APPEND LIB_SOURCES $<TARGET_OBJECTS:glfw>)
 endif ()
 
 if (HARDCORE_LOGS)
@@ -29,9 +29,10 @@ endif ()
 add_subdirectory(src)
 
 # Setup library target
-add_library(${PROJECT_NAME} ${SOURCES})
+# Instead of calling target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBRARIES}), the library compiled objects are
+# linked directly so that everything is included in hardcore's library
+add_library(${PROJECT_NAME} ${SOURCES} ${LIB_SOURCES})
 target_include_directories(${PROJECT_NAME} PUBLIC "include" PRIVATE ${PRIVATE_INCLUDES})
-target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBRARIES})
 target_precompile_headers(${PROJECT_NAME} PRIVATE "src/pch.hpp")
 
 install(TARGETS ${PROJECT_NAME}
