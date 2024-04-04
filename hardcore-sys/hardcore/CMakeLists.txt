@@ -29,10 +29,11 @@ endif ()
 add_subdirectory(src)
 
 # Setup library target
+add_library(${PROJECT_NAME})
+target_include_directories(${PROJECT_NAME} PUBLIC "include" PRIVATE ${PRIVATE_INCLUDES})
 # Instead of calling target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBRARIES}), the library compiled objects are
 # linked directly so that everything is included in hardcore's library
-add_library(${PROJECT_NAME} ${SOURCES} ${LIB_SOURCES})
-target_include_directories(${PROJECT_NAME} PUBLIC "include" PRIVATE ${PRIVATE_INCLUDES})
+target_sources(${PROJECT_NAME} PUBLIC ${SOURCES} PRIVATE ${LIB_SOURCES})
 target_precompile_headers(${PROJECT_NAME} PRIVATE "src/pch.hpp")
 
 install(TARGETS ${PROJECT_NAME}

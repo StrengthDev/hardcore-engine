@@ -14,7 +14,7 @@ fn main() {
         .define("GLFW_BUILD_EXAMPLES", "OFF")
         .define("GLFW_BUILD_TESTS", "OFF")
         .define("GLFW_BUILD_DOCS", "OFF")
-        .define("GLFW_INSTALL", "ON");
+        .define("GLFW_INSTALL", "OFF");
 
     #[cfg(feature = "headless")]
     {
