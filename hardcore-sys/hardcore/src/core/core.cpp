@@ -9,6 +9,7 @@
 
 #include <core/core.h>
 #include "log.hpp"
+#include <render/renderer.hpp>
 
 #ifndef HC_HEADLESS
 
@@ -28,6 +29,10 @@ int hc_init(HCInitParams params) {
     }
 #endif // HC_LOGGING
 
+    if (hc::render::init() != hc::render::InstanceResult::Success) {
+        return -1;
+    }
+
 #ifndef HC_HEADLESS
     if (!glfwInit()) {
         const char *description;
@@ -43,6 +48,10 @@ int hc_init(HCInitParams params) {
 }
 
 int hc_term() {
+    if (hc::render::term() != hc::render::InstanceResult::Success) {
+        return -1;
+    }
+
 #ifndef HC_HEADLESS
     glfwTerminate();
 #endif // HC_HEADLESS

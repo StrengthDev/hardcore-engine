@@ -2,19 +2,35 @@ cmake_minimum_required(VERSION 3.14)
 project("hardcore" C CXX)
 set(CMAKE_CXX_STANDARD 20)
 
+if (NOT DEFINED VERSION_MAJOR)
+    set(VERSION_MAJOR "0")
+endif ()
+if (NOT DEFINED VERSION_MINOR)
+    set(VERSION_MINOR "0")
+endif ()
+if (NOT DEFINED VERSION_PATCH)
+    set(VERSION_PATCH "0")
+endif ()
 option(HARDCORE_HEADLESS "disable window functionality" OFF)
 option(HARDCORE_LOGS "enable logging" ON)
 option(HARDCORE_VALIDATION "enable Vulkan validation layers" OFF)
 
-list(APPEND PRIVATE_INCLUDES "src")
-list(APPEND LIB_SOURCES)
+set(VULKAN_HEADERS_INSTALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/Vulkan-Headers")
+add_subdirectory(thirdparty/volk)
+
+list(APPEND PRIVATE_INCLUDES
+        "src"
+        "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/volk"
+        "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/Vulkan-Headers/include"
+)
+list(APPEND LIB_OBJECTS $<TARGET_OBJECTS:volk>)
 
 if (HARDCORE_HEADLESS)
     add_compile_definitions(HC_HEADLESS)
 else ()
     add_subdirectory(thirdparty/glfw)
-    list(APPEND PRIVATE_INCLUDES "thirdparty/glfw/include")
-    list(APPEND LIB_SOURCES $<TARGET_OBJECTS:glfw>)
+    list(APPEND PRIVATE_INCLUDES "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/glfw/include")
+    list(APPEND LIB_OBJECTS $<TARGET_OBJECTS:glfw>)
 endif ()
 
 if (HARDCORE_LOGS)
@@ -25,6 +41,10 @@ if (HARDCORE_VALIDATION)
     add_compile_definitions(HC_VULKAN_VALIDATION)
 endif ()
 
+add_compile_definitions(HC_MAJOR=${VERSION_MAJOR})
+add_compile_definitions(HC_MINOR=${VERSION_MINOR})
+add_compile_definitions(HC_PATCH=${VERSION_PATCH})
+
 # Add source files to SOURCES
 add_subdirectory(src)
 
@@ -33,7 +53,7 @@ add_library(${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME} PUBLIC "include" PRIVATE ${PRIVATE_INCLUDES})
 # Instead of calling target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBRARIES}), the library compiled objects are
 # linked directly so that everything is included in hardcore's library
-target_sources(${PROJECT_NAME} PUBLIC ${SOURCES} PRIVATE ${LIB_SOURCES})
+target_sources(${PROJECT_NAME} PUBLIC ${SOURCES} PRIVATE ${LIB_OBJECTS})
 target_precompile_headers(${PROJECT_NAME} PRIVATE "src/pch.hpp")
 
 install(TARGETS ${PROJECT_NAME}

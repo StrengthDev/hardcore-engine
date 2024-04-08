@@ -25,9 +25,9 @@ void default_log(HCLogKind kind, const char *message) {
     }
 }
 
-HCLogFn log_fn = default_log; //!< The logging function to use for the whole library.
-HCStartSpanFn start_span_fn = nullptr; //!< The start span function to use for the whole library.
-HCEndSpanFn end_span_fn = nullptr; //!< The end span function to use for the whole library.
+static HCLogFn log_fn = default_log; //!< The logging function to use for the whole library.
+static HCStartSpanFn start_span_fn = nullptr; //!< The start span function to use for the whole library.
+static HCEndSpanFn end_span_fn = nullptr; //!< The end span function to use for the whole library.
 
 namespace hc {
     void log(HCLogKind kind, const char *message) {

@@ -10,6 +10,9 @@ fn main() {
     let native_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/hardcore");
     let mut config = Config::new(native_dir);
     config
+        .define("VERSION_MAJOR", env!("CARGO_PKG_VERSION_MAJOR"))
+        .define("VERSION_MINOR", env!("CARGO_PKG_VERSION_MINOR"))
+        .define("VERSION_PATCH", env!("CARGO_PKG_VERSION_PATCH"))
         .define("BUILD_SHARED_LIBS", "OFF")
         .define("GLFW_BUILD_EXAMPLES", "OFF")
         .define("GLFW_BUILD_TESTS", "OFF")
