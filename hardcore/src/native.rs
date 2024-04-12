@@ -7,7 +7,6 @@ use tracing::{
 
 const TARGET: &str = "hardcore-sys";
 
-#[no_mangle]
 pub(super) unsafe extern "C" fn log(level: LogKind, text: *const c_char) {
     let text = unsafe {
         // SAFETY: `text` is a NUL-terminated C String.
@@ -26,7 +25,6 @@ pub(super) unsafe extern "C" fn log(level: LogKind, text: *const c_char) {
 
 // TODO as of 3/10/2024, the tracing crate does not support dynamic metadata, so this is the best that can be done for spans
 
-#[no_mangle]
 pub(super) unsafe extern "C" fn start_span(level: LogKind, name: *const c_char) -> *mut c_void {
     let name = unsafe {
         // SAFETY: `name` is a NUL-terminated C String.
@@ -44,7 +42,6 @@ pub(super) unsafe extern "C" fn start_span(level: LogKind, name: *const c_char) 
     Box::into_raw(Box::new(span.entered())) as *mut c_void
 }
 
-#[no_mangle]
 pub(super) unsafe extern "C" fn end_span(ptr: *mut c_void) {
     let ptr: *mut EnteredSpan = ptr as *mut EnteredSpan;
     let _ = unsafe { Box::from_raw(ptr) };

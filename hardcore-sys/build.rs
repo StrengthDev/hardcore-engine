@@ -19,6 +19,10 @@ fn main() {
         .define("GLFW_BUILD_DOCS", "OFF")
         .define("GLFW_INSTALL", "OFF");
 
+    // Missing debug symbols on windows
+    #[cfg(all(target_family = "windows", debug_assertions))]
+    config.cxxflag("/ZI");
+
     #[cfg(feature = "headless")]
     {
         config.define("HARDCORE_HEADLESS", "ON");

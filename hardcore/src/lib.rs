@@ -80,15 +80,33 @@ enum ThreadKind {
     Worker,
 }
 
+/// A descriptor used to identify an application by its name and version.
+#[derive(Clone)]
+pub struct ApplicationDescriptor<'a> {
+    /// The name of the application.
+    pub name: &'a str,
+
+    /// The major version of the application.
+    pub major: u32,
+
+    /// The minor version of the application.
+    pub minor: u32,
+
+    /// The patch version of the application.
+    pub patch: u32,
+}
+
 /// An error within the core **Hardcore** functionality.
 #[derive(Error, Debug)]
 pub enum CoreError {
     /// Failed to join with tokio task.
     #[error(transparent)]
     TokioJoin(#[from] tokio::task::JoinError),
+
     /// Failed to create tokio runtime.
     #[error(transparent)]
     IO(#[from] std::io::Error),
+
     /// An error as occurred inside the native module.
     #[error("an error as occurred inside the native module (code {code})")]
     System {
@@ -98,15 +116,20 @@ pub enum CoreError {
     /// The function isn't getting executed on the main thread.
     #[error("the function isn't getting executed on the main thread")]
     NotMain,
+
     /// The context has not been initialised yet.
     #[error("the context has not been initialised yet")]
     Uninitialised,
+
+    /// The provided string could not be converted into a C string.
+    #[error("the provided string could not be converted into a C string")]
+    InvalidString(#[from] std::ffi::NulError),
 }
 
 /// Initialise the library context.
 ///
 /// This function must be called before any other library functions may be used.
-pub fn init() -> Result<(), CoreError> {
+pub fn init(app: ApplicationDescriptor) -> Result<(), CoreError> {
     let (tx, rx) = unbounded_channel();
     let _ = LAYER_TX.write().insert(tx);
     let _ = LAYER_RX.lock().insert(rx);
@@ -114,7 +137,17 @@ pub fn init() -> Result<(), CoreError> {
     let _ = EVENT_TX.write().insert(tx);
     let _ = EVENT_RX.lock().insert(rx);
 
+    let c_name = std::ffi::CString::new(app.name)?;
+
+    let descriptor = hardcore_sys::ApplicationDescriptor {
+        name: c_name.into_raw(),
+        major: app.major,
+        minor: app.minor,
+        patch: app.patch,
+    };
+
     let params = InitParams {
+        app: descriptor,
         log_fn: Some(native::log),
         start_span_fn: Some(native::start_span),
         end_span_fn: Some(native::end_span),

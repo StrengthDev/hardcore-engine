@@ -29,7 +29,7 @@ int hc_init(HCInitParams params) {
     }
 #endif // HC_LOGGING
 
-    if (hc::render::init() != hc::render::InstanceResult::Success) {
+    if (hc::render::init(params.app) != hc::render::InstanceResult::Success) {
         return -1;
     }
 

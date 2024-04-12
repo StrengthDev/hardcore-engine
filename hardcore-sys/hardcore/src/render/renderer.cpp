@@ -12,6 +12,7 @@
 #include "util.hpp"
 
 #include "renderer.hpp"
+#include "device.hpp"
 
 #define VK_CHECK_RETURN(vk_fn_call)     \
 {                                       \
@@ -24,9 +25,10 @@ namespace hc::render {
 
     static VkInstance global_instance = VK_NULL_HANDLE;
     static VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
+    static std::vector<Device> devices;
 
     VkResult layer_support(const std::vector<const char *> &layer_names, std::vector<bool> &out_found_layers) {
-        std::uint32_t layer_count;
+        u32 layer_count;
         VK_CHECK_RETURN(vkEnumerateInstanceLayerProperties(&layer_count, nullptr));
         std::vector<VkLayerProperties> available_layers(layer_count);
         VK_CHECK_RETURN(vkEnumerateInstanceLayerProperties(&layer_count, available_layers.data()));
@@ -35,7 +37,7 @@ namespace hc::render {
             HC_DEBUG("Layer available: " << available_layer.layerName);
         }
 
-        std::uint32_t current = 0;
+        u32 current = 0;
         for (auto &layer_name: layer_names) {
             out_found_layers[current] = false;
 
@@ -54,7 +56,7 @@ namespace hc::render {
 
     VkResult extension_support(const char *layer_name, const std::vector<const char *> &extension_names,
                                std::vector<bool> &out_found_extensions) {
-        std::uint32_t extension_count;
+        u32 extension_count;
         VK_CHECK_RETURN(vkEnumerateInstanceExtensionProperties(layer_name, &extension_count, nullptr));
         std::vector<VkExtensionProperties> available_extensions(extension_count);
         VK_CHECK_RETURN(
@@ -64,7 +66,7 @@ namespace hc::render {
             HC_DEBUG("Extension available: " << available_extension.extensionName);
         }
 
-        std::uint32_t current = 0;
+        u32 current = 0;
         for (auto &extension_name: extension_names) {
             out_found_extensions[current] = false;
 
@@ -86,48 +88,43 @@ namespace hc::render {
             VkDebugUtilsMessageTypeFlagsEXT message_type,
             const VkDebugUtilsMessengerCallbackDataEXT *callback_data,
             [[maybe_unused]] void *user_data) {
-        char type[] = "|---|";
+        char type[] = "[----]";
         if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) type[1] = 'G';
         if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) type[2] = 'V';
         if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) type[3] = 'P';
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT) type[4] = 'B';
 
         if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-            HC_ERROR("[VULKAN] " << type << ' ' << callback_data->pMessage);
+            HC_ERROR("Vulkan " << type << ": " << callback_data->pMessage);
         } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-            HC_WARN("[VULKAN] " << type << ' ' << callback_data->pMessage);
+            HC_WARN("Vulkan " << type << ": " << callback_data->pMessage);
         } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
-            HC_INFO("[VULKAN] " << type << ' ' << callback_data->pMessage);
+            HC_INFO("Vulkan " << type << ": " << callback_data->pMessage);
         } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
-            HC_TRACE("[VULKAN] " << type << ' ' << callback_data->pMessage);
+            HC_TRACE("Vulkan " << type << ": " << callback_data->pMessage);
         }
 
         return VK_FALSE;
     }
 
-    VkResult create_instance() {
+    VkResult create_instance(const HCApplicationDescriptor &app, const std::vector<const char *> &layers) {
         HC_INFO("Initialising Vulkan instance..");
         HC_INFO("Engine: Hardcore " << HC_MAJOR << '.' << HC_MINOR << '.' << HC_PATCH);
-        HC_INFO("Application: ");
+        HC_INFO("Application: " << app.name << ' ' << app.major << '.' << app.minor << '.' << app.patch);
 
         VkApplicationInfo app_info = {};
         app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-        app_info.pApplicationName = "client.name";
-        app_info.applicationVersion = VK_MAKE_API_VERSION(0, 0, 0, 0);
+        app_info.pApplicationName = app.name;
+        app_info.applicationVersion = VK_MAKE_API_VERSION(0, app.major, app.minor, app.patch);
         app_info.pEngineName = "Hardcore";
         app_info.engineVersion = VK_MAKE_API_VERSION(0, HC_MAJOR, HC_MINOR, HC_MAJOR);
         app_info.apiVersion = VK_API_VERSION_1_3;
-
-        std::vector<const char *> layers;
-
-#ifdef HC_VULKAN_VALIDATION
-        layers.push_back(VALIDATION_LAYER_NAME);
-#endif // HC_VULKAN_VALIDATION
 
         std::vector<bool> found_layers(layers.size());
         std::fill(found_layers.begin(), found_layers.end(), false);
         VK_CHECK_RETURN(layer_support(layers, found_layers));
         bool support_success = true;
-        for (std::uint32_t i = 0; i < layers.size(); i++) {
+        for (u32 i = 0; i < layers.size(); i++) {
             HC_INFO("Using layer " << layers[i]);
             if (!found_layers[i]) {
                 HC_ERROR("Layer " << layers[i] << " is not supported");
@@ -144,7 +141,7 @@ namespace hc::render {
 #ifdef HC_HEADLESS
         std::vector<const char *> extensions;
 #else
-        std::uint32_t glfw_extension_count = 0;
+        u32 glfw_extension_count = 0;
         const char **glfw_extensions;
         glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
         std::vector<const char *> extensions(glfw_extensions, glfw_extensions + glfw_extension_count);
@@ -157,7 +154,7 @@ namespace hc::render {
         std::vector<bool> found_extensions(extensions.size());
         std::fill(found_extensions.begin(), found_extensions.end(), false);
         VK_CHECK_RETURN(extension_support(nullptr, extensions, found_extensions));
-        for (std::uint32_t i = 0; i < extensions.size(); i++) {
+        for (u32 i = 0; i < extensions.size(); i++) {
             HC_INFO("Using extension " << extensions[i]);
             if (!found_extensions[i]) {
                 HC_ERROR("Extension " << extensions[i] << " is not supported");
@@ -171,25 +168,61 @@ namespace hc::render {
         VkInstanceCreateInfo instance_info = {};
         instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         instance_info.pApplicationInfo = &app_info;
-        instance_info.enabledExtensionCount = static_cast<std::uint32_t>(extensions.size());
+        instance_info.enabledExtensionCount = static_cast<u32>(extensions.size());
         instance_info.ppEnabledExtensionNames = extensions.data();
-        instance_info.enabledLayerCount = static_cast<std::uint32_t>(layers.size());
+        instance_info.enabledLayerCount = static_cast<u32>(layers.size());
         instance_info.ppEnabledLayerNames = layers.data();
 
         return vkCreateInstance(&instance_info, nullptr, &global_instance);
     }
 
-    InstanceResult init() {
+
+    InstanceResult init_devices(const std::vector<const char *> &layers) {
+        u32 device_count = 0;
+        VkResult res = vkEnumeratePhysicalDevices(global_instance, &device_count, nullptr);
+        if (res != VK_SUCCESS) {
+            return InstanceResult::DeviceError;
+        }
+        if (!device_count) {
+            return InstanceResult::NoDevicesFound;
+        }
+        std::vector<VkPhysicalDevice> physical_handles(device_count);
+        res = vkEnumeratePhysicalDevices(global_instance, &device_count, physical_handles.data());
+        if (res != VK_SUCCESS) {
+            return InstanceResult::DeviceError;
+        }
+
+        for (auto physical_handle: physical_handles) {
+            std::optional<Device> device = Device::create(physical_handle, layers);
+            if (device) {
+                devices.push_back(std::move(*device));
+            }
+        }
+
+        if (devices.empty()) {
+            return InstanceResult::NoDevicesFound;
+        }
+
+        return InstanceResult::Success;
+    }
+
+    InstanceResult init(const HCApplicationDescriptor &app) {
         VkResult res = volkInitialize();
         if (res != VK_SUCCESS) {
             HC_ERROR("Failed to initialize Volk: " << to_str(res));
             return InstanceResult::VolkError;
         }
 
-        res = create_instance();
+        std::vector<const char *> layers;
+
+#ifdef HC_VULKAN_VALIDATION
+        layers.push_back(VALIDATION_LAYER_NAME);
+#endif // HC_VULKAN_VALIDATION
+
+        res = create_instance(app, layers);
         if (res != VK_SUCCESS) {
             HC_ERROR("Failed to initialize Vulkan instance: " << to_str(res));
-            return InstanceResult::VolkError;
+            return InstanceResult::VulkanInstanceError;
         }
         volkLoadInstanceOnly(global_instance);
 
@@ -209,20 +242,43 @@ namespace hc::render {
         res = vkCreateDebugUtilsMessengerEXT(global_instance, &debug_info, nullptr, &debug_messenger);
         if (res != VK_SUCCESS) {
             HC_ERROR("Failed to initialize debug messenger: " << to_str(res));
-            return InstanceResult::VolkError;
+            return InstanceResult::DebugCallbackError;
         }
 #endif // HC_LOGGING
+
+        InstanceResult device_res = init_devices(layers);
+        if (device_res != InstanceResult::Success) {
+            switch (device_res) {
+                case InstanceResult::DeviceError: HC_ERROR("Failed to initialize Vulkan devices");
+                    break;
+                case InstanceResult::NoDevicesFound: HC_ERROR("Did not find any devices");
+                    break;
+                default: HC_ERROR("Unknown error while initialising Vulkan devices");
+            }
+
+            return device_res;
+        }
 
         return InstanceResult::Success;
     }
 
     InstanceResult term() {
+        devices.clear();
+
 #ifdef HC_LOGGING
-        vkDestroyDebugUtilsMessengerEXT(global_instance, debug_messenger, nullptr);
+        if (debug_messenger != VK_NULL_HANDLE) {
+            vkDestroyDebugUtilsMessengerEXT(global_instance, debug_messenger, nullptr);
+            debug_messenger = VK_NULL_HANDLE;
+        }
 #endif // HC_LOGGING
 
-        vkDestroyInstance(global_instance, nullptr);
+        if (global_instance != VK_NULL_HANDLE) {
+            vkDestroyInstance(global_instance, nullptr);
+            global_instance = VK_NULL_HANDLE;
+        }
+
         volkFinalize();
+
         return InstanceResult::Success;
     }
 }

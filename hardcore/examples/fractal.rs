@@ -6,7 +6,7 @@ use tracing_subscriber::EnvFilter;
 use hardcore::event::{Event, WindowEvent};
 use hardcore::layer::{Context, Layer};
 use hardcore::window::Window;
-use hardcore::{init, push_layer, run, stop, terminate};
+use hardcore::{init, push_layer, run, stop, terminate, ApplicationDescriptor};
 
 struct FractalLayer {
     _window: Window,
@@ -53,7 +53,13 @@ fn main() {
         .event_format(format)
         .init();
 
-    init().expect("Failed to initialise library");
+    init(ApplicationDescriptor {
+        name: "Hardcore Fractal sample",
+        major: env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap(),
+        minor: env!("CARGO_PKG_VERSION_MINOR").parse().unwrap(),
+        patch: env!("CARGO_PKG_VERSION_PATCH").parse().unwrap(),
+    })
+    .expect("Failed to initialise library");
     push_layer(FractalLayer::new()).expect("Failed to send fractal layer");
     run().expect("Failed to run main loop");
     terminate().expect("Failed to terminate library");
