@@ -7,8 +7,6 @@
 #include <core/core.h>
 #include <core/util.hpp>
 
-#include "swapchain.hpp"
-
 namespace hc::render {
     enum class InstanceResult : u32 {
         Success = 0,

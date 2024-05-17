@@ -8,8 +8,6 @@
 #include <core/util.hpp>
 
 namespace hc::render {
-    class Device;
-
     struct SurfaceInfo {
         VkSurfaceCapabilities2KHR capabilities = {};
         std::vector<VkSurfaceFormat2KHR> available_formats;

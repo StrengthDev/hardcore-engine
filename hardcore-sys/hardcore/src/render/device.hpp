@@ -10,7 +10,7 @@
 
 #include "device/scheduler.hpp"
 #include "device/destruction_mark.hpp"
-#include "swapchain.hpp"
+#include "device/swapchain.hpp"
 
 namespace hc::render {
     enum class DeviceResult : u32 {

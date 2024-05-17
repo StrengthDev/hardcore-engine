@@ -1,11 +1,10 @@
 #include <pch.hpp>
 
 #include <core/log.hpp>
+#include <render/vars.hpp>
+#include <render/util.hpp>
 
 #include "swapchain.hpp"
-#include "device.hpp"
-#include "vars.hpp"
-#include "util.hpp"
 
 namespace hc::render {
 
