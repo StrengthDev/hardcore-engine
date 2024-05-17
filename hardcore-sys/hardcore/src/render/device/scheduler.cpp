@@ -1,6 +1,8 @@
 #include <pch.hpp>
 
 #include <core/log.hpp>
+#include <render/vars.hpp>
+#include <render/util.hpp>
 
 #include "scheduler.hpp"
 
@@ -97,10 +99,10 @@ namespace hc::render::device {
                 return std::nullopt;
             }
             if (scheduler.compute_family == queue_family) {
-                scheduler.compute_idx = scheduler.queues.size();
+                scheduler.compute_index = scheduler.queues.size();
             }
             if (scheduler.transfer_family == queue_family) {
-                scheduler.transfer_idx = scheduler.queues.size();
+                scheduler.transfer_index = scheduler.queues.size();
             }
             scheduler.queues.emplace_back(queue_family, queue);
         }
@@ -124,8 +126,8 @@ namespace hc::render::device {
             compute_family(std::exchange(other.compute_family, std::numeric_limits<u32>::max())),
             transfer_family(std::exchange(other.transfer_family, std::numeric_limits<u32>::max())),
             graphics_queue_indexes(std::move(other.graphics_queue_indexes)),
-            compute_idx(std::exchange(other.compute_idx, std::numeric_limits<u32>::max())),
-            transfer_idx(std::exchange(other.transfer_idx, std::numeric_limits<u32>::max())) {
+            compute_index(std::exchange(other.compute_index, std::numeric_limits<u32>::max())),
+            transfer_index(std::exchange(other.transfer_index, std::numeric_limits<u32>::max())) {
 
     }
 
@@ -136,9 +138,36 @@ namespace hc::render::device {
         this->compute_family = std::exchange(other.compute_family, std::numeric_limits<u32>::max());
         this->transfer_family = std::exchange(other.transfer_family, std::numeric_limits<u32>::max());
         this->graphics_queue_indexes = std::move(other.graphics_queue_indexes);
-        this->compute_idx = std::exchange(other.compute_idx, std::numeric_limits<u32>::max());
-        this->transfer_idx = std::exchange(other.transfer_idx, std::numeric_limits<u32>::max());
+        this->compute_index = std::exchange(other.compute_index, std::numeric_limits<u32>::max());
+        this->transfer_index = std::exchange(other.transfer_index, std::numeric_limits<u32>::max());
 
         return *this;
+    }
+
+    std::pair<u32, u32>
+    Scheduler::present_support(VkPhysicalDevice const &physical_handle, VkSurfaceKHR const &surface) const {
+        u32 found = std::numeric_limits<u32>::max();
+        for (u32 i = 0; i < this->queues.size(); i++) {
+            VkBool32 supported = VK_FALSE;
+            VkResult res = vkGetPhysicalDeviceSurfaceSupportKHR(physical_handle, this->queues[i].first, surface,
+                                                                &supported);
+            if (res != VK_SUCCESS) {
+                HC_ERROR("Failed to query queue family surface support: " << to_str(res));
+                break;
+            }
+            if (supported == VK_TRUE) {
+                if (this->queue_families[this->queues[i].first].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+                    return std::pair(i, i);
+                } else if (found == std::numeric_limits<u32>::max()) {
+                    found = i;
+                }
+            }
+        }
+
+        if (this->graphics_queue_families.empty()) {
+            return std::pair(std::numeric_limits<u32>::max(), found);
+        } else {
+            return std::pair(this->graphics_queue_families[0], found);
+        }
     }
 }

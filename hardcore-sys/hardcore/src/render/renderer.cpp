@@ -8,10 +8,12 @@
 #endif // HC_HEADLESS
 
 #include <core/log.hpp>
+#include <render/renderer.h>
 
 #include "util.hpp"
 
 #include "renderer.hpp"
+#include "vars.hpp"
 #include "device.hpp"
 
 #define VK_CHECK_RETURN(vk_fn_call)     \
@@ -23,9 +25,13 @@
 namespace hc::render {
     static const char *VALIDATION_LAYER_NAME = "VK_LAYER_KHRONOS_validation";
 
+    static u8 max_frames_in_flight_count = std::numeric_limits<u8>::max();
+    static u8 frame_mod = std::numeric_limits<u8>::max();
+
     static VkInstance global_instance = VK_NULL_HANDLE;
     static VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
     static std::vector<Device> devices;
+    static u32 default_device_idx = std::numeric_limits<u32>::max();
 
     VkResult layer_support(const std::vector<const char *> &layer_names, std::vector<bool> &out_found_layers) {
         u32 layer_count;
@@ -145,6 +151,7 @@ namespace hc::render {
         const char **glfw_extensions;
         glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
         std::vector<const char *> extensions(glfw_extensions, glfw_extensions + glfw_extension_count);
+        extensions.push_back(VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME);
 #endif // HC_HEADLESS
 
 #ifdef HC_LOGGING
@@ -206,7 +213,9 @@ namespace hc::render {
         return InstanceResult::Success;
     }
 
-    InstanceResult init(const HCApplicationDescriptor &app) {
+    InstanceResult init(const HCApplicationDescriptor &app, const HCRenderParams &params) {
+        max_frames_in_flight_count = params.max_frames_in_flight;
+
         VkResult res = volkInitialize();
         if (res != VK_SUCCESS) {
             HC_ERROR("Failed to initialize Volk: " << to_str(res));
@@ -259,6 +268,11 @@ namespace hc::render {
             return device_res;
         }
 
+        // TODO select most powerful device
+        default_device_idx = 0;
+
+        frame_mod = 0;
+
         return InstanceResult::Success;
     }
 
@@ -279,6 +293,65 @@ namespace hc::render {
 
         volkFinalize();
 
+        max_frames_in_flight_count = std::numeric_limits<u8>::max();
+        default_device_idx = std::numeric_limits<u32>::max();
+
         return InstanceResult::Success;
     }
+
+    InstanceResult create_swapchain(GLFWwindow *window, u32 device_idx) {
+        if (device_idx == std::numeric_limits<u32>::max()) {
+            device_idx = default_device_idx;
+        }
+
+        HC_DEBUG("Creating new swapchain on device " << devices[device_idx].name() << " (id: " << device_idx << ')');
+        DeviceResult res = devices[device_idx].create_swapchain(global_instance, window);
+        switch (res) {
+            case DeviceResult::Success:
+                return InstanceResult::Success;
+            case DeviceResult::SurfaceFailure:
+                return InstanceResult::SurfaceFailure;
+            default:
+                return InstanceResult::Unimplemented;
+        }
+    }
+
+    void destroy_swapchain(GLFWwindow *window, u32 device_idx) {
+        // The default device may have changed meanwhile
+        HC_ASSERT(device_idx != std::numeric_limits<u32>::max(), "Cannot assume default device");
+        devices[device_idx].destroy_swapchain(global_instance, window, frame_mod);
+    }
+
+    u8 max_frames_in_flight() {
+        return max_frames_in_flight_count;
+    }
+
+    VkInstance instance() {
+        return global_instance;
+    }
+
+    u32 default_device() {
+        return default_device_idx;
+    }
+}
+
+int hc_render_tick() {
+    u8 current_mod = hc::render::frame_mod;
+
+    for (auto &device: hc::render::devices) {
+        device.tick(current_mod);
+    }
+
+    current_mod++;
+    hc::render::frame_mod = current_mod < hc::render::max_frames_in_flight() ? current_mod : 0;
+
+    return 0;
+}
+
+int hc_render_finish() {
+    for (u8 i = 0; i < hc::render::max_frames_in_flight_count; ++i) {
+        hc_render_tick();
+    }
+
+    return 0;
 }

@@ -146,8 +146,13 @@ pub fn init(app: ApplicationDescriptor) -> Result<(), CoreError> {
         patch: app.patch,
     };
 
+    let render_params = hardcore_sys::RenderParams {
+        max_frames_in_flight: 2,
+    };
+
     let params = InitParams {
         app: descriptor,
+        render_params,
         log_fn: Some(native::log),
         start_span_fn: Some(native::start_span),
         end_span_fn: Some(native::end_span),
@@ -279,7 +284,18 @@ async fn core_run() -> Result<(), CoreError> {
         .instrument(span)
         .await?;
 
+        if layers.is_empty() {
+            RUNNING.store(false, Ordering::SeqCst);
+        }
+
         context.frame += 1;
+    }
+
+    layers.clear();
+
+    let res: i32 = unsafe { hardcore_sys::render_finish() };
+    if res < 0 {
+        return Err(CoreError::System { code: res });
     }
 
     worker_rt.shutdown_background();

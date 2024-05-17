@@ -426,14 +426,30 @@ struct HCWindow {
 };
 
 /**
+ * @brief Initialisation parameters for a new window.
+ */
+struct HCWindowParams {
+    uint32_t width; //!< The width of the window.
+    uint32_t height; //!< The height of the window.
+    int pos_x; //!< A hint for the initial position of the window, in the x-axis.
+    int pos_y; //!< A hint for the initial position of the window, in the y-axis.
+    const char *name; //!< The name of the window, UTF-8 encoded.
+};
+
+/**
  * @brief Constructs a new `HCWindow`.
+ *
+ * @param params the window initialisation parameters.
  *
  * @return The newly created `HCWindow`. The returned object is invalid if some error has occurred.
  */
-struct HCWindow hc_new_window();
+struct HCWindow hc_new_window(struct HCWindowParams params);
 
 /**
  * @brief Destroys a `HCWindow`.
+ *
+ * The window will become unusable immediately, but will only truly be destroyed once its resources are no longer
+ * being used, which should be after after a few frames, depending on the number of frames in flight.
  *
  * @param window a pointer to the `HCWindow` to be destroyed
  */

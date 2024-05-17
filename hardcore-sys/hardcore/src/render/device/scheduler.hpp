@@ -32,17 +32,20 @@ namespace hc::render::device {
 
         Scheduler &operator=(Scheduler &&other) noexcept;
 
-    private:
-        std::vector<VkQueueFamilyProperties> queue_families;
+        [[nodiscard]] std::pair<u32, u32>
+        present_support(const VkPhysicalDevice &physical_handle, const VkSurfaceKHR &surface) const;
 
-        std::vector<std::pair<u32, VkQueue>> queues;
+    private:
+        std::vector<VkQueueFamilyProperties> queue_families; //!< The properties of a device's queue families.
+
+        std::vector<std::pair<u32, VkQueue>> queues; //!< The instanced queues, the first item of the pair is the queue's family.
 
         std::vector<u32> graphics_queue_families;
         u32 compute_family = std::numeric_limits<u32>::max();
         u32 transfer_family = std::numeric_limits<u32>::max();
         std::vector<u32> graphics_queue_indexes;
-        u32 compute_idx = std::numeric_limits<u32>::max();
-        u32 transfer_idx = std::numeric_limits<u32>::max();
+        u32 compute_index = std::numeric_limits<u32>::max();
+        u32 transfer_index = std::numeric_limits<u32>::max();
 
     };
 }

@@ -15,7 +15,8 @@ struct FractalLayer {
 impl FractalLayer {
     fn new() -> Self {
         Self {
-            _window: Window::new().expect("Failed to create window"),
+            _window: Window::new(1920, 1080, None, None, "Hardcore sample - Fractal")
+                .expect("Failed to create window"),
         }
     }
 }

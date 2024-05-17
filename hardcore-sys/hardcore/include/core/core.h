@@ -1,5 +1,8 @@
 #pragma once
 
+// Can't use angled include here due to bindgen
+#include "../render/params.h"
+
 #include "log.h"
 
 #ifdef __cplusplus
@@ -9,7 +12,7 @@ extern "C" {
 #include <stdint.h>
 
 /**
- * A descriptor used to identify an application by its name and version.
+ * @brief A descriptor used to identify an application by its name and version.
  */
 struct HCApplicationDescriptor {
     const char *name; //!< The name of the application.
@@ -23,6 +26,7 @@ struct HCApplicationDescriptor {
  */
 struct HCInitParams {
     struct HCApplicationDescriptor app; //!< A descriptor of the currently running program/application.
+    struct HCRenderParams render_params; //!< Initialisation parameters for the rendering portion of the Hardcore context.
     HCLogFn log_fn; //!< The function the context should use for emitting log events.
     HCStartSpanFn start_span_fn; //!< The function the context should use for starting spans.
     HCEndSpanFn end_span_fn; //!< The function the context should use for ending spans.
@@ -33,7 +37,7 @@ struct HCInitParams {
  *
  * This function must be called before any other library functions may be used.
  *
- * @param params The initialisation parameters
+ * @param params the initialisation parameters.
  *
  * @return 0 on success, a negative code if an error occurs and a code larger than 0 on success, but with some
  * warning.
@@ -49,18 +53,6 @@ int hc_init(struct HCInitParams params);
  * warning.
  */
 int hc_term();
-
-/**
- * @brief Process one frame.
- *
- * This function is meant to be called in a loop.
- * In non-headless configurations, it can (and should) be called from a loop seperated from `hc_poll_events()`,
- * in another thread.
- *
- * @return 0 on success, a negative code if an error occurs and a code larger than 0 on success, but with some
- * warning.
- */
-int hc_render_tick();
 
 #ifndef HC_HEADLESS
 /**

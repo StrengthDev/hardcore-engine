@@ -6,8 +6,8 @@ namespace hc::render {
     /**
      * @brief Returns a C string representation of the provided `VkResult`.
      *
-     * @param result The VKResult for which the the string is returned.
-     * @return A C string representation of the VkResult.
+     * @param result The `VKResult` for which the the string is returned.
+     * @return A C string representation of the `VKResult`.
      */
     inline const char *to_str(VkResult result) {
         switch (result) {
@@ -110,5 +110,17 @@ namespace hc::render {
             default:
                 return "UNIMPLEMENTED";
         }
+    }
+
+    /**
+     * @brief Returns a string representation of the provided `VkExtent2D`.
+     *
+     * @param extent The `VkExtent2D` for which the the string is returned.
+     * @return A string representation of the `VkExtent2D`.
+     */
+    inline std::string to_str(const VkExtent2D &extent) {
+        std::stringstream stream;
+        stream << '(' << extent.width << ", " << extent.height << ')';
+        return stream.str();
     }
 }

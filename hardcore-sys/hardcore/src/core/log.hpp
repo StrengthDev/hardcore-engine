@@ -36,7 +36,11 @@ namespace hc {
 
         Span(Span const &) = delete;
 
+        Span &operator=(Span const &) = delete;
+
         Span(Span &&) = delete;
+
+        Span &operator=(Span &&) = delete;
 
         Span(HCLogKind kind, const char *name);
 

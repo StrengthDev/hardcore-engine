@@ -11,6 +11,7 @@ use hardcore_sys::{
     set_window_refresh_callback, set_window_scale_callback, set_window_scroll_callback,
     set_window_size_callback,
 };
+use std::ffi::{c_int, CString, NulError};
 use std::ptr::addr_of_mut;
 use thiserror::Error;
 
@@ -20,6 +21,9 @@ pub enum WindowError {
     /// Failed to initialise window, this may indicate that the context has not been initialised yet.
     #[error("failed to create a new window")]
     Initialisation,
+    /// Could turn provided string slice into a valid [`CString`].
+    #[error("could turn provided string slice into a valid C string")]
+    InvalidName(#[from] NulError),
 }
 
 /// A high-level abstraction over an *OS* window.
@@ -29,9 +33,25 @@ pub struct Window {
 
 impl Window {
     /// Instantiate a new window.
-    pub fn new() -> Result<Self, WindowError> {
+    pub fn new(
+        width: u32,
+        height: u32,
+        pos_x: Option<i32>,
+        pos_y: Option<i32>,
+        name: &str,
+    ) -> Result<Self, WindowError> {
+        let c_name = CString::new(name)?;
+
+        let params = hardcore_sys::WindowParams {
+            width,
+            height,
+            pos_x: pos_x.unwrap_or(i32::MAX) as c_int,
+            pos_y: pos_y.unwrap_or(i32::MAX) as c_int,
+            name: c_name.as_ptr(),
+        };
+
         let handle = unsafe {
-            let mut handle = new_window();
+            let mut handle = new_window(params);
 
             if handle.handle.is_null() {
                 return Err(WindowError::Initialisation);

@@ -7,7 +7,10 @@
 #include <GLFW/glfw3.h>
 
 #include <core/window.h>
+#include <core/window.hpp>
+#include <core/util.hpp>
 #include <core/log.hpp>
+#include <render/renderer.hpp>
 
 namespace hc {
     inline HCMouseButton from_glfw_button(int button) {
@@ -321,47 +324,81 @@ namespace hc {
     }
 }
 
+/**
+ * @brief Static window callback function pointers.
+ */
 struct StaticWindow {
-    size_t id;
-    HCWindowPositionCallback position_callback;
-    HCWindowSizeCallback size_callback;
-    HCWindowCloseCallback close_callback;
-    HCWindowRefreshCallback refresh_callback;
-    HCWindowFocusCallback focus_callback;
-    HCWindowMinimizeCallback minimize_callback;
-    HCWindowMaximizeCallback maximize_callback;
-    HCWindowFramebufferCallback framebuffer_callback;
-    HCWindowScaleCallback scale_callback;
-    HCWindowMouseButtonCallback mouse_button_callback;
-    HCWindowCursorPositionCallback cursor_position_callback;
-    HCWindowCursorEnterCallback cursor_enter_callback;
-    HCWindowScrollCallback scroll_callback;
-    HCWindowKeyCallback key_callback;
-    HCWindowCharCallback char_callback;
-    HCWindowCharModsCallback char_mod_callback;
-    HCWindowDropCallback drop_callback;
+    Sz id = std::numeric_limits<Sz>::max();
+    u32 owning_device = std::numeric_limits<u32>::max();;
+    HCWindowPositionCallback position_callback = nullptr;
+    HCWindowSizeCallback size_callback = nullptr;
+    HCWindowCloseCallback close_callback = nullptr;
+    HCWindowRefreshCallback refresh_callback = nullptr;
+    HCWindowFocusCallback focus_callback = nullptr;
+    HCWindowMinimizeCallback minimize_callback = nullptr;
+    HCWindowMaximizeCallback maximize_callback = nullptr;
+    HCWindowFramebufferCallback framebuffer_callback = nullptr;
+    HCWindowScaleCallback scale_callback = nullptr;
+    HCWindowMouseButtonCallback mouse_button_callback = nullptr;
+    HCWindowCursorPositionCallback cursor_position_callback = nullptr;
+    HCWindowCursorEnterCallback cursor_enter_callback = nullptr;
+    HCWindowScrollCallback scroll_callback = nullptr;
+    HCWindowKeyCallback key_callback = nullptr;
+    HCWindowCharCallback char_callback = nullptr;
+    HCWindowCharModsCallback char_mod_callback = nullptr;
+    HCWindowDropCallback drop_callback = nullptr;
 };
 
-std::shared_mutex window_mutex;
-std::unordered_map<void *, StaticWindow> window_map;
+/**
+ * @brief The mutex used to lock access to `window_map`.
+ */
+static std::shared_mutex window_mutex;
 
-HCWindow hc_new_window() {
+/**
+ * @brief A map that takes a GLFWwindow pointer as a key, and stores the respective window callbacks.
+ *
+ * This is needed because GLFW window callbacks do not accept user data and only provide the GLFWwindow pointer within
+ * the callback, so this is used to access each window's individual callbacks.
+ */
+static std::unordered_map<void *, StaticWindow> window_map;
+
+HCWindow hc_new_window(HCWindowParams params) {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    GLFWwindow *window = glfwCreateWindow(1080, 720, "Placeholder", nullptr, nullptr);
+    if (params.pos_x == std::numeric_limits<int>::max()) {
+        glfwWindowHint(GLFW_POSITION_X, GLFW_ANY_POSITION);
+    } else {
+        glfwWindowHint(GLFW_POSITION_X, params.pos_x);
+    }
+    if (params.pos_y == std::numeric_limits<int>::max()) {
+        glfwWindowHint(GLFW_POSITION_X, GLFW_ANY_POSITION);
+    } else {
+        glfwWindowHint(GLFW_POSITION_Y, params.pos_y);
+    }
+
+    GLFWwindow *window = glfwCreateWindow(static_cast<int>(params.width), static_cast<int>(params.height), params.name,
+                                          nullptr, nullptr);
 
     if (!window) {
         HC_ERROR("Failed to create window");
         return HCWindow{.handle = nullptr, .id = 0};
     }
 
+    u32 device = hc::render::default_device();
+    hc::render::InstanceResult res = hc::render::create_swapchain(window, device);
+    if (res != hc::render::InstanceResult::Success) {
+        HC_ERROR("Failed to create swapchain");
+        glfwDestroyWindow(window);
+        return HCWindow{.handle = nullptr, .id = 0};
+    }
+
     std::unique_lock lock(window_mutex);
-    std::vector<size_t> ids;
+    std::vector<Sz> ids;
     ids.reserve(window_map.size());
     for (auto item: window_map) {
         ids.push_back(item.second.id);
     }
     std::sort(ids.begin(), ids.end());
-    size_t id = 0;
+    Sz id = 0;
     for (auto item: ids) {
         if (id == item) {
             id++;
@@ -370,8 +407,9 @@ HCWindow hc_new_window() {
         }
     }
 
-    StaticWindow static_window = {};
+    StaticWindow static_window;
     static_window.id = id;
+    static_window.owning_device = device;
     window_map.emplace(window, static_window);
 
     HC_INFO("Created new window with id " << id);
@@ -381,16 +419,51 @@ HCWindow hc_new_window() {
 
 void hc_destroy_window(HCWindow *window) {
     if (window->handle) {
+        HC_INFO("Window " << window->id << " marked for destruction (handle: " << window->handle << ')');
         auto *handle = static_cast<GLFWwindow *>(window->handle);
-        const char *name = glfwGetWindowTitle(handle);
-        if (name) {
-            HC_INFO("Destroying window " << window->id);
-            std::unique_lock lock(window_mutex);
-            window_map.erase(handle);
-            glfwDestroyWindow(handle);
-            window->handle = nullptr;
-        } else {
-            HC_WARN("Invalid window or GLFW context");
+
+        glfwSetWindowPosCallback(handle, nullptr);
+        glfwSetWindowSizeCallback(handle, nullptr);
+        glfwSetWindowCloseCallback(handle, nullptr);
+        glfwSetWindowRefreshCallback(handle, nullptr);
+        glfwSetWindowFocusCallback(handle, nullptr);
+        glfwSetWindowIconifyCallback(handle, nullptr);
+        glfwSetWindowMaximizeCallback(handle, nullptr);
+        glfwSetFramebufferSizeCallback(handle, nullptr);
+        glfwSetWindowContentScaleCallback(handle, nullptr);
+        glfwSetMouseButtonCallback(handle, nullptr);
+        glfwSetCursorPosCallback(handle, nullptr);
+        glfwSetCursorEnterCallback(handle, nullptr);
+        glfwSetScrollCallback(handle, nullptr);
+        glfwSetKeyCallback(handle, nullptr);
+        glfwSetCharCallback(handle, nullptr);
+        glfwSetCharModsCallback(handle, nullptr);
+        glfwSetDropCallback(handle, nullptr);
+
+        u32 device;
+        {
+            std::shared_lock lock(window_mutex);
+            StaticWindow &static_window = window_map.at(handle);
+            device = static_window.owning_device;
+        }
+        hc::render::destroy_swapchain(handle, device);
+
+        window->handle = nullptr;
+    }
+}
+
+namespace hc::window {
+    void destroy(GLFWwindow *window) {
+        if (window) {
+            const char *name = glfwGetWindowTitle(window);
+            if (name) {
+                HC_INFO("Destroying window (handle " << window << ')');
+                std::unique_lock lock(window_mutex);
+                window_map.erase(window);
+                glfwDestroyWindow(window);
+            } else {
+                HC_WARN("Invalid window or GLFW context");
+            }
         }
     }
 }

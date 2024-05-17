@@ -29,10 +29,6 @@ int hc_init(HCInitParams params) {
     }
 #endif // HC_LOGGING
 
-    if (hc::render::init(params.app) != hc::render::InstanceResult::Success) {
-        return -1;
-    }
-
 #ifndef HC_HEADLESS
     if (!glfwInit()) {
         const char *description;
@@ -44,10 +40,16 @@ int hc_init(HCInitParams params) {
     glfwSetErrorCallback(glfw_error_callback);
 #endif // HC_HEADLESS
 
+    if (hc::render::init(params.app, params.render_params) != hc::render::InstanceResult::Success) {
+        return -1;
+    }
+
     return 0;
 }
 
 int hc_term() {
+    // TODO destroy all windows
+
     if (hc::render::term() != hc::render::InstanceResult::Success) {
         return -1;
     }
@@ -56,10 +58,6 @@ int hc_term() {
     glfwTerminate();
 #endif // HC_HEADLESS
 
-    return 0;
-}
-
-int hc_render_tick() {
     return 0;
 }
 

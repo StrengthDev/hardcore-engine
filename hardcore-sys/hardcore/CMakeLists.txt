@@ -45,6 +45,14 @@ add_compile_definitions(HC_MAJOR=${VERSION_MAJOR})
 add_compile_definitions(HC_MINOR=${VERSION_MINOR})
 add_compile_definitions(HC_PATCH=${VERSION_PATCH})
 
+if (MSVC)
+    list(APPEND FLAGS /W4 /Wall /EHsc)
+else ()
+    list(APPEND FLAGS -Wall)
+endif ()
+
+add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${FLAGS}>")
+
 # Add source files to SOURCES
 add_subdirectory(src)
 
