@@ -437,6 +437,14 @@ struct HCWindowParams {
 };
 
 /**
+ * @brief Processes all pending window events.
+ *
+ * This function is meant to be called in a loop, once per frame, it MUST be called in non-headless configurations and
+ * it MUST be from the main thread.
+ */
+void hc_poll_events();
+
+/**
  * @brief Constructs a new `HCWindow`.
  *
  * @param params the window initialisation parameters.

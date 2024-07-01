@@ -30,6 +30,7 @@ namespace hc::render {
 
     static VkInstance global_instance = VK_NULL_HANDLE;
     static VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
+    static HCVulkanDebugCallbackFn user_debug_callback = nullptr;
     static std::vector<Device> devices;
     static u32 default_device_idx = std::numeric_limits<u32>::max();
 
@@ -89,7 +90,7 @@ namespace hc::render {
         return VK_SUCCESS;
     }
 
-    static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
+    static VKAPI_ATTR VkBool32 VKAPI_CALL default_debug_callback(
             VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
             VkDebugUtilsMessageTypeFlagsEXT message_type,
             const VkDebugUtilsMessengerCallbackDataEXT *callback_data,
@@ -109,6 +110,37 @@ namespace hc::render {
         } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
             HC_TRACE("Vulkan " << type << ": " << callback_data->pMessage);
         }
+
+        return VK_FALSE;
+    }
+
+    static VKAPI_ATTR VkBool32 VKAPI_CALL custom_debug_callback(
+            VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+            VkDebugUtilsMessageTypeFlagsEXT message_type,
+            const VkDebugUtilsMessengerCallbackDataEXT *callback_data,
+            [[maybe_unused]] void *user_data) {
+        int flags = 0;
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT)
+            flags |= HC_VK_GENERAL;
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT)
+            flags |= HC_VK_VALIDATION;
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
+            flags |= HC_VK_PERFORMANCE;
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT)
+            flags |= HC_VK_DEVICE_ADDRESS_BINDING;
+
+        HCLogKind kind = HCLogKind::Error;
+        if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+            kind = HCLogKind::Error;
+        } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+            kind = HCLogKind::Warn;
+        } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
+            kind = HCLogKind::Info;
+        } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
+            kind = HCLogKind::Debug;
+        }
+
+        user_debug_callback(kind, flags, callback_data->pMessage);
 
         return VK_FALSE;
     }
@@ -244,8 +276,16 @@ namespace hc::render {
         debug_info.messageType =
                 VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                 VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-        debug_info.pfnUserCallback = debug_callback;
+
+        if (params.debug_callback) {
+            user_debug_callback = params.debug_callback;
+            debug_info.pfnUserCallback = custom_debug_callback;
+        } else {
+            debug_info.pfnUserCallback = default_debug_callback;
+        }
+
         debug_info.pUserData = nullptr;
+
 
         // vkCreateDebugUtilsMessengerEXT is loaded via Volk
         res = vkCreateDebugUtilsMessengerEXT(global_instance, &debug_info, nullptr, &debug_messenger);
@@ -283,6 +323,7 @@ namespace hc::render {
         if (debug_messenger != VK_NULL_HANDLE) {
             vkDestroyDebugUtilsMessengerEXT(global_instance, debug_messenger, nullptr);
             debug_messenger = VK_NULL_HANDLE;
+            user_debug_callback = nullptr;
         }
 #endif // HC_LOGGING
 
@@ -350,7 +391,9 @@ int hc_render_tick() {
 
 int hc_render_finish() {
     for (u8 i = 0; i < hc::render::max_frames_in_flight_count; ++i) {
-        hc_render_tick();
+        int res = hc_render_tick();
+        if (res)
+            return res;
     }
 
     return 0;

@@ -329,7 +329,8 @@ namespace hc {
  */
 struct StaticWindow {
     Sz id = std::numeric_limits<Sz>::max();
-    u32 owning_device = std::numeric_limits<u32>::max();;
+    u32 owning_device = std::numeric_limits<u32>::max();
+    bool resizing = false;
     HCWindowPositionCallback position_callback = nullptr;
     HCWindowSizeCallback size_callback = nullptr;
     HCWindowCloseCallback close_callback = nullptr;
@@ -361,6 +362,17 @@ static std::shared_mutex window_mutex;
  * the callback, so this is used to access each window's individual callbacks.
  */
 static std::unordered_map<void *, StaticWindow> window_map;
+
+void hc_poll_events() {
+    glfwPollEvents();
+
+    // Unsure if this needed, as callbacks should only be called from within glfwPollEvents.
+    std::unique_lock lock(window_mutex);
+    // Set resizing to false, in order to allow swapchains to be recreated.
+    for (auto &[window, static_window]: window_map) {
+        static_window.resizing = false;
+    }
+}
 
 HCWindow hc_new_window(HCWindowParams params) {
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -457,7 +469,7 @@ namespace hc::window {
         if (window) {
             const char *name = glfwGetWindowTitle(window);
             if (name) {
-                HC_INFO("Destroying window (handle " << window << ')');
+                HC_INFO("Destroying window (handle: " << window << ')');
                 std::unique_lock lock(window_mutex);
                 window_map.erase(window);
                 glfwDestroyWindow(window);
@@ -465,6 +477,12 @@ namespace hc::window {
                 HC_WARN("Invalid window or GLFW context");
             }
         }
+    }
+
+    bool is_resizing(GLFWwindow *window) {
+        std::shared_lock lock(window_mutex);
+        StaticWindow &static_window = window_map.at(window);
+        return static_window.resizing;
     }
 }
 
@@ -617,8 +635,14 @@ void hc_set_window_framebuffer_callback(HCWindow *window, HCWindowFramebufferCal
         if (callback) {
             HC_TRACE("Setting window framebuffer callback for window " << window->id);
             glfwSetFramebufferSizeCallback(handle, [](GLFWwindow *glfw_window, int width, int height) {
-                std::shared_lock lock(window_mutex);
+                // Unique lock because a variable is being set.
+                std::unique_lock lock(window_mutex);
                 StaticWindow &static_window = window_map.at(glfw_window);
+                // Set resizing to true to keep the window's swapchain from recreating itself,
+                // while glfwPollEvents is blocking.
+                // This way, swapchains are only recreated at the end of glfwPollEvents, when the user stops resizing
+                // the window.
+                static_window.resizing = true;
                 static_window.framebuffer_callback(static_window.id, width, height);
             });
         } else {

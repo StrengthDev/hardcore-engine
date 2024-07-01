@@ -51,7 +51,7 @@ namespace hc::render {
         VkPhysicalDeviceProperties properties = {};
         VkPhysicalDeviceFeatures features = {};
         device::Scheduler scheduler;
-        std::unordered_map<GLFWwindow *, Swapchain> swapchains;
+        std::unordered_map<GLFWwindow *, device::Swapchain> swapchains;
 
         std::vector<std::vector<device::DestructionMark>> cleanup_queues;
 

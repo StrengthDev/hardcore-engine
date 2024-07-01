@@ -1,20 +1,21 @@
 #include <pch.hpp>
 
 #include <core/log.hpp>
+#include <core/window.hpp>
 #include <render/vars.hpp>
 #include <render/util.hpp>
 
 #include "swapchain.hpp"
 
-namespace hc::render {
+namespace hc::render::device {
 
-    std::optional<InnerSwapchain> create_inner_swapchain(const VolkDeviceTable &fn_table, VkDevice device,
-                                                         const VkSwapchainCreateInfoKHR &create_info) {
+    Result<InnerSwapchain, SwapchainResult> create_inner_swapchain(const VolkDeviceTable &fn_table, VkDevice device,
+                                                                   const VkSwapchainCreateInfoKHR &create_info) {
         VkSwapchainKHR swapchain = VK_NULL_HANDLE;
         VkResult res = fn_table.vkCreateSwapchainKHR(device, &create_info, nullptr, &swapchain);
         if (res != VK_SUCCESS) {
             HC_ERROR("Failed to create swapchain: " << to_str(res));
-            return std::nullopt;
+            return Result<InnerSwapchain, SwapchainResult>::err(SwapchainResult::CreationFailure);
         }
 
         u32 image_count = 0;
@@ -22,14 +23,14 @@ namespace hc::render {
         if (res != VK_SUCCESS) {
             HC_ERROR("Failed to query swapchain images: " << to_str(res));
             fn_table.vkDestroySwapchainKHR(device, swapchain, nullptr);
-            return std::nullopt;
+            return Result<InnerSwapchain, SwapchainResult>::err(SwapchainResult::ImageAcquisitionFailure);
         }
         std::vector<VkImage> images(image_count);
         res = fn_table.vkGetSwapchainImagesKHR(device, swapchain, &image_count, images.data());
         if (res != VK_SUCCESS) {
             HC_ERROR("Failed to obtain swapchain images: " << to_str(res));
             fn_table.vkDestroySwapchainKHR(device, swapchain, nullptr);
-            return std::nullopt;
+            return Result<InnerSwapchain, SwapchainResult>::err(SwapchainResult::ImageAcquisitionFailure);
         }
 
         std::vector<VkImageView> image_views(image_count);
@@ -56,11 +57,14 @@ namespace hc::render {
                     fn_table.vkDestroyImageView(device, image_views[j], nullptr);
                 }
                 fn_table.vkDestroySwapchainKHR(device, swapchain, nullptr);
-                return std::nullopt;
+                return Result<InnerSwapchain, SwapchainResult>::err(SwapchainResult::ImageViewFailure);
             }
         }
 
-        return InnerSwapchain{.handle = swapchain, .image_views = std::move(image_views)};
+        return Result<InnerSwapchain, SwapchainResult>::ok(InnerSwapchain{
+                .handle = swapchain,
+                .image_views = std::move(image_views)
+        });
     }
 
     void destroy_inner_swapchain(const VolkDeviceTable &fn_table, VkDevice device, InnerSwapchain &swapchain) {
@@ -74,8 +78,9 @@ namespace hc::render {
         }
     }
 
-    std::optional<Swapchain> Swapchain::create(const VolkDeviceTable &fn_table, VkDevice device, VkSurfaceKHR &&surface,
-                                               SurfaceInfo &&surface_info, SwapchainParams params) {
+    Result<Swapchain, SwapchainResult>
+    Swapchain::create(const VolkDeviceTable &fn_table, VkDevice device, VkSurfaceKHR &&surface,
+                      SurfaceInfo &&surface_info, SwapchainParams &&params) {
         VkSurfaceCapabilities2KHR &surface_capabilities = surface_info.capabilities;
         if (params.extent.width < surface_capabilities.surfaceCapabilities.minImageExtent.width
             || params.extent.height < surface_capabilities.surfaceCapabilities.minImageExtent.height
@@ -85,7 +90,7 @@ namespace hc::render {
                                                    << to_str(surface_capabilities.surfaceCapabilities.minImageExtent)
                                                    << " and maximum is "
                                                    << to_str(surface_capabilities.surfaceCapabilities.maxImageExtent));
-            return std::nullopt;
+            return Result<Swapchain, SwapchainResult>::err(SwapchainResult::UnsupportedSurface);
         }
 
         VkPresentModeKHR present_mode = surface_info.available_present_modes[0];
@@ -93,9 +98,8 @@ namespace hc::render {
         u32 image_count = std::max(surface_capabilities.surfaceCapabilities.minImageCount,
                                    static_cast<u32>(max_frames_in_flight()));
         // Maximum images may be 0, indicating there is no limit
-        if (surface_capabilities.surfaceCapabilities.maxImageCount > 0) {
+        if (surface_capabilities.surfaceCapabilities.maxImageCount > 0)
             image_count = std::min(surface_capabilities.surfaceCapabilities.maxImageCount, image_count);
-        }
 
         VkSwapchainCreateInfoKHR create_info = {};
         create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -128,24 +132,28 @@ namespace hc::render {
         create_info.clipped = VK_TRUE;
         create_info.oldSwapchain = VK_NULL_HANDLE; //used when it's needed to create a new target
 
-        std::optional<InnerSwapchain> inner_opt = create_inner_swapchain(fn_table, device, create_info);
-        if (!inner_opt) {
-            return std::nullopt;
-        }
+        auto inner_res = create_inner_swapchain(fn_table, device, create_info);
+        if (!inner_res)
+            return Result<Swapchain, SwapchainResult>::err(std::move(inner_res).err());
 
         Swapchain swapchain;
-        swapchain.inner = std::move(*inner_opt);
+        swapchain.inner = std::move(inner_res).ok();
         swapchain.surface = surface;
         swapchain.surface_format = surface_format;
         swapchain.present_mode = present_mode;
         swapchain.extent = params.extent;
+        swapchain.creation_params.graphics_queue_family = params.graphics_queue;
+        swapchain.creation_params.present_queue_family = params.present_queue;
+        swapchain.creation_params.image_count = image_count;
+        swapchain.creation_params.transform = surface_capabilities.surfaceCapabilities.currentTransform;
 
-        return swapchain;
+        return Result<Swapchain, SwapchainResult>::ok(std::move(swapchain));
     }
 
     Swapchain::~Swapchain() {
         if (this->inner.handle != VK_NULL_HANDLE) {
             HC_ERROR("Destructor called on un-destroyed swapchain");
+            HC_ASSERT(false, "Must call Swapchain::destroy beforehand");
         }
     }
 
@@ -157,13 +165,15 @@ namespace hc::render {
             extent(std::move(other.extent)),
             viewport(std::move(other.viewport)),
             scissor(std::move(other.scissor)),
-            old_swapchains(std::move(other.old_swapchains)) {
-
-    }
+            creation_params(std::move(other.creation_params)),
+            presentation_fences(std::move(other.presentation_fences)),
+            image_semaphores(std::move(other.image_semaphores)),
+            old_swapchains(std::move(other.old_swapchains)) {}
 
     Swapchain &Swapchain::operator=(Swapchain &&other) noexcept {
         if (this->inner.handle != VK_NULL_HANDLE) {
             HC_ERROR("Move assignment called on un-destroyed swapchain");
+            HC_ASSERT(false, "Must call Swapchain::destroy beforehand");
         }
 
         this->inner = std::exchange(other.inner, {.handle = VK_NULL_HANDLE});
@@ -173,6 +183,9 @@ namespace hc::render {
         this->extent = std::move(other.extent);
         this->viewport = std::move(other.viewport);
         this->scissor = std::move(other.scissor);
+        this->creation_params = std::move(other.creation_params);
+        this->presentation_fences = std::move(other.presentation_fences);
+        this->image_semaphores = std::move(other.image_semaphores);
         this->old_swapchains = std::move(other.old_swapchains);
 
         return *this;
@@ -183,9 +196,10 @@ namespace hc::render {
             destroy_inner_swapchain(fn_table, device, this->old_swapchains.front());
             old_swapchains.pop();
         }
-        if (this->inner.handle != VK_NULL_HANDLE) {
+
+        if (this->inner.handle != VK_NULL_HANDLE)
             destroy_inner_swapchain(fn_table, device, this->inner);
-        }
+
         vkDestroySurfaceKHR(instance, this->surface, nullptr);
     }
 
@@ -193,5 +207,79 @@ namespace hc::render {
         HC_ASSERT(!this->old_swapchains.empty(), "There should be an old swapchain to destroy");
         destroy_inner_swapchain(fn_table, device, this->old_swapchains.front());
         old_swapchains.pop();
+    }
+
+    Result<u32, SwapchainResult>
+    Swapchain::acquire_image(const VolkDeviceTable &fn_table, VkDevice device, GLFWwindow *window, u8 frame_mod,
+                             u64 timeout) {
+        VkResult res = fn_table.vkWaitForFences(device, 1, &this->presentation_fences[frame_mod], VK_TRUE, timeout);
+        if (res != VK_SUCCESS) {
+            HC_ERROR("Failed to wait for presentation fence: " << to_str(res));
+            return Result<u32, SwapchainResult>::err(SwapchainResult::FenceFailure);
+        }
+
+        u32 index = std::numeric_limits<u32>::max();
+        res = fn_table.vkAcquireNextImageKHR(device, this->inner.handle, timeout, image_semaphores[frame_mod],
+                                             VK_NULL_HANDLE, &index);
+        if (res == VK_ERROR_OUT_OF_DATE_KHR && !window::is_resizing(window)) {
+            HC_DEBUG("Swapchain out of date, recreating");
+            SwapchainResult swapchain_result = this->recreate(fn_table, device, window);
+            if (swapchain_result != SwapchainResult::Success)
+                return Result<u32, SwapchainResult>::err(std::move(swapchain_result));
+
+            return Result<u32, SwapchainResult>::err(SwapchainResult::SkipFrame);
+        } else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR) {
+            HC_ERROR("Failed to acquire swapchain image: " << to_str(res));
+            return Result<u32, SwapchainResult>::err(SwapchainResult::ImageAcquisitionFailure);
+        }
+
+        return Result<u32, SwapchainResult>::ok(std::move(index));
+    }
+
+    SwapchainResult Swapchain::recreate(const VolkDeviceTable &fn_table, VkDevice device, GLFWwindow *window) {
+        int width = 0, height = 0;
+        glfwGetFramebufferSize(window, &width, &height);
+
+        this->extent.width = static_cast<u32>(width);
+        this->extent.height = static_cast<u32>(height);
+
+        VkSwapchainCreateInfoKHR create_info = {};
+        create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        create_info.pNext = nullptr;
+        create_info.flags = 0;
+        create_info.surface = this->surface;
+        create_info.minImageCount = this->creation_params.image_count;
+        create_info.imageFormat = this->surface_format.format;
+        create_info.imageColorSpace = this->surface_format.colorSpace;
+        create_info.imageExtent = this->extent;
+        create_info.imageArrayLayers = 1;
+        create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+        u32 queue_families[2];
+        if (this->creation_params.graphics_queue_family == this->creation_params.present_queue_family) {
+            create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+            create_info.queueFamilyIndexCount = 0;
+            create_info.pQueueFamilyIndices = nullptr;
+        } else {
+            create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+            create_info.queueFamilyIndexCount = 2;
+            queue_families[0] = this->creation_params.graphics_queue_family;
+            queue_families[1] = this->creation_params.present_queue_family;
+            create_info.pQueueFamilyIndices = queue_families;
+        }
+
+        create_info.preTransform = this->creation_params.transform;
+        create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        create_info.presentMode = this->present_mode;
+        create_info.clipped = VK_TRUE;
+        create_info.oldSwapchain = this->inner.handle;
+
+        auto inner_res = create_inner_swapchain(fn_table, device, create_info);
+        if (!inner_res)
+            return SwapchainResult::CreationFailure;
+
+        this->old_swapchains.push(std::exchange(this->inner, std::move(inner_res).ok()));
+
+        return SwapchainResult::Success;
     }
 }

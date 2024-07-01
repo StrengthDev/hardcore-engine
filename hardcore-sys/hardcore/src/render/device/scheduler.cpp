@@ -7,7 +7,6 @@
 #include "scheduler.hpp"
 
 namespace hc::render::device {
-
     void Scheduler::select_queue_families(const std::vector<VkQueueFamilyProperties> &queue_families,
                                           std::vector<u32> &out_graphics_queue_families, u32 &out_compute_idx,
                                           u32 &out_transfer_idx) {

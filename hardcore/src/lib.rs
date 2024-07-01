@@ -53,12 +53,14 @@ use hardcore_sys::InitParams;
 
 use crate::event::Event;
 use crate::layer::{Context, Layer};
+use crate::native::vulkan_debug_callback;
 use crate::sync::{Mutex, RwLock};
 
 pub mod event;
 pub mod input;
 pub mod layer;
 mod native;
+pub mod resource;
 mod sync;
 pub mod window;
 
@@ -75,8 +77,9 @@ enum ThreadKind {
     Uninitialised,
     Main,
     Core,
-    Physics,
-    Networking,
+    // Audio,
+    // Physics,
+    // Networking,
     Worker,
 }
 
@@ -148,6 +151,7 @@ pub fn init(app: ApplicationDescriptor) -> Result<(), CoreError> {
 
     let render_params = hardcore_sys::RenderParams {
         max_frames_in_flight: 2,
+        debug_callback: Some(vulkan_debug_callback),
     };
 
     let params = InitParams {
@@ -330,6 +334,8 @@ pub fn push_layer(layer: impl Layer + 'static) -> Result<(), CoreError> {
         Err(CoreError::Uninitialised)
     }
 }
+
+// TODO change pop layer functionality to keep users from popping beyond the current layer
 
 /// Increment the number of layers to be popped in the next frame by 1.
 pub fn pop_layer() {

@@ -37,7 +37,7 @@ struct HCInitParams {
  *
  * This function must be called before any other library functions may be used.
  *
- * @param params the initialisation parameters.
+ * @param params The initialisation parameters.
  *
  * @return 0 on success, a negative code if an error occurs and a code larger than 0 on success, but with some
  * warning.
@@ -53,16 +53,6 @@ int hc_init(struct HCInitParams params);
  * warning.
  */
 int hc_term();
-
-#ifndef HC_HEADLESS
-/**
- * @brief Processes all pending window events.
- *
- * This function is meant to be called in a loop, once per frame, and MUST be called in non-headless configurations and
- * it MUST be from the main thread.
- */
-void hc_poll_events();
-#endif // HC_HEADLESS
 
 #ifdef __cplusplus
 }

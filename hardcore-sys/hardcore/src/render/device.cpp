@@ -146,8 +146,8 @@ namespace hc::render {
 
     void Device::tick(u8 frame_mod) {
         // Destroy objects marked for destruction that are no longer being used
-        auto &deletion_queue = this->cleanup_queues[frame_mod];
-        for (auto &mark: deletion_queue) {
+        auto &cleanup_queue = this->cleanup_queues[frame_mod];
+        for (auto &mark: cleanup_queue) {
             std::visit(device::DestructionMarkHandler{
                     [this](device::WindowDestructionMark window_mark) {
                         auto node = this->swapchains.extract(window_mark.window);
@@ -162,7 +162,16 @@ namespace hc::render {
                     },
             }, mark);
         }
-        deletion_queue.clear();
+        cleanup_queue.clear();
+
+        // Rendering and presentation
+        for (auto &[window, swapchain]: this->swapchains) {
+            auto res = swapchain.acquire_image(this->fn_table, this->handle, window, frame_mod);
+            if (!res)
+                continue;
+
+            u32 image_index = res.ok();
+        }
     }
 
     const char *Device::name() const noexcept {
@@ -260,18 +269,24 @@ namespace hc::render {
         }
 
         auto capabilities = surface_capabilities(this->physical_handle, surface);
-        if (!capabilities)
+        if (!capabilities) {
+            vkDestroySurfaceKHR(instance, surface, nullptr);
             return DeviceResult::VkFailure;
+        }
 
         std::vector<VkSurfaceFormat2KHR> formats = surface_formats(this->physical_handle, surface);
-        if (formats.empty())
+        if (formats.empty()) {
+            vkDestroySurfaceKHR(instance, surface, nullptr);
             return DeviceResult::SurfaceFailure;
+        }
 
         std::vector<VkPresentModeKHR> present_modes = surface_present_modes(this->physical_handle, surface);
-        if (present_modes.empty())
+        if (present_modes.empty()) {
+            vkDestroySurfaceKHR(instance, surface, nullptr);
             return DeviceResult::SurfaceFailure;
+        }
 
-        SurfaceInfo surface_info = {
+        device::SurfaceInfo surface_info = {
                 .capabilities = *capabilities,
                 .available_formats = std::move(formats),
                 .available_present_modes = std::move(present_modes),
@@ -280,7 +295,7 @@ namespace hc::render {
         int width = 0, height = 0;
         glfwGetFramebufferSize(window, &width, &height);
 
-        SwapchainParams params = {
+        device::SwapchainParams params = {
                 .graphics_queue = graphics_present_queues.first,
                 .present_queue = graphics_present_queues.second,
                 .extent = VkExtent2D{.width = static_cast<u32>(width), .height = static_cast<u32>(height)},
@@ -291,10 +306,10 @@ namespace hc::render {
                 },
         };
 
-        auto swapchain = Swapchain::create(this->fn_table, this->handle, std::move(surface), std::move(surface_info),
-                                           params);
+        auto swapchain = device::Swapchain::create(this->fn_table, this->handle, std::move(surface),
+                                                   std::move(surface_info), std::move(params));
         if (swapchain) {
-            this->swapchains.emplace(window, std::move(*swapchain));
+            this->swapchains.emplace(window, std::move(swapchain).ok());
             return DeviceResult::Success;
         } else {
             return DeviceResult::SwapchainFailure;

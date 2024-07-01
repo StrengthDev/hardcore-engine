@@ -60,11 +60,3 @@ int hc_term() {
 
     return 0;
 }
-
-#ifndef HC_HEADLESS
-
-void hc_poll_events() {
-    glfwPollEvents();
-}
-
-#endif // HC_HEADLESS
