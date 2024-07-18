@@ -1,0 +1,29 @@
+add_subdirectory(src)
+
+add_executable(${PROJECT_NAME} ${CLIENT_SOURCES})
+
+list(APPEND PROJECT_COMPILE_OPTIONS ${PLATFORM_COMPILE_OPTIONS})
+
+if(CMAKE_BUILD_TYPE MATCHES "Release")
+	if(MSVC)
+		list(APPEND PROJECT_LINK_OPTIONS ${PLATFORM_LINK_OPTIONS} "/SUBSYSTEM:windows" "/ENTRY:mainCRTStartup")
+	endif()
+elseif(CMAKE_BUILD_TYPE MATCHES "Debug")
+	list(APPEND PROJECT_LINK_OPTIONS ${PLATFORM_LINK_OPTIONS})
+else()
+endif()
+
+list(JOIN PROJECT_LINK_OPTIONS "," PROJECT_LINK_OPTIONS_STRING)
+
+target_include_directories(${PROJECT_NAME} PRIVATE "include")
+target_link_libraries(${PROJECT_NAME} ${ENGINE})
+target_compile_options(${PROJECT_NAME} PUBLIC ${PROJECT_COMPILE_OPTIONS})
+target_link_options(${PROJECT_NAME} PUBLIC "LINKER:${PROJECT_LINK_OPTIONS_STRING}")
+
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:${PROJECT_NAME}> $<TARGET_FILE_DIR:${PROJECT_NAME}>
+  COMMAND_EXPAND_LISTS
+)
+
+add_shader(${PROJECT_NAME} "shader.vert")
+add_shader(${PROJECT_NAME} "shader.frag")

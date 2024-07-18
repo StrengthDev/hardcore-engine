@@ -1,0 +1,30 @@
+add_subdirectory(src)
+
+if(MSVC)
+	set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+endif()
+
+add_library(${PROJECT_NAME} ${ENGINE_SOURCES})
+
+list(APPEND PROJECT_COMPILE_OPTIONS ${PLATFORM_COMPILE_OPTIONS})
+list(APPEND PROJECT_LINK_OPTIONS ${PLATFORM_LINK_OPTIONS})
+
+list(JOIN PROJECT_LINK_OPTIONS "," PROJECT_LINK_OPTIONS_STRING)
+
+target_include_directories(${PROJECT_NAME} PUBLIC "include" PRIVATE "include/hardcore" "src" ${GLFW_INCLUDE_DIRS} ${Vulkan_INCLUDE_DIRS} ${GLM_INCLUDE_DIRS})
+target_link_directories(${PROJECT_NAME} PRIVATE ${GLFW_LIBRARIES} ${Vulkan_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE glfw3 vulkan-1 shaderc_combined spirv-cross-core)
+target_compile_options(${PROJECT_NAME} PRIVATE ${PROJECT_COMPILE_OPTIONS})
+target_link_options(${PROJECT_NAME} PRIVATE "LINKER:${PROJECT_LINK_OPTIONS_STRING}")
+target_precompile_headers(${PROJECT_NAME} PRIVATE "src/pch.hpp")
+target_compile_definitions(${PROJECT_NAME} PRIVATE ENGINE_BUILD)
+
+install(TARGETS ${PROJECT_NAME}
+LIBRARY DESTINATION "${PROJECT_NAME}/lib"
+ARCHIVE DESTINATION "${PROJECT_NAME}/lib"
+RUNTIME DESTINATION "${PROJECT_NAME}/bin"
+)
+
+install(DIRECTORY "include" DESTINATION "${PROJECT_NAME}/include")
+
+set(ENGINE ${PROJECT_NAME} PARENT_SCOPE)
