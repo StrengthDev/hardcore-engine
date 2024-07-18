@@ -71,7 +71,7 @@ namespace hc::render::device {
          * This function MUST be called before `record`.
          * If the logical flow of the graph is unsound, an error is returned.
          *
-         * @return GraphResult::Success on if the graph was successfully compiled, otherwise an appropriate error value.
+         * @return GraphResult::Success if the graph was successfully compiled, otherwise an appropriate error value.
          */
         GraphResult compile();
 

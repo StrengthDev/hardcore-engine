@@ -147,8 +147,8 @@ namespace hc::render {
 
     VkResult create_instance(const HCApplicationDescriptor &app, const std::vector<const char *> &layers) {
         HC_INFO("Initialising Vulkan instance..");
-        HC_INFO("Engine: Hardcore " << HC_MAJOR << '.' << HC_MINOR << '.' << HC_PATCH);
-        HC_INFO("Application: " << app.name << ' ' << app.major << '.' << app.minor << '.' << app.patch);
+        HC_INFO("Engine: Hardcore v" << HC_MAJOR << '.' << HC_MINOR << '.' << HC_PATCH);
+        HC_INFO("Application: " << app.name << " v" << app.major << '.' << app.minor << '.' << app.patch);
 
         VkApplicationInfo app_info = {};
         app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;

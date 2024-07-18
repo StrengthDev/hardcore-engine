@@ -35,6 +35,12 @@ namespace hc::render::device {
         [[nodiscard]] std::pair<u32, u32>
         present_support(const VkPhysicalDevice &physical_handle, const VkSurfaceKHR &surface) const;
 
+        [[nodiscard]] inline u32 graphics_queue_family() const noexcept { return this->graphics_queue_families[0]; }
+
+        [[nodiscard]] inline u32 compute_queue_family() const noexcept { return this->compute_family; }
+
+        [[nodiscard]] inline u32 transfer_queue_family() const noexcept { return this->transfer_family; }
+
     private:
         std::vector<VkQueueFamilyProperties> queue_families; //!< The properties of a device's queue families.
 

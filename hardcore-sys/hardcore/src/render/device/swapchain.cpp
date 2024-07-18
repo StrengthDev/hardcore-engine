@@ -151,10 +151,8 @@ namespace hc::render::device {
     }
 
     Swapchain::~Swapchain() {
-        if (this->inner.handle != VK_NULL_HANDLE) {
-            HC_ERROR("Destructor called on un-destroyed swapchain");
-            HC_ASSERT(false, "Must call Swapchain::destroy beforehand");
-        }
+        HC_ASSERT(this->inner.handle == VK_NULL_HANDLE,
+                  "Must call Swapchain::destroy before Swapchain object is destroyed");
     }
 
     Swapchain::Swapchain(Swapchain &&other) noexcept:
@@ -171,10 +169,7 @@ namespace hc::render::device {
             old_swapchains(std::move(other.old_swapchains)) {}
 
     Swapchain &Swapchain::operator=(Swapchain &&other) noexcept {
-        if (this->inner.handle != VK_NULL_HANDLE) {
-            HC_ERROR("Move assignment called on un-destroyed swapchain");
-            HC_ASSERT(false, "Must call Swapchain::destroy beforehand");
-        }
+        HC_ASSERT(this->inner.handle == VK_NULL_HANDLE, "Must call Swapchain::destroy before move assignment");
 
         this->inner = std::exchange(other.inner, {.handle = VK_NULL_HANDLE});
         this->surface = std::exchange(other.surface, VK_NULL_HANDLE);

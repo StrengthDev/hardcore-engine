@@ -11,7 +11,7 @@
 
 #ifdef NDEBUG
 
-#define HC_ASSERT(condition, expected)
+#define HC_ASSERT(condition, expected) [[assumme(condition)]]
 
 #else
 
@@ -47,6 +47,14 @@
 #define HC_DEBUGBREAK
 #endif
 
+/**
+ * @brief Make an assertion.
+ *
+ * On builds where NDEBUG is defined, instead of asserting the condition expression, it turned into an [[assume]] clause.
+ *
+ * @param condition The boolean expression to be asserted.
+ * @param expected The message given if the assertion fails
+ */
 #define HC_ASSERT(condition, expected)                                                                              \
 if (!(condition)) {                                                                                                 \
     HC_ERROR(__FILE__ "(" HC_STRING(__LINE__) "): Assertion \"" HC_STRING(condition) "\" has failed: " expected);   \
@@ -55,6 +63,20 @@ if (!(condition)) {                                                             
 }(0)
 
 #endif // NDEBUG
+
+/**
+ * @brief Mark unreachable code path.
+ *
+ * If execution goes through this path, the program will immediately abort.
+ *
+ * @param message Reason why the code path is not reachable.
+ */
+#define HC_UNREACHABLE(message)                                                           \
+{                                                                                         \
+    HC_ERROR(__FILE__ "(" HC_STRING(__LINE__) "): Entered unreachable code: " message);   \
+    HC_DEBUGBREAK;                                                                        \
+    std::abort();                                                                         \
+}(0)
 
 typedef std::uint8_t u8; //!< Short alias for a 8 bit unsigned integer.
 typedef std::uint16_t u16; //!< Short alias for a 16 bit unsigned integer.
@@ -195,6 +217,70 @@ static constexpr std::array<u8, reversed_bytes_size> reversed_bytes{[]() constex
 }()};
 
 /**
+ * @brief Helper struct that keeps the compiler from immediately evaluating static asserts.
+ *
+ * @tparam T Any function or struct template parameter.
+ */
+template<Sz T>
+struct InstantiatedFalse : std::false_type {
+};
+
+/**
+ * @brief Reverse the bits of an arbitrarily sized byte array.
+ *
+ * While specializations may implement any arbitrary size, this function is meant to be used only by `reverse_bits`,
+ * and may not im implemented for sizes irrelevant to that function.
+ *
+ * @tparam N Size of the array.
+ * @param bytes The array to be reversed.
+ */
+template<Sz N>
+constexpr void reverse_byte_array([[maybe_unused]] std::array<u8, N> &bytes) noexcept {
+    static_assert(InstantiatedFalse<N>::value, "Impossible number byte size");
+}
+
+template<>
+[[maybe_unused]] constexpr void reverse_byte_array<1>(std::array<u8, 1> &bytes) noexcept {
+    bytes[0] = reversed_bytes[bytes[0]];
+}
+
+template<>
+[[maybe_unused]] constexpr void reverse_byte_array<2>(std::array<u8, 2> &bytes) noexcept {
+    u8 tmp;
+    tmp = reversed_bytes[bytes[0]];
+    bytes[0] = reversed_bytes[bytes[1]];
+    bytes[1] = tmp;
+}
+
+template<>
+[[maybe_unused]] constexpr void reverse_byte_array<4>(std::array<u8, 4> &bytes) noexcept {
+    u8 tmp;
+    tmp = reversed_bytes[bytes[0]];
+    bytes[0] = reversed_bytes[bytes[3]];
+    bytes[3] = tmp;
+    tmp = reversed_bytes[bytes[1]];
+    bytes[1] = reversed_bytes[bytes[2]];
+    bytes[2] = tmp;
+}
+
+template<>
+[[maybe_unused]] constexpr void reverse_byte_array<8>(std::array<u8, 8> &bytes) noexcept {
+    u8 tmp;
+    tmp = reversed_bytes[bytes[0]];
+    bytes[0] = reversed_bytes[bytes[7]];
+    bytes[7] = tmp;
+    tmp = reversed_bytes[bytes[1]];
+    bytes[1] = reversed_bytes[bytes[6]];
+    bytes[6] = tmp;
+    tmp = reversed_bytes[bytes[2]];
+    bytes[2] = reversed_bytes[bytes[5]];
+    bytes[5] = tmp;
+    tmp = reversed_bytes[bytes[3]];
+    bytes[3] = reversed_bytes[bytes[4]];
+    bytes[4] = tmp;
+}
+
+/**
  * @brief Reverse the order of bits in an integral number.
  *
  * @tparam T The integral type of the input and output.
@@ -204,37 +290,6 @@ static constexpr std::array<u8, reversed_bytes_size> reversed_bytes{[]() constex
 template<Integral T>
 constexpr T reverse_bits(T number) noexcept {
     auto bytes = std::bit_cast<std::array<u8, sizeof(T)>>(number);
-    u8 tmp;
-
-    if constexpr (bytes.size() == 1) {
-        bytes[0] = reversed_bytes[bytes[0]];
-    } else if constexpr (bytes.size() == 2) {
-        tmp = reversed_bytes[bytes[0]];
-        bytes[0] = reversed_bytes[bytes[1]];
-        bytes[1] = tmp;
-    } else if constexpr (bytes.size() == 4) {
-        tmp = reversed_bytes[bytes[0]];
-        bytes[0] = reversed_bytes[bytes[3]];
-        bytes[3] = tmp;
-        tmp = reversed_bytes[bytes[1]];
-        bytes[1] = reversed_bytes[bytes[2]];
-        bytes[2] = tmp;
-    } else if constexpr (bytes.size() == 8) {
-        tmp = reversed_bytes[bytes[0]];
-        bytes[0] = reversed_bytes[bytes[7]];
-        bytes[7] = tmp;
-        tmp = reversed_bytes[bytes[1]];
-        bytes[1] = reversed_bytes[bytes[6]];
-        bytes[6] = tmp;
-        tmp = reversed_bytes[bytes[2]];
-        bytes[2] = reversed_bytes[bytes[5]];
-        bytes[5] = tmp;
-        tmp = reversed_bytes[bytes[3]];
-        bytes[3] = reversed_bytes[bytes[4]];
-        bytes[4] = tmp;
-    } else {
-        static_assert(false, "Impossible number byte size");
-    }
-
+    reverse_byte_array(bytes);
     return std::bit_cast<T>(bytes);
 }

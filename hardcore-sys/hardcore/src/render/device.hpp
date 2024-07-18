@@ -9,6 +9,7 @@
 #include <GLFW/glfw3.h>
 
 #include "device/scheduler.hpp"
+#include "device/graph.hpp"
 #include "device/destruction_mark.hpp"
 #include "device/swapchain.hpp"
 
@@ -51,6 +52,7 @@ namespace hc::render {
         VkPhysicalDeviceProperties properties = {};
         VkPhysicalDeviceFeatures features = {};
         device::Scheduler scheduler;
+        device::Graph graph;
         std::unordered_map<GLFWwindow *, device::Swapchain> swapchains;
 
         std::vector<std::vector<device::DestructionMark>> cleanup_queues;

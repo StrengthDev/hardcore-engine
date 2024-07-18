@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bitset>
 #include <iostream>
 #include <limits>
 #include <queue>

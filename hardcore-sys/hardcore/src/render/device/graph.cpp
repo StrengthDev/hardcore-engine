@@ -135,7 +135,7 @@ namespace hc::render::device {
                                  << " unused operations within the device graph");
         }
 
-        return std::pair(output_dependencies, root_nodes);
+        return {output_dependencies, root_nodes};
     }
 
     GraphResult Graph::compile() {

@@ -16,63 +16,57 @@ namespace hc::render::device {
         u32 transfer_score = 0;
 
         for (u32 i = 0; i < queue_families.size(); i++) {
-            if (queue_families[i].queueCount) {
-                if (queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-                    // Graphics queue is selected at runtime, depending on target surfaces
-                    out_graphics_queue_families.push_back(i);
-                }
+            // Does this even happen?
+            if (!queue_families[i].queueCount)
+                continue;
 
-                if (compute_score < 1 && (queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT)) {
-                    compute_idx = i;
-                    compute_score = 1;
-                }
-
-                if (compute_score < 2 && (queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT) &&
-                    !(queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
-                    // Async compute queue is optimal
-                    compute_idx = i;
-                    compute_score = 2;
-                }
-
-                if (transfer_score < 1 && (queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT)) {
-                    transfer_idx = i;
-                    transfer_score = 1;
-                }
-
-                if (transfer_score < 2 && (queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT) &&
-                    !(queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
-                    transfer_idx = i;
-                    transfer_score = 2;
-                }
-
-                if (transfer_score < 3 && (queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT) &&
-                    !(queue_families[i].queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT))) {
-                    // Async transfer is optimal
-                    transfer_idx = i;
-                    transfer_score = 3;
-                }
-
-                HC_TRACE(
-                        "Queue family " << i << " properties:\tCount: " << queue_families[i].queueCount << "\tFlags: "
-                                        //<< '(' << std::bitset<sizeof(VkQueueFlags) * 8>(queue_families[i].queueFlags) << ") => "
-                                        << (queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT
-                                            ? "GRAPHICS | " : "")
-                                        << (queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT
-                                            ? "COMPUTE | " : "")
-                                        << (queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT
-                                            ? "TRANSFER | " : "")
-                                        << (queue_families[i].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT
-                                            ? "SPARSE_BINDING | " : "")
-                                        << (queue_families[i].queueFlags & VK_QUEUE_PROTECTED_BIT
-                                            ? "PROTECTED | " : "")
-                                        << (queue_families[i].queueFlags & VK_QUEUE_VIDEO_DECODE_BIT_KHR
-                                            ? "VIDEO_DECODE | " : "")
-                                        << (queue_families[i].queueFlags & VK_QUEUE_VIDEO_ENCODE_BIT_KHR
-                                            ? "VIDEO_ENCODE | " : "")
-                                        << (queue_families[i].queueFlags & VK_QUEUE_OPTICAL_FLOW_BIT_NV
-                                            ? "OPTICAL_FLOW | " : "")
-                                        << (queue_families[i].queueFlags ? "\b\b  " : ""));
+            if (queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+                // Graphics queue is selected at runtime, depending on target surfaces
+                out_graphics_queue_families.push_back(i);
             }
+
+            if (compute_score < 1 && (queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT)) {
+                compute_idx = i;
+                compute_score = 1;
+            }
+
+            if (compute_score < 2 && (queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT) &&
+                !(queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
+                // Async compute queue is optimal
+                compute_idx = i;
+                compute_score = 2;
+            }
+
+            if (transfer_score < 1 && (queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT)) {
+                transfer_idx = i;
+                transfer_score = 1;
+            }
+
+            if (transfer_score < 2 && (queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT) &&
+                !(queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
+                transfer_idx = i;
+                transfer_score = 2;
+            }
+
+            if (transfer_score < 3 && (queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT) &&
+                !(queue_families[i].queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT))) {
+                // Async transfer is optimal for host<->device transfers
+                transfer_idx = i;
+                transfer_score = 3;
+            }
+
+            HC_TRACE("Queue family "
+                             << i << " properties:\tCount: " << queue_families[i].queueCount << "\tFlags: "
+                             //<< '(' << std::bitset<sizeof(VkQueueFlags) * 8>(queue_families[i].queueFlags) << ") => "
+                             << (queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT ? "GRAPHICS | " : "")
+                             << (queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT ? "COMPUTE | " : "")
+                             << (queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT ? "TRANSFER | " : "")
+                             << (queue_families[i].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT ? "SPARSE_BINDING | " : "")
+                             << (queue_families[i].queueFlags & VK_QUEUE_PROTECTED_BIT ? "PROTECTED | " : "")
+                             << (queue_families[i].queueFlags & VK_QUEUE_VIDEO_DECODE_BIT_KHR ? "VIDEO_DECODE | " : "")
+                             << (queue_families[i].queueFlags & VK_QUEUE_VIDEO_ENCODE_BIT_KHR ? "VIDEO_ENCODE | " : "")
+                             << (queue_families[i].queueFlags & VK_QUEUE_OPTICAL_FLOW_BIT_NV ? "OPTICAL_FLOW | " : "")
+                             << (queue_families[i].queueFlags ? "\b\b  " : "NONE"));
         }
 
         out_compute_idx = compute_idx;
@@ -156,7 +150,7 @@ namespace hc::render::device {
             }
             if (supported == VK_TRUE) {
                 if (this->queue_families[this->queues[i].first].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-                    return std::pair(i, i);
+                    return {i, i};
                 } else if (found == std::numeric_limits<u32>::max()) {
                     found = i;
                 }
@@ -164,9 +158,9 @@ namespace hc::render::device {
         }
 
         if (this->graphics_queue_families.empty()) {
-            return std::pair(std::numeric_limits<u32>::max(), found);
+            return {std::numeric_limits<u32>::max(), found};
         } else {
-            return std::pair(this->graphics_queue_families[0], found);
+            return {this->graphics_queue_families[0], found};
         }
     }
 }

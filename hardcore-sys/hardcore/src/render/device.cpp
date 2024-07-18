@@ -98,6 +98,10 @@ namespace hc::render {
         }
         device.scheduler = std::move(*scheduler);
 
+        device.graph = device::Graph::create(device.scheduler.graphics_queue_family(),
+                                             device.scheduler.compute_queue_family(),
+                                             device.scheduler.transfer_queue_family());
+
         device.physical_handle = physical_handle;
         device.handle = handle;
         device.cleanup_queues = std::vector<std::vector<device::DestructionMark>>(max_frames_in_flight());
@@ -164,14 +168,19 @@ namespace hc::render {
         }
         cleanup_queue.clear();
 
-        // Rendering and presentation
-        for (auto &[window, swapchain]: this->swapchains) {
-            auto res = swapchain.acquire_image(this->fn_table, this->handle, window, frame_mod);
-            if (!res)
-                continue;
+        device::GraphResult graph_res = this->graph.compile();
+        HC_ASSERT(graph_res == device::GraphResult::Success, "Graph compilation should always succeed");
 
-            u32 image_index = res.ok();
-        }
+        // Rendering and presentation
+//        for (auto &[window, swapchain]: this->swapchains) {
+//            auto res = swapchain.acquire_image(this->fn_table, this->handle, window, frame_mod);
+//            if (!res)
+//                continue;
+//
+//            u32 image_index = res.ok();
+//        }
+
+//        this->graph.record();
     }
 
     const char *Device::name() const noexcept {
@@ -213,7 +222,7 @@ namespace hc::render {
                                                              nullptr);
         if (res != VK_SUCCESS) {
             HC_ERROR("Failed to query surface formats: " << to_str(res));
-            return std::vector<VkSurfaceFormat2KHR>();
+            return {};
         }
         std::vector<VkSurfaceFormat2KHR> formats(format_count);
         for (auto &format: formats) {
@@ -223,7 +232,7 @@ namespace hc::render {
                                                     formats.data());
         if (res != VK_SUCCESS) {
             HC_ERROR("Failed to query surface formats: " << to_str(res));
-            return std::vector<VkSurfaceFormat2KHR>();
+            return {};
         }
 
         return formats;
@@ -234,14 +243,14 @@ namespace hc::render {
         VkResult res = vkGetPhysicalDeviceSurfacePresentModesKHR(physical_handle, surface, &mode_count, nullptr);
         if (res != VK_SUCCESS) {
             HC_ERROR("Failed to query surface display modes: " << to_str(res));
-            return std::vector<VkPresentModeKHR>();
+            return {};
         }
         std::vector<VkPresentModeKHR> present_modes(mode_count);
         res = vkGetPhysicalDeviceSurfacePresentModesKHR(physical_handle, surface, &mode_count,
                                                         present_modes.data());
         if (res != VK_SUCCESS) {
             HC_ERROR("Failed to query surface display modes: " << to_str(res));
-            return std::vector<VkPresentModeKHR>();
+            return {};
         }
 
         // The specification requires that this present mode is supported, if the surface is supported
