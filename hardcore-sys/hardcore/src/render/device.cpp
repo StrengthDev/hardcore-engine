@@ -332,4 +332,39 @@ namespace hc::render {
         };
         this->cleanup_queues[frame_mod].emplace_back(mark);
     }
+
+    Result<HCBuffer, DeviceResult> Device::new_buffer(HCBufferKind kind, resource::Descriptor &&descriptor, u64 count,
+                                                      bool writable) {
+        HC_ASSERT(kind != HCBufferKind::Index, "`new_index_buffer` should be used to create index buffers");
+        HC_ASSERT(count, "Must have something to allocate");
+        return Result<HCBuffer, DeviceResult>();
+    }
+
+    Result<HCBuffer, DeviceResult> Device::new_index_buffer(HCPrimitive index_type, u64 count, bool writable) {
+        HC_ASSERT(count, "Must have something to allocate");
+        return Result<HCBuffer, DeviceResult>();
+    }
+
+    void Device::destroy_buffer(const HCBuffer &buffer, u8 frame_mod) {
+
+    }
+
+    Result<HCDynamicBuffer, DeviceResult> Device::new_dynamic_buffer(HCBufferKind kind,
+                                                                     resource::Descriptor &&descriptor, u64 count,
+                                                                     bool writable) {
+        HC_ASSERT(kind != HCBufferKind::Index,
+                  "`new_dynamic_index_buffer` should be used to create dynamic index buffers");
+        HC_ASSERT(count, "Must have something to allocate");
+        return Result<HCDynamicBuffer, DeviceResult>();
+    }
+
+    Result<HCDynamicBuffer, DeviceResult> Device::new_dynamic_index_buffer(HCPrimitive index_type, u64 count,
+                                                                           bool writable) {
+        HC_ASSERT(count, "Must have something to allocate");
+        return Result<HCDynamicBuffer, DeviceResult>();
+    }
+
+    void Device::destroy_dynamic_buffer(const HCDynamicBuffer &buffer, u8 frame_mod) {
+
+    }
 }

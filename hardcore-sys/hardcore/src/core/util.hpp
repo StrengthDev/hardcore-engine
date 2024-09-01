@@ -13,6 +13,8 @@
 
 #define HC_ASSERT(condition, expected) [[assumme(condition)]]
 
+#define HC_UNREACHABLE(message) std::unreachable()
+
 #else
 
 #include <cstdlib>
@@ -62,8 +64,6 @@ if (!(condition)) {                                                             
     std::abort();                                                                                                   \
 }(0)
 
-#endif // NDEBUG
-
 /**
  * @brief Mark unreachable code path.
  *
@@ -78,6 +78,12 @@ if (!(condition)) {                                                             
     std::abort();                                                                         \
 }(0)
 
+#endif // NDEBUG
+
+#define KIBIBYTES(value) ((value) << 10)
+#define MEBIBYTES(value) (KIBIBYTES(value) << 10)
+#define GIBIBYTES(value) (MEBIBYTES(value) << 10)
+
 typedef std::uint8_t u8; //!< Short alias for a 8 bit unsigned integer.
 typedef std::uint16_t u16; //!< Short alias for a 16 bit unsigned integer.
 typedef std::uint32_t u32; //!< Short alias for a 32 bit unsigned integer.
@@ -89,6 +95,101 @@ typedef std::int32_t i32; //!< Short alias for a 32 bit integer.
 typedef std::int64_t i64; //!< Short alias for a 64 bit integer.
 
 typedef std::size_t Sz; //!< Short alias for the standard size type. (`std::size_t`)
+
+/**
+ * @brief An uncopyable value.
+ *
+ * The inner value of this object may only be moved from one instance to another.
+ * When a move occurs, the object that got moved from is assigned the specified default value.
+ *
+ * @tparam T The type of the inner value.
+ * @tparam DEFAULT The default value assigned by the default constructor, move constructor and move assignment.
+ */
+template<typename T, T DEFAULT>
+class Uncopyable {
+public:
+    Uncopyable() = default;
+
+    /**
+     * @brief Implicit value constructor.
+     *
+     * @param value The value to assign to this uncopyable variable.
+     */
+    Uncopyable(const T &value) : value(value) {} // NOLINT intentionally implicit
+
+    Uncopyable(const Uncopyable &) = delete;
+
+    Uncopyable &operator=(const Uncopyable &) = delete;
+
+    Uncopyable(Uncopyable &&other) noexcept: value(std::exchange(other.value, DEFAULT)) {}
+
+    Uncopyable &operator=(Uncopyable &&other) noexcept {
+        this->value = std::exchange(other.value, DEFAULT);
+    }
+
+    operator T() const { return value; } // NOLINT intentionally implicit
+
+    operator T &() { return value; } // NOLINT intentionally implicit
+
+private:
+    T value = DEFAULT;
+};
+
+/**
+ * @brief A value which cannot be copied and cannot be moved into a value that has already been assigned.
+ *
+ * Similar to an `Uncopyable`.
+ * The inner value of this object may only be moved from one instance to another.
+ * When a move occurs, the object that got moved from is assigned the specified default value.
+ *
+ * Unlike an `Uncopyable` when moving into a value that has already been assigned, the program SHOULD crash. "Should"
+ * because this type is only used internally, any related errors should be easily caught in debug builds.
+ *
+ * @tparam T The type of the inner value.
+ * @tparam DEFAULT The default value assigned by the default constructor, move constructor and move assignment.
+ */
+template<typename T, T DEFAULT>
+class ExternalHandle {
+public:
+    ExternalHandle() = default;
+
+    /**
+     * @brief Implicit value constructor.
+     *
+     * @param value The value to assign to this external handle.
+     */
+    ExternalHandle(const T &value) : value(value) {} // NOLINT intentionally implicit
+
+    ~ExternalHandle() {
+        HC_ASSERT(this->value == DEFAULT, "Inner value must be externally cleaned up");
+    }
+
+    ExternalHandle(const ExternalHandle &) = delete;
+
+    ExternalHandle &operator=(const ExternalHandle &) = delete;
+
+    ExternalHandle(ExternalHandle &&other) noexcept: value(std::exchange(other.value, DEFAULT)) {}
+
+    ExternalHandle &operator=(ExternalHandle &&other) noexcept {
+        HC_ASSERT(this->value == DEFAULT, "Inner value cannot be overwritten if already assigned");
+        this->value = std::exchange(other.value, DEFAULT);
+        return *this;
+    }
+
+    operator T() const { return value; } // NOLINT intentionally implicit
+
+    operator T &() { return value; } // NOLINT intentionally implicit
+
+    /**
+     * @brief "Destroy" this handle by setting it to the default value.
+     */
+    void destroy() {
+        this->value = DEFAULT;
+    }
+
+private:
+    T value = DEFAULT;
+};
 
 /**
  * @brief A class representing the result of some operation, typically returned by functions.
@@ -191,6 +292,24 @@ private:
     std::variant<Ok, Error> value; //!< The inner result value.
 };
 
+/**
+ * @brief Helper struct that keeps the compiler from immediately evaluating static asserts.
+ *
+ * @tparam T Any function or struct template parameter.
+ */
+template<typename T>
+struct InstantiatedFalse : std::false_type {
+};
+
+/**
+ * @brief Helper struct that keeps the compiler from immediately evaluating static asserts.
+ *
+ * @tparam T A size value.
+ */
+template<Sz T>
+struct InstantiatedSizeFalse : std::false_type {
+};
+
 template<class T>
 concept Integral = std::is_integral<T>::value; //!< An integral number type.
 
@@ -217,15 +336,6 @@ static constexpr std::array<u8, reversed_bytes_size> reversed_bytes{[]() constex
 }()};
 
 /**
- * @brief Helper struct that keeps the compiler from immediately evaluating static asserts.
- *
- * @tparam T Any function or struct template parameter.
- */
-template<Sz T>
-struct InstantiatedFalse : std::false_type {
-};
-
-/**
  * @brief Reverse the bits of an arbitrarily sized byte array.
  *
  * While specializations may implement any arbitrary size, this function is meant to be used only by `reverse_bits`,
@@ -236,7 +346,7 @@ struct InstantiatedFalse : std::false_type {
  */
 template<Sz N>
 constexpr void reverse_byte_array([[maybe_unused]] std::array<u8, N> &bytes) noexcept {
-    static_assert(InstantiatedFalse<N>::value, "Impossible number byte size");
+    static_assert(InstantiatedSizeFalse<N>::value, "Impossible number byte size");
 }
 
 template<>

@@ -4,218 +4,105 @@
 
 #include "resource_pool.hpp"
 
-namespace hc::device::memory {
-    const u32 INITIAL_POOL_SLOT_SIZE = 16;
+namespace hc::render::device::memory {
+    Result<BufferPool, PoolResult> BufferPool::create(const VolkDeviceTable &fn_table, VkDevice device,
+                                                      hc::render::device::memory::HeapManager &heap_manager,
+                                                      VkDeviceSize size, VkBufferUsageFlags usage) {
+        VkDeviceMemory memory = VK_NULL_HANDLE;
+        VkBuffer buffer = VK_NULL_HANDLE;
 
-    resource_pool::resource_pool(VkDeviceSize size, bool per_frame_allocation) :
-            capacity(size), slots(INITIAL_POOL_SLOT_SIZE) {
-        this->slots[0].in_use = false;
-        this->slots[0].offset = 0;
-        this->slots[0].size = size;
-        this->largest_free_slot = 0;
+        HeapResult res = heap_manager.alloc_buffer(fn_table, device, memory, buffer, size, usage, Heap::Main);
 
-        for (u32 i = 1; i < this->slots.size(); i++) {
-            this->slots[i].in_use = false;
-            this->slots[i].offset = size;
-            this->slots[i].size = 0;
+        switch (res) {
+            case HeapResult::Success:
+                // Nothing, keep going
+                break;
+            case HeapResult::OutOfHostMemory:
+                return Result<BufferPool, PoolResult>::err(PoolResult::OutOfHostMemory);
+            case HeapResult::OutOfDeviceMemory:
+                return Result<BufferPool, PoolResult>::err(PoolResult::OutOfDeviceMemory);
+            case HeapResult::UnsupportedHeap:
+                return Result<BufferPool, PoolResult>::err(PoolResult::UnsupportedHeap);
+                // These are both ignored because a specific address is never requested, and no external handle is used
+                // case HeapResult::InvalidCapture:
+                // case HeapResult::InvalidHandle:
+            default: HC_UNREACHABLE("alloc_buffer should not return any other values here");
         }
 
-        this->per_frame_allocation = per_frame_allocation;
+        BufferPool pool = BufferPool(memory, size, false);
+        pool.buffer = buffer;
+
+        return Result<BufferPool, PoolResult>::ok(std::move(pool));
     }
 
-    resource_pool::~resource_pool() {
-        HC_ASSERT(this->memory == VK_NULL_HANDLE, "Resource pool not freed");
-    }
-
-    void
-    resource_pool::free_memory(const VolkDeviceTable &fn_table, VkDevice device, HeapManager &heap_manager) noexcept {
-        if (this->memory != VK_NULL_HANDLE) {
-            heap_manager.free(fn_table, device, this->memory);
-            this->slots.clear();
-        }
-    }
-
-    // TODO could try making allocations more efficient my reducing the size of the alignment padding
-    bool resource_pool::search(VkDeviceSize size, VkDeviceSize alignment,
-                               u32 &out_slot_idx, VkDeviceSize &out_size_needed, VkDeviceSize &out_offset) const {
-        if (this->capacity < size)
-            return false;
-
-        constexpr u32 invalid_idx = std::numeric_limits<u32>::max();
-
-        if (this->slots[this->largest_free_slot].in_use) {
-            // Largest free slot is unknown, must check everything, look for smallest possible fit
-            // if possible, update the largest free slot to reduce cost of future calls
-
-            VkDeviceSize largest_fit = 0;
-            u32 largest_idx = invalid_idx;
-            VkDeviceSize smallest_fit = std::numeric_limits<VkDeviceSize>::max();
-            u32 smallest_idx = invalid_idx;
-            VkDeviceSize smallest_offset = 0;
-
-            VkDeviceSize offset = 0;
-            for (u32 i = 0; i < this->slots.size(); i++) {
-                offset += this->slots[i].offset;
-
-                if (this->slots[i].in_use)
-                    continue;
-
-                if (largest_fit < this->slots[i].size) {
-                    largest_fit = this->slots[i].size;
-                    largest_idx = i;
-                }
-
-                if (smallest_fit > this->slots[i].size &&
-                    size + alignment_pad(this->slots[i].offset, alignment) <= this->slots[i].size) {
-                    smallest_fit = this->slots[i].size;
-                    smallest_idx = i;
-                    smallest_offset = offset;
-                }
-            }
-
-            if (smallest_idx != invalid_idx) {
-                if (largest_idx != invalid_idx && largest_idx != smallest_idx)
-                    this->largest_free_slot = largest_idx;
-
-                out_slot_idx = smallest_idx;
-                out_size_needed = size + alignment_pad(this->slots[smallest_idx].offset, alignment);
-                out_offset = smallest_offset;
-                return true;
-            } else {
-                if (largest_idx != invalid_idx)
-                    this->largest_free_slot = largest_idx;
-
-                return false;
-            }
-        } else {
-            // Largest free slot is known, so if it is large enough, assign a slot in this pool,
-            // otherwise move on to next pool
-
-            if (this->slots[this->largest_free_slot].size < size)
-                return false;
-
-            VkDeviceSize smallest_fit = std::numeric_limits<VkDeviceSize>::max();
-            u32 smallest_idx = invalid_idx;
-            VkDeviceSize smallest_offset = 0;
-
-            VkDeviceSize offset = 0;
-            for (u32 i = 0; i < this->slots.size(); i++) {
-                offset += this->slots[i].offset;
-
-                if (!this->slots[i].in_use && smallest_fit > this->slots[i].size &&
-                    size + alignment_pad(this->slots[i].offset, alignment) <= this->slots[i].size) {
-                    smallest_fit = this->slots[i].size;
-                    smallest_idx = i;
-                    smallest_offset = offset;
-                }
-            }
-
-            out_slot_idx = smallest_idx;
-            out_size_needed = size + alignment_pad(this->slots[smallest_idx].offset, alignment);
-            out_offset = smallest_offset;
-            return true;
-        }
-    }
-
-    void resource_pool::fill_slot(u32 slot_idx, VkDeviceSize size) {
-        HC_ASSERT(slot_idx < this->slots.size(), "Slot index out of bounds");
-        HC_ASSERT(size <= this->slots[slot_idx].size, "Allocation size greater than slot size");
-        HC_ASSERT((slot_idx == 0) | this->slots[slot_idx - 1].in_use, "Slot before a selected slot must be in use.");
-
-        if (size < this->slots[slot_idx].size) {
-            const u32 old_size = this->slots.size();
-            bool selected_last = slot_idx == (this->slots.size() - 1);
-
-            // Resize needed
-            if (selected_last ||
-                (this->slots[slot_idx + 1].in_use && this->slots[this->slots.size() - 1].in_use)) {
-                push_back_empty();
-                this->slots[old_size].in_use = false;
-                this->slots[old_size].offset = this->slots[old_size - 1].offset + this->slots[old_size - 1].size;
-                this->slots[old_size].size = 0;
-            }
-
-            HC_ASSERT(this->slots[slot_idx + 1].in_use || !this->slots[slot_idx + 1].size,
-                      "Slot after the selected slot must be either empty or in use");
-
-            // Shift remaining slots one position and add new slot with the remaining unused memory
-            if (this->slots[slot_idx + 1].in_use) {
-                u32 last_in_use = 0;
-                for (u32 i = old_size - 1; i > slot_idx; i--) {
-                    if (this->slots[i].in_use) {
-                        last_in_use = i;
-                        break;
-                    }
-                }
-                move_slots(slot_idx + 2, slot_idx + 1, last_in_use - slot_idx);
-            }
-
-            this->slots[slot_idx + 1].in_use = false;
-            this->slots[slot_idx + 1].offset = this->slots[slot_idx].offset + size;
-            this->slots[slot_idx + 1].size = this->slots[slot_idx].size - size;
-        }
-
-        this->slots[slot_idx].in_use = true;
-        this->slots[slot_idx].size = size;
-    }
-
-    u32 resource_pool::find_slot(VkDeviceSize offset) const noexcept {
-        VkDeviceSize total_offset = 0;
-        u32 i = 0;
-        for (; i < this->slots.size() && total_offset < offset; i++)
-            total_offset += this->slots[i].offset;
-
-        if (total_offset == offset)
-            return i;
-        else
-            return std::numeric_limits<u32>::max();
-    }
-
-    buffer_pool::buffer_pool(VkDevice device, HeapManager &heap_manager,
-                             VkDeviceSize size, VkBufferUsageFlags usage, Heap heap,
-                             bool per_frame_allocation) :
-            resource_pool(size, per_frame_allocation) {
-        u8 max_frames_in_flight = hc::render::max_frames_in_flight();
-        heap_manager.alloc_buffer(device, this->memory, this->buffer,
-                                  per_frame_allocation ? size * max_frames_in_flight : size,
-                                  usage, heap);
-    }
-
-    void buffer_pool::free(const VolkDeviceTable &fn_table, VkDevice device, HeapManager &heap_manager) noexcept {
+    void BufferPool::free(const VolkDeviceTable &fn_table, VkDevice device, HeapManager &heap_manager) noexcept {
         if (this->memory != VK_NULL_HANDLE) {
             fn_table.vkDestroyBuffer(device, this->buffer, nullptr);
+            this->buffer.destroy();
             this->free_memory(fn_table, device, heap_manager);
         }
     }
 
-    void buffer_pool::push_back_empty() {
-        this->slots.push_back({});
-    }
+    Result<DynamicBufferPool, PoolResult> DynamicBufferPool::create(const VolkDeviceTable &fn_table,
+                                                                    VkDevice device,
+                                                                    hc::render::device::memory::HeapManager &heap_manager,
+                                                                    VkDeviceSize size, VkBufferUsageFlags usage) {
+        VkDeviceMemory memory = VK_NULL_HANDLE;
+        VkBuffer buffer = VK_NULL_HANDLE;
 
-    void buffer_pool::move_slots(u32 dst, u32 src, u32 count) {
-        std::memmove(&this->slots.data()[dst], &this->slots.data()[src], sizeof(*this->slots.data()) * count);
-    }
+        u8 max_frames_in_flight = hc::render::max_frames_in_flight();
+        HeapResult res = heap_manager.alloc_buffer(fn_table, device, memory, buffer, size * max_frames_in_flight,
+                                                   usage, Heap::Dynamic);
 
-    void dynamic_buffer_pool::map(VkDevice device, u8 current_frame) {
-        VK_CRASH_CHECK(
-                vkMapMemory(device, this->memory, this->capacity * current_frame, this->capacity, 0,
-                            &this->mapped_host_ptr),
-                "Failed to map memory");
-    }
-
-    void dynamic_buffer_pool::unmap(VkDevice device) {
-        HC_ASSERT(this->mapped_host_ptr != nullptr, "Memmory not mapped");
-        vkUnmapMemory(device, this->memory);
-        this->mapped_host_ptr = nullptr;
-    }
-
-    void dynamic_buffer_pool::push_flush_ranges(std::vector<VkMappedMemoryRange> &ranges, u8 current_frame,
-                                                const std::vector<dynamic_buffer_pool> &pools) {
-        for (const dynamic_buffer_pool &pool: pools) {
-            // TODO skip pools with no allocations, need to track allocations somehow
-
-            ranges.push_back(pool.mapped_range(current_frame));
+        switch (res) {
+            case HeapResult::Success:
+                // Nothing, keep going
+                break;
+            case HeapResult::OutOfHostMemory:
+                return Result<DynamicBufferPool, PoolResult>::err(PoolResult::OutOfHostMemory);
+            case HeapResult::OutOfDeviceMemory:
+                return Result<DynamicBufferPool, PoolResult>::err(PoolResult::OutOfDeviceMemory);
+            case HeapResult::UnsupportedHeap:
+                return Result<DynamicBufferPool, PoolResult>::err(PoolResult::UnsupportedHeap);
+                // These are both ignored because a specific address is never requested, and no external handle is used
+                // case HeapResult::InvalidCapture:
+                // case HeapResult::InvalidHandle:
+            default: HC_UNREACHABLE("alloc_buffer should not return any other values here");
         }
+
+        DynamicBufferPool pool = DynamicBufferPool(memory, size);
+        pool.buffer = buffer;
+        pool.mapped_host_ptr = std::make_unique<void *>(nullptr);
+
+        return Result<DynamicBufferPool, PoolResult>::ok(std::move(pool));
+    }
+
+    DynamicBufferPool::~DynamicBufferPool() {
+        HC_ASSERT(this->mapped_host_ptr == nullptr, "Memory not unmapped");
+    }
+
+    PoolResult DynamicBufferPool::map(const VolkDeviceTable &fn_table, VkDevice device, u8 frame_mod) {
+        HC_ASSERT(this->mapped_host_ptr == nullptr, "Memory already mapped");
+        VkResult res = fn_table.vkMapMemory(device, this->memory, this->capacity * frame_mod, this->capacity, 0,
+                                            this->mapped_host_ptr.get());
+
+        switch (res) {
+            case VK_SUCCESS:
+                return PoolResult::Success;
+            case VK_ERROR_OUT_OF_HOST_MEMORY:
+                return PoolResult::OutOfHostMemory;
+            case VK_ERROR_OUT_OF_DEVICE_MEMORY:
+                return PoolResult::OutOfDeviceMemory;
+            case VK_ERROR_MEMORY_MAP_FAILED:
+                return PoolResult::MapFailure;
+            default: HC_UNREACHABLE("vkMapMemory should not return any other VkResult values");
+        }
+    }
+
+    void DynamicBufferPool::unmap(const VolkDeviceTable &fn_table, VkDevice device) {
+        HC_ASSERT(this->mapped_host_ptr != nullptr, "Memory not mapped");
+        fn_table.vkUnmapMemory(device, this->memory);
+        this->mapped_host_ptr = nullptr;
     }
 
     texture_slot
@@ -284,46 +171,35 @@ namespace hc::device::memory {
 
     texture_pool::texture_pool(VkDevice device, HeapManager &heap_manager, VkDeviceSize size,
                                u32 memory_type_bits, Heap preferred_heap) :
-            resource_pool(size), m_texture_slots(INITIAL_POOL_SLOT_SIZE) {
+            AllocationPool<TextureSlot>(size) {
         this->m_memory_type_idx = heap_manager.alloc_texture_memory(device, this->memory, size, preferred_heap,
                                                                     memory_type_bits);
     }
 
     void texture_pool::free(const VolkDeviceTable &fn_table, VkDevice device, HeapManager &heap_manager) noexcept {
         this->free_memory(fn_table, device, heap_manager);
-        this->m_texture_slots.clear();
+        this->extra_slots.clear();
     }
 
     bool texture_pool::search(VkDeviceSize size, VkDeviceSize alignment, u32 memory_type_bits,
                               u32 &out_slot_idx, VkDeviceSize &out_size_needed, VkDeviceSize &out_offset) const {
         if (memory_type_bits & (1ULL << this->m_memory_type_idx))
-            return resource_pool::search(size, alignment, out_slot_idx, out_size_needed, out_offset);
+            return AllocationPool<TextureSlot>::search(size, alignment, out_slot_idx, out_size_needed, out_offset);
 
         return false;
     }
 
-    void texture_pool::fill_slot(VkDevice device, texture_slot &&tex, u32 slot_idx, VkDeviceSize size,
+    void texture_pool::fill_slot(VkDevice device, TextureSlot &&tex, u32 slot_idx, VkDeviceSize size,
                                  VkDeviceSize alignment) {
-        resource_pool::fill_slot(slot_idx, size);
+        AllocationPool<TextureSlot>::fill_slot(slot_idx, size);
 
         // resource_pool::fill_slot should perform any reallocation if necessary, so the slot should always exist
 
-        this->m_texture_slots[slot_idx] = std::move(tex);
+        this->extra_slots[slot_idx] = std::move(tex);
 
-        VK_CRASH_CHECK(vkBindImageMemory(device, this->m_texture_slots[slot_idx].image, this->memory,
+        VK_CRASH_CHECK(vkBindImageMemory(device, this->extra_slots[slot_idx].image, this->memory,
                                          aligned_offset(this->slots[slot_idx].offset, alignment)),
                        "Failed to bind image to memory");
-    }
-
-    void texture_pool::push_back_empty() {
-        this->slots.push_back({});
-        this->m_texture_slots.push_back({});
-    }
-
-    void texture_pool::move_slots(u32 dst, u32 src, u32 count) {
-        std::memmove(&this->slots.data()[dst], &this->slots.data()[src], sizeof(*this->slots.data()) * count);
-        std::memmove(&this->m_texture_slots.data()[dst], &this->m_texture_slots.data()[src],
-                     sizeof(*this->m_texture_slots.data()) * count);
     }
 
 #ifdef TODO

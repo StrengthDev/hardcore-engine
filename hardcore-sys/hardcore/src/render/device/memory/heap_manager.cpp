@@ -18,103 +18,127 @@ const VkMemoryPropertyFlags DOWNLOAD_REQUIRED_FLAGS =
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
 const VkMemoryPropertyFlags DOWNLOAD_UNWANTED_FLAGS = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
-namespace hc::device::memory {
-    HeapManager::HeapManager(VkPhysicalDevice physical_device) {
-        vkGetPhysicalDeviceMemoryProperties(physical_device, &this->mem_properties);
+namespace hc::render::device::memory {
+    Result<HeapManager, HeapResult> HeapManager::create(VkPhysicalDevice physical_device) {
+        HeapManager manager;
+        vkGetPhysicalDeviceMemoryProperties(physical_device, &manager.mem_properties);
 
         constexpr u32 unassigned_idx = std::numeric_limits<u32>::max();
-        this->heap_indexes[static_cast<Sz>(Heap::Main)] = unassigned_idx;
-        this->heap_indexes[static_cast<Sz>(Heap::Dynamic)] = unassigned_idx;
-        this->heap_indexes[static_cast<Sz>(Heap::Upload)] = unassigned_idx;
-        this->heap_indexes[static_cast<Sz>(Heap::Download)] = unassigned_idx;
+        manager.heap_indexes[static_cast<Sz>(Heap::Main)] = unassigned_idx;
+        manager.heap_indexes[static_cast<Sz>(Heap::Dynamic)] = unassigned_idx;
+        manager.heap_indexes[static_cast<Sz>(Heap::Upload)] = unassigned_idx;
+        manager.heap_indexes[static_cast<Sz>(Heap::Download)] = unassigned_idx;
 
-        for (u32 i = 0; i < this->mem_properties.memoryTypeCount; i++) {
-            VkMemoryPropertyFlags flags = this->mem_properties.memoryTypes[i].propertyFlags;
+        for (u32 i = 0; i < manager.mem_properties.memoryTypeCount; i++) {
+            VkMemoryPropertyFlags flags = manager.mem_properties.memoryTypes[i].propertyFlags;
 
-            HC_INFO("Memory type " << i << " properties: "
-                                   //<< '(' << std::bitset<sizeof(VkMemoryPropertyFlags) * 8>(flags) << ") => "
-                                   << (flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT ? "DEVICE_LOCAL | " : "")
-                                   << (flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ? "HOST_VISIBLE | " : "")
-                                   << (flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT ? "HOST_COHERENT | " : "")
-                                   << (flags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT ? "HOST_CACHED | " : "")
-                                   << (flags & VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT ? "LAZILY_ALLOCATED | " : "")
-                                   << (flags & VK_MEMORY_PROPERTY_PROTECTED_BIT ? "PROTECTED | " : "")
-                                   << (flags ? "\b\b  " : "NONE"));
+            HC_TRACE("Memory type " << i << " properties: "
+                                    //<< '(' << std::bitset<sizeof(VkMemoryPropertyFlags) * 8>(flags) << ") => "
+                                    << (flags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT ? "DEVICE_LOCAL | " : "")
+                                    << (flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ? "HOST_VISIBLE | " : "")
+                                    << (flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT ? "HOST_COHERENT | " : "")
+                                    << (flags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT ? "HOST_CACHED | " : "")
+                                    << (flags & VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT ? "LAZILY_ALLOCATED | " : "")
+                                    << (flags & VK_MEMORY_PROPERTY_PROTECTED_BIT ? "PROTECTED | " : "")
+                                    << (flags ? "\b\b  " : "NONE"));
 
-            if (this->heap_indexes[static_cast<Sz>(Heap::Main)] == unassigned_idx ||
-                this->mem_properties.memoryTypes[this->heap_indexes[static_cast<Sz>(Heap::Main)]].propertyFlags !=
+            if (manager.heap_indexes[static_cast<Sz>(Heap::Main)] == unassigned_idx ||
+                manager.mem_properties.memoryTypes[manager.heap_indexes[static_cast<Sz>(Heap::Main)]].propertyFlags !=
                 MAIN_REQUIRED_FLAGS) {
                 if (flags == MAIN_REQUIRED_FLAGS) {
-                    this->heap_indexes[static_cast<Sz>(Heap::Main)] = i;
+                    manager.heap_indexes[static_cast<Sz>(Heap::Main)] = i;
                     continue;
                 }
 
-                if (this->heap_indexes[static_cast<Sz>(Heap::Main)] == unassigned_idx &&
+                if (manager.heap_indexes[static_cast<Sz>(Heap::Main)] == unassigned_idx &&
                     flags & MAIN_REQUIRED_FLAGS &&
                     !(flags & MAIN_UNWANTED_FLAGS))
-                    this->heap_indexes[static_cast<Sz>(Heap::Main)] = i;
+                    manager.heap_indexes[static_cast<Sz>(Heap::Main)] = i;
             }
 
-            if (this->heap_indexes[static_cast<Sz>(Heap::Dynamic)] == unassigned_idx ||
-                this->mem_properties.memoryTypes[this->heap_indexes[static_cast<Sz>(Heap::Dynamic)]].propertyFlags !=
+            if (manager.heap_indexes[static_cast<Sz>(Heap::Dynamic)] == unassigned_idx ||
+                manager.mem_properties.memoryTypes[manager.heap_indexes[static_cast<Sz>(Heap::Dynamic)]].propertyFlags !=
                 (DYNAMIC_REQUIRED_FLAGS | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
                 if (flags == (DYNAMIC_REQUIRED_FLAGS | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)) {
-                    this->heap_indexes[static_cast<Sz>(Heap::Dynamic)] = i;
+                    manager.heap_indexes[static_cast<Sz>(Heap::Dynamic)] = i;
                     continue;
                 }
 
-                if (this->heap_indexes[static_cast<Sz>(Heap::Dynamic)] == unassigned_idx &&
+                if (manager.heap_indexes[static_cast<Sz>(Heap::Dynamic)] == unassigned_idx &&
                     flags & DYNAMIC_REQUIRED_FLAGS &&
                     !(flags & DYNAMIC_UNWANTED_FLAGS))
-                    this->heap_indexes[static_cast<Sz>(Heap::Dynamic)] = i;
+                    manager.heap_indexes[static_cast<Sz>(Heap::Dynamic)] = i;
             }
 
-            if (this->heap_indexes[static_cast<Sz>(Heap::Upload)] == unassigned_idx ||
-                this->mem_properties.memoryTypes[this->heap_indexes[static_cast<Sz>(Heap::Upload)]].propertyFlags !=
+            if (manager.heap_indexes[static_cast<Sz>(Heap::Upload)] == unassigned_idx ||
+                manager.mem_properties.memoryTypes[manager.heap_indexes[static_cast<Sz>(Heap::Upload)]].propertyFlags !=
                 UPLOAD_REQUIRED_FLAGS) {
                 if (flags == UPLOAD_REQUIRED_FLAGS) {
-                    this->heap_indexes[static_cast<Sz>(Heap::Upload)] = i;
+                    manager.heap_indexes[static_cast<Sz>(Heap::Upload)] = i;
                     continue;
                 }
 
-                if (this->heap_indexes[static_cast<Sz>(Heap::Upload)] == unassigned_idx &&
+                if (manager.heap_indexes[static_cast<Sz>(Heap::Upload)] == unassigned_idx &&
                     flags & UPLOAD_REQUIRED_FLAGS &&
                     !(flags & UPLOAD_UNWANTED_FLAGS))
-                    this->heap_indexes[static_cast<Sz>(Heap::Upload)] = i;
+                    manager.heap_indexes[static_cast<Sz>(Heap::Upload)] = i;
             }
 
-            if (this->heap_indexes[static_cast<Sz>(Heap::Download)] == unassigned_idx ||
-                this->mem_properties.memoryTypes[this->heap_indexes[static_cast<Sz>(Heap::Download)]].propertyFlags !=
+            if (manager.heap_indexes[static_cast<Sz>(Heap::Download)] == unassigned_idx ||
+                manager.mem_properties.memoryTypes[manager.heap_indexes[static_cast<Sz>(Heap::Download)]].propertyFlags !=
                 DOWNLOAD_REQUIRED_FLAGS) {
                 if (flags == DOWNLOAD_REQUIRED_FLAGS) {
-                    this->heap_indexes[static_cast<Sz>(Heap::Download)] = i;
+                    manager.heap_indexes[static_cast<Sz>(Heap::Download)] = i;
                     continue;
                 }
 
-                if (this->heap_indexes[static_cast<Sz>(Heap::Download)] == unassigned_idx &&
+                if (manager.heap_indexes[static_cast<Sz>(Heap::Download)] == unassigned_idx &&
                     flags & DOWNLOAD_REQUIRED_FLAGS &&
                     !(flags & DOWNLOAD_UNWANTED_FLAGS))
-                    this->heap_indexes[static_cast<Sz>(Heap::Download)] = i;
+                    manager.heap_indexes[static_cast<Sz>(Heap::Download)] = i;
             }
         }
 
-        HC_INFO("Heap type indexes: "
-                        << "main = " << this->heap_indexes[static_cast<Sz>(Heap::Main)]
-                        << " ; dynamic = " << this->heap_indexes[static_cast<Sz>(Heap::Dynamic)]
-                        << " ; upload = " << this->heap_indexes[static_cast<Sz>(Heap::Upload)]
-                        << " ; download = " << this->heap_indexes[static_cast<Sz>(Heap::Download)]);
+        // Check for heaps that haven't been assigned
+        bool missing_heaps = false;
+        if (manager.heap_indexes[static_cast<Sz>(Heap::Main)] == unassigned_idx) {
+            HC_ERROR("Could not find suitable main heap");
+            missing_heaps = true;
+        }
+        if (manager.heap_indexes[static_cast<Sz>(Heap::Dynamic)] == unassigned_idx) {
+            HC_ERROR("Could not find suitable dynamic heap");
+            missing_heaps = true;
+        }
+        if (manager.heap_indexes[static_cast<Sz>(Heap::Upload)] == unassigned_idx) {
+            HC_ERROR("Could not find suitable upload heap");
+            missing_heaps = true;
+        }
+        if (manager.heap_indexes[static_cast<Sz>(Heap::Download)] == unassigned_idx) {
+            HC_ERROR("Could not find suitable download heap");
+            missing_heaps = true;
+        }
+        if (missing_heaps)
+            return Result<HeapManager, HeapResult>::err(HeapResult::HeapNotFound);
 
-        if (this->host_coherent_dynamic_heap()) {
-            HC_INFO("Dynamic heap is host coherent");
+        HC_TRACE("Heap type indexes: "
+                         << "main = " << manager.heap_indexes[static_cast<Sz>(Heap::Main)]
+                         << " ; dynamic = " << manager.heap_indexes[static_cast<Sz>(Heap::Dynamic)]
+                         << " ; upload = " << manager.heap_indexes[static_cast<Sz>(Heap::Upload)]
+                         << " ; download = " << manager.heap_indexes[static_cast<Sz>(Heap::Download)]);
+
+        if (manager.host_coherent_dynamic_heap()) {
+            HC_DEBUG("Dynamic heap is host coherent");
         } else {
-            HC_INFO("Dynamic heap is NOT host coherent");
+            HC_DEBUG("Dynamic heap is NOT host coherent");
         }
 
-        if (this->host_coherent_upload_heap()) {
-            HC_INFO("Upload heap is host coherent");
+        if (manager.host_coherent_upload_heap()) {
+            HC_DEBUG("Upload heap is host coherent");
         } else {
-            HC_INFO("Upload heap is NOT host coherent");
+            HC_DEBUG("Upload heap is NOT host coherent");
         }
+
+        return Result<HeapManager, HeapResult>::ok(std::move(manager));
     }
 
     u32 HeapManager::find_memory_type(u32 type_filter, VkMemoryPropertyFlags heap_properties) {
@@ -179,7 +203,7 @@ namespace hc::device::memory {
         VkResult res = fn_table.vkCreateBuffer(device, &buffer_info, nullptr, &buffer);
         switch (res) {
             case VK_SUCCESS:
-                // nothing, keep going
+                // Nothing, keep going
                 break;
             case VK_ERROR_OUT_OF_HOST_MEMORY:
                 return HeapResult::OutOfHostMemory;
@@ -212,7 +236,7 @@ namespace hc::device::memory {
         }
         switch (res) {
             case VK_SUCCESS:
-                // nothing, keep going
+                // Nothing, keep going
                 break;
             case VK_ERROR_OUT_OF_HOST_MEMORY:
                 return HeapResult::OutOfHostMemory;
@@ -234,7 +258,7 @@ namespace hc::device::memory {
         }
         switch (res) {
             case VK_SUCCESS:
-                // nothing, keep going
+                // Nothing, keep going
                 break;
             case VK_ERROR_OUT_OF_HOST_MEMORY:
                 return HeapResult::OutOfHostMemory;

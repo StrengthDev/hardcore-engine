@@ -329,7 +329,7 @@ namespace hc {
  */
 struct StaticWindow {
     Sz id = std::numeric_limits<Sz>::max();
-    u32 owning_device = std::numeric_limits<u32>::max();
+    DeviceID owning_device = std::numeric_limits<u32>::max();
     bool resizing = false;
     HCWindowPositionCallback position_callback = nullptr;
     HCWindowSizeCallback size_callback = nullptr;
@@ -395,7 +395,7 @@ HCWindow hc_new_window(HCWindowParams params) {
         return HCWindow{.handle = nullptr, .id = 0};
     }
 
-    u32 device = hc::render::default_device();
+    DeviceID device = hc::render::default_device();
     hc::render::InstanceResult res = hc::render::create_swapchain(window, device);
     if (res != hc::render::InstanceResult::Success) {
         HC_ERROR("Failed to create swapchain");
@@ -430,38 +430,39 @@ HCWindow hc_new_window(HCWindowParams params) {
 }
 
 void hc_destroy_window(HCWindow *window) {
-    if (window->handle) {
-        HC_INFO("Window " << window->id << " marked for destruction (handle: " << window->handle << ')');
-        auto *handle = static_cast<GLFWwindow *>(window->handle);
+    if (!window || !window->handle)
+        return;
 
-        glfwSetWindowPosCallback(handle, nullptr);
-        glfwSetWindowSizeCallback(handle, nullptr);
-        glfwSetWindowCloseCallback(handle, nullptr);
-        glfwSetWindowRefreshCallback(handle, nullptr);
-        glfwSetWindowFocusCallback(handle, nullptr);
-        glfwSetWindowIconifyCallback(handle, nullptr);
-        glfwSetWindowMaximizeCallback(handle, nullptr);
-        glfwSetFramebufferSizeCallback(handle, nullptr);
-        glfwSetWindowContentScaleCallback(handle, nullptr);
-        glfwSetMouseButtonCallback(handle, nullptr);
-        glfwSetCursorPosCallback(handle, nullptr);
-        glfwSetCursorEnterCallback(handle, nullptr);
-        glfwSetScrollCallback(handle, nullptr);
-        glfwSetKeyCallback(handle, nullptr);
-        glfwSetCharCallback(handle, nullptr);
-        glfwSetCharModsCallback(handle, nullptr);
-        glfwSetDropCallback(handle, nullptr);
+    HC_INFO("Window " << window->id << " marked for destruction (handle: " << window->handle << ')');
+    auto *handle = static_cast<GLFWwindow *>(window->handle);
 
-        u32 device;
-        {
-            std::shared_lock lock(window_mutex);
-            StaticWindow &static_window = window_map.at(handle);
-            device = static_window.owning_device;
-        }
-        hc::render::destroy_swapchain(handle, device);
+    glfwSetWindowPosCallback(handle, nullptr);
+    glfwSetWindowSizeCallback(handle, nullptr);
+    glfwSetWindowCloseCallback(handle, nullptr);
+    glfwSetWindowRefreshCallback(handle, nullptr);
+    glfwSetWindowFocusCallback(handle, nullptr);
+    glfwSetWindowIconifyCallback(handle, nullptr);
+    glfwSetWindowMaximizeCallback(handle, nullptr);
+    glfwSetFramebufferSizeCallback(handle, nullptr);
+    glfwSetWindowContentScaleCallback(handle, nullptr);
+    glfwSetMouseButtonCallback(handle, nullptr);
+    glfwSetCursorPosCallback(handle, nullptr);
+    glfwSetCursorEnterCallback(handle, nullptr);
+    glfwSetScrollCallback(handle, nullptr);
+    glfwSetKeyCallback(handle, nullptr);
+    glfwSetCharCallback(handle, nullptr);
+    glfwSetCharModsCallback(handle, nullptr);
+    glfwSetDropCallback(handle, nullptr);
 
-        window->handle = nullptr;
+    DeviceID device;
+    {
+        std::shared_lock lock(window_mutex);
+        StaticWindow &static_window = window_map.at(handle);
+        device = static_window.owning_device;
     }
+    hc::render::destroy_swapchain(handle, device);
+
+    window->handle = nullptr;
 }
 
 namespace hc::window {

@@ -8,10 +8,13 @@
 
 #include <GLFW/glfw3.h>
 
+#include <render/buffer.h>
+
 #include "device/scheduler.hpp"
 #include "device/graph.hpp"
 #include "device/destruction_mark.hpp"
 #include "device/swapchain.hpp"
+#include "resource/descriptor.hpp"
 
 namespace hc::render {
     enum class DeviceResult : u32 {
@@ -42,6 +45,22 @@ namespace hc::render {
         [[nodiscard]] DeviceResult create_swapchain(VkInstance instance, GLFWwindow *window);
 
         void destroy_swapchain(VkInstance instance, GLFWwindow *window, u8 frame_mod);
+
+        [[nodiscard]] Result<HCBuffer, DeviceResult> new_buffer(HCBufferKind kind, resource::Descriptor &&descriptor,
+                                                                u64 count, bool writable);
+
+        [[nodiscard]] Result<HCBuffer, DeviceResult> new_index_buffer(HCPrimitive index_type, u64 count, bool writable);
+
+        void destroy_buffer(const HCBuffer &buffer, u8 frame_mod);
+
+        [[nodiscard]] Result<HCDynamicBuffer, DeviceResult> new_dynamic_buffer(HCBufferKind kind,
+                                                                               resource::Descriptor &&descriptor,
+                                                                               u64 count, bool writable);
+
+        [[nodiscard]] Result<HCDynamicBuffer, DeviceResult> new_dynamic_index_buffer(HCPrimitive index_type, u64 count,
+                                                                                     bool writable);
+
+        void destroy_dynamic_buffer(const HCDynamicBuffer &buffer, u8 frame_mod);
 
     private:
         Device() = default;

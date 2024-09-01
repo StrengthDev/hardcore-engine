@@ -32,7 +32,7 @@ namespace hc::render {
     static VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
     static HCVulkanDebugCallbackFn user_debug_callback = nullptr;
     static std::vector<Device> devices;
-    static u32 default_device_idx = std::numeric_limits<u32>::max();
+    static DeviceID default_device_idx = std::numeric_limits<DeviceID>::max();
 
     VkResult layer_support(const std::vector<const char *> &layer_names, std::vector<bool> &out_found_layers) {
         u32 layer_count;
@@ -335,13 +335,13 @@ namespace hc::render {
         volkFinalize();
 
         max_frames_in_flight_count = std::numeric_limits<u8>::max();
-        default_device_idx = std::numeric_limits<u32>::max();
+        default_device_idx = std::numeric_limits<DeviceID>::max();
 
         return InstanceResult::Success;
     }
 
-    InstanceResult create_swapchain(GLFWwindow *window, u32 device_idx) {
-        if (device_idx == std::numeric_limits<u32>::max()) {
+    InstanceResult create_swapchain(GLFWwindow *window, DeviceID device_idx) {
+        if (device_idx == std::numeric_limits<DeviceID>::max()) {
             device_idx = default_device_idx;
         }
 
@@ -357,9 +357,9 @@ namespace hc::render {
         }
     }
 
-    void destroy_swapchain(GLFWwindow *window, u32 device_idx) {
+    void destroy_swapchain(GLFWwindow *window, DeviceID device_idx) {
         // The default device may have changed meanwhile
-        HC_ASSERT(device_idx != std::numeric_limits<u32>::max(), "Cannot assume default device");
+        HC_ASSERT(device_idx != std::numeric_limits<DeviceID>::max(), "Cannot assume default device");
         devices[device_idx].destroy_swapchain(global_instance, window, frame_mod);
     }
 
@@ -367,11 +367,19 @@ namespace hc::render {
         return max_frames_in_flight_count;
     }
 
+    u8 current_frame_mod() {
+        return frame_mod;
+    }
+
     VkInstance instance() {
         return global_instance;
     }
 
-    u32 default_device() {
+    std::vector<Device> &device_list() noexcept {
+        return devices;
+    }
+
+    DeviceID default_device() {
         return default_device_idx;
     }
 }

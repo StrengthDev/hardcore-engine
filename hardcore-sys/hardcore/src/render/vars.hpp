@@ -9,5 +9,7 @@
 
 namespace hc::render {
     u8 max_frames_in_flight();
+
+    u8 current_frame_mod();
 }
 

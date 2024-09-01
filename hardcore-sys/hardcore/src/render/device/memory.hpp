@@ -1,14 +1,17 @@
 #pragma once
 
+#include <vulkan/vulkan.h>
+
 #include <core/util.hpp>
 #include "memory/heap_manager.hpp"
 #include "memory/resource_pool.hpp"
 #include "memory/staging_pool.hpp"
+#include "memory/reference.hpp"
 
 #include <render/memory_reference.hpp>
 #include <render/resource.hpp>
 
-namespace hc::device {
+namespace hc::render::device {
     // for operations such as allocations, which happen outside of device functions, memory needs access to some device
     // data, such as the VkDevice handle for operations like vkAllocateMemory
     struct random_access_device_data {
@@ -164,41 +167,41 @@ namespace hc::device {
         //they are private so it's not a problem that they aren't defined in the header
 
         template<buffer_t BType>
-        inline std::vector<buffer_pool> &static_pools() {
+        inline std::vector<BufferPool> &static_pools() {
             static_assert(force_eval<BType>::value, "Unimplemented buffer type");
         }
 
         template<>
-        inline std::vector<buffer_pool> &static_pools<VERTEX>() noexcept { return vertex_pools; }
+        inline std::vector<BufferPool> &static_pools<VERTEX>() noexcept { return vertex_pools; }
 
         template<>
-        inline std::vector<buffer_pool> &static_pools<INDEX>() noexcept { return index_pools; }
+        inline std::vector<BufferPool> &static_pools<INDEX>() noexcept { return index_pools; }
 
         template<>
-        inline std::vector<buffer_pool> &static_pools<UNIFORM>() noexcept { return uniform_pools; }
+        inline std::vector<BufferPool> &static_pools<UNIFORM>() noexcept { return uniform_pools; }
 
         template<>
-        inline std::vector<buffer_pool> &static_pools<STORAGE>() noexcept { return storage_pools; }
+        inline std::vector<BufferPool> &static_pools<STORAGE>() noexcept { return storage_pools; }
 
         template<>
-        inline std::vector<buffer_pool> &static_pools<UNIVERSAL>() noexcept { return writable_pools; }
+        inline std::vector<BufferPool> &static_pools<UNIVERSAL>() noexcept { return writable_pools; }
 
         template<buffer_t BType>
-        inline std::vector<dynamic_buffer_pool> &dynamic_pools() {
+        inline std::vector<DynamicBufferPool> &dynamic_pools() {
             static_assert(force_eval<BType>::value, "Unimplemented buffer type");
         }
 
         template<>
-        inline std::vector<dynamic_buffer_pool> &dynamic_pools<VERTEX>() noexcept { return d_vertex_pools; }
+        inline std::vector<DynamicBufferPool> &dynamic_pools<VERTEX>() noexcept { return d_vertex_pools; }
 
         template<>
-        inline std::vector<dynamic_buffer_pool> &dynamic_pools<INDEX>() noexcept { return d_index_pools; }
+        inline std::vector<DynamicBufferPool> &dynamic_pools<INDEX>() noexcept { return d_index_pools; }
 
         template<>
-        inline std::vector<dynamic_buffer_pool> &dynamic_pools<UNIFORM>() noexcept { return d_uniform_pools; }
+        inline std::vector<DynamicBufferPool> &dynamic_pools<UNIFORM>() noexcept { return d_uniform_pools; }
 
         template<>
-        inline std::vector<dynamic_buffer_pool> &dynamic_pools<STORAGE>() noexcept { return d_storage_pools; }
+        inline std::vector<DynamicBufferPool> &dynamic_pools<STORAGE>() noexcept { return d_storage_pools; }
 
         template<buffer_t BType>
         inline VkDeviceSize offset_alignment() const noexcept { return 0; }
@@ -275,5 +278,55 @@ namespace hc::device {
         std::vector<upload_pool> m_upload_pools;
         std::vector<texture_upload_pool> m_tex_upload_pools;
         bool m_uploads_pending = false;
+    };
+
+    enum class MemoryResult : u8 {
+        Success = 0, //!< Success.
+        HeapError,
+        MapError,
+        FlushError,
+        OutOfHostMemory,
+        OutOfDeviceMemory,
+    };
+
+    class Memory {
+    public:
+        Memory() = default;
+
+        static Result<Memory, MemoryResult> create(VkPhysicalDevice physical_device, const VolkDeviceTable &fn_table,
+                                                   VkDevice device, const VkPhysicalDeviceLimits &limits);
+
+        ~Memory();
+
+        void destroy(const VolkDeviceTable &fn_table, VkDevice device);
+
+        Memory(Memory &&) noexcept = default;
+
+        Memory &operator=(Memory &&) = default;
+
+        [[nodiscard]] MemoryResult map_ranges(const VolkDeviceTable &fn_table, VkDevice device, u8 frame_mod);
+
+        void unmap_ranges(const VolkDeviceTable &fn_table, VkDevice device);
+
+        [[nodiscard]] MemoryResult flush_ranges(const VolkDeviceTable &fn_table, VkDevice device, u8 frame_mod);
+
+        [[nodiscard]] Result<memory::Ref, MemoryResult> alloc(const VolkDeviceTable &fn_table, VkDevice device,
+                                                              VkBufferUsageFlags flags, VkDeviceSize size);
+
+        [[nodiscard]] Result<memory::Ref, MemoryResult> alloc_dyn(const VolkDeviceTable &fn_table, VkDevice device,
+                                                                  VkBufferUsageFlags flags, VkDeviceSize size,
+                                                                  u8 frame_mod);
+
+        void free(const VolkDeviceTable &fn_table, VkDevice device, memory::Ref ref);
+
+    private:
+        [[nodiscard]] VkDeviceSize alignment_of(VkBufferUsageFlags flags) const noexcept;
+
+        VkPhysicalDeviceLimits limits = {};
+
+        memory::HeapManager heap_manager;
+
+        std::unordered_map<VkBufferUsageFlags, std::vector<memory::BufferPool>> buffer_pools;
+        std::unordered_map<VkBufferUsageFlags, std::vector<memory::DynamicBufferPool>> dynamic_buffer_pools;
     };
 }

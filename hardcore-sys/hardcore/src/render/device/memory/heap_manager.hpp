@@ -8,9 +8,10 @@
 
 #include <core/util.hpp>
 
-namespace hc::device::memory {
+namespace hc::render::device::memory {
     enum class HeapResult : u8 {
         Success = 0, //!< Success.
+        HeapNotFound, //!< Could not find a matching heap in the device.
         OutOfHostMemory, //!< Not enough memory to perform the allocation on the host.
         OutOfDeviceMemory, //!< Not enough memory to perform the allocation on the device.
         UnsupportedHeap, //!< The provided heap cannot back the specified buffer.
@@ -30,7 +31,7 @@ namespace hc::device::memory {
     public:
         HeapManager() = default;
 
-        explicit HeapManager(VkPhysicalDevice physical_device);
+        static Result<HeapManager, HeapResult> create(VkPhysicalDevice physical_device);
 
         HeapManager(const HeapManager &) = delete;
 
@@ -112,7 +113,12 @@ namespace hc::device::memory {
 
         VkPhysicalDeviceMemoryProperties mem_properties = {};
 
-        std::array<u32, static_cast<Sz>(Heap::MaxEnum)> heap_indexes = {};
+        std::array<u32, static_cast<Sz>(Heap::MaxEnum)> heap_indexes = {
+                std::numeric_limits<u32>::max(),
+                std::numeric_limits<u32>::max(),
+                std::numeric_limits<u32>::max(),
+                std::numeric_limits<u32>::max(),
+        };
 
         u32 allocation_count = 0;
 //        std::array<VkDeviceSize, static_cast<Sz>(Heap::MaxEnum)> allocated_memory;

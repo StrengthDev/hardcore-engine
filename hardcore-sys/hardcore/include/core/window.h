@@ -419,6 +419,9 @@ typedef void (*HCWindowJoystickCallback)(size_t window, enum HCDeviceEvent event
 
 /**
  * @brief A high-level abstraction of a graphical window.
+ *
+ * This struct should never be created directly. Instead, `hc_new_window` should be used to create a new instance, and
+ * `hc_destroy_window` used to destroy the instance.
  */
 struct HCWindow {
     void *handle; //!< The internal handle of this window.
@@ -447,7 +450,7 @@ void hc_poll_events();
 /**
  * @brief Constructs a new `HCWindow`.
  *
- * @param params the window initialisation parameters.
+ * @param params The window initialisation parameters.
  *
  * @return The newly created `HCWindow`. The returned object is invalid if some error has occurred.
  */
@@ -459,7 +462,7 @@ struct HCWindow hc_new_window(struct HCWindowParams params);
  * The window will become unusable immediately, but will only truly be destroyed once its resources are no longer
  * being used, which should be after after a few frames, depending on the number of frames in flight.
  *
- * @param window a pointer to the `HCWindow` to be destroyed
+ * @param window A pointer to the `HCWindow` to be destroyed.
  */
 void hc_destroy_window(struct HCWindow *window);
 
@@ -468,8 +471,8 @@ void hc_destroy_window(struct HCWindow *window);
  *
  * If the pointer to the new callback is null, unsets the callback and none is used.
  *
- * @param window a pointer to the `HCWindow` for which the callback is set.
- * @param callback a pointer to the new callback function.
+ * @param window A pointer to the `HCWindow` for which the callback is set.
+ * @param callback A pointer to the new callback function.
  */
 void hc_set_window_position_callback(struct HCWindow *window, HCWindowPositionCallback callback);
 

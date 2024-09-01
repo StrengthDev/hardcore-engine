@@ -5,6 +5,7 @@ use std::ops::{Deref, DerefMut};
 pub use mesh::*;
 pub use texture::*;
 
+mod descriptor;
 mod generic;
 mod mesh;
 mod texture;

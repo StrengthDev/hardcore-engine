@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <optional>
 
+#include <render/renderer.h>
 #include <core/util.hpp>
 
 namespace hc::render::device {
@@ -11,8 +12,6 @@ namespace hc::render::device {
         NotCompiled,
         Invalid,
     };
-
-    typedef u64 GraphItemID; //!< The type of a graph node ID, used as a map key in the graph.
 
     /**
      * @brief A node's input resource.

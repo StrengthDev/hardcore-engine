@@ -4,6 +4,11 @@
 extern "C" {
 #endif // __cplusplus
 
+#include <stdint.h>
+
+typedef uint32_t DeviceID; //!< The type of a device ID.
+typedef uint64_t GraphItemID; //!< The type of a graph node ID, used as a map key in an execution graph.
+
 /**
 * @brief Process one frame.
 *

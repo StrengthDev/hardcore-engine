@@ -9,7 +9,7 @@ extern "C" {
 #include "../core/log.h"
 
 // Vulkan debug callback scope bits.
-// Matches original values.
+// Match original values.
 
 /**
  * Designates general or miscellaneous events.
