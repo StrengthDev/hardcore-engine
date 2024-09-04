@@ -8,8 +8,8 @@
 
 #include <core/window.h>
 #include <core/window.hpp>
-#include <core/util.hpp>
 #include <core/log.hpp>
+#include <util/number.hpp>
 #include <render/renderer.hpp>
 
 namespace hc {

@@ -12,17 +12,10 @@
  * @param message The message of the log.
  */
 void default_log(HCLogKind kind, const char *message) {
-    switch (kind) {
-        case Trace:
-        case Info:
-        case Debug:
-        case Warn:
-            std::cout << message << std::endl;
-            break;
-        case Error:
-            std::cerr << message << std::endl;
-            break;
-    }
+    if (kind == Error)
+        std::cerr << message << std::endl;
+    else
+        std::cout << message << std::endl;
 }
 
 static HCLogFn log_fn = default_log; //!< The logging function to use for the whole library.

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <core/util.hpp>
 #include <render/descriptor.h>
 
 namespace hc::render::resource {

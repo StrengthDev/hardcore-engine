@@ -9,7 +9,8 @@
 
 #include <GLFW/glfw3.h>
 
-#include <core/util.hpp>
+#include <util/number.hpp>
+#include <util/result.hpp>
 
 namespace hc::render::device {
     enum class SwapchainResult : u8 {

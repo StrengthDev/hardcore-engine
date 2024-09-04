@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <core/util.hpp>
+#include <util/number.hpp>
 
 namespace hc::render {
     u8 max_frames_in_flight();

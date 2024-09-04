@@ -1,5 +1,7 @@
 #include <pch.hpp>
 
+#include <util/flow.hpp>
+
 #include "heap_manager.hpp"
 
 const VkMemoryPropertyFlags MAIN_REQUIRED_FLAGS = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;

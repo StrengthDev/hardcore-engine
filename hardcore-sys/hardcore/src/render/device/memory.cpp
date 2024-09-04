@@ -830,7 +830,7 @@ namespace hc::render::device {
         }
 
         if (!spec.size_needed) {
-            VkDeviceSize pool_size = increase_to_fit(MEBIBYTES(8), size);
+            VkDeviceSize pool_size = increase_to_fit(MEBI(8), size);
             auto pool_result = memory::BufferPool::create(fn_table, device, this->heap_manager, pool_size, flags);
             if (pool_result) {
                 pools.push_back(std::move(pool_result).ok());
@@ -877,7 +877,7 @@ namespace hc::render::device {
         }
 
         if (!spec.size_needed) {
-            VkDeviceSize pool_size = increase_to_fit(MEBIBYTES(8), size);
+            VkDeviceSize pool_size = increase_to_fit(MEBI(8), size);
             auto pool_result = memory::DynamicBufferPool::create(fn_table, device, this->heap_manager, pool_size, flags);
             if (pool_result) {
                 pools.push_back(std::move(pool_result).ok());
@@ -912,6 +912,10 @@ namespace hc::render::device {
              .offset = spec.offset,
              .flags = flags,
         });
+    }
+
+    void Memory::free(const VolkDeviceTable &fn_table, VkDevice device, memory::Ref ref) {
+        HC_ASSERT(this->buffer_pools.contains(ref.flags), "Pool list matching the flags must exist");
     }
 
 }

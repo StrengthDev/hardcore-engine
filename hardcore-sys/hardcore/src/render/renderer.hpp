@@ -7,7 +7,7 @@
 #include <GLFW/glfw3.h>
 
 #include <core/core.h>
-#include <core/util.hpp>
+#include <util/number.hpp>
 #include <render/renderer.h>
 
 #include "device.hpp"

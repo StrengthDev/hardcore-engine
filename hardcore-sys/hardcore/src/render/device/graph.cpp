@@ -1,5 +1,9 @@
 #include <pch.hpp>
 
+#include <util/flow.hpp>
+#include <util/number.hpp>
+#include <util/reverse_bits.hpp>
+
 #include "graph.hpp"
 
 namespace hc::render::device {

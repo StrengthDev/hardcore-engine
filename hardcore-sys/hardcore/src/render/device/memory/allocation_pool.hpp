@@ -6,7 +6,8 @@
 
 #include <GLFW/glfw3.h>
 
-#include <core/util.hpp>
+#include <util/flow.hpp>
+#include <util/number.hpp>
 
 // The way this is implemented is a bit overly complex, but it's done this way to avoid using virtual inheritance
 
@@ -193,6 +194,47 @@ namespace hc::render::device::memory {
             }
 
             this->slots[slot_idx].in_use = true;
+        }
+
+        void clear_slot(VkDeviceSize offset) {
+            u32 slot_idx = 0;
+
+            // TODO this is probably an inefficient way to look for the slot
+            for (Slot &slot: this->slots) {
+                if (offset <= slot.offset) {
+                    if (slot.offset == offset)
+                        break;
+
+                    slot_idx = this->slots.size();
+                    break;
+                }
+
+                slot_idx++;
+            }
+
+            HC_ASSERT(slot_idx != this->slots.size(), "A slot with the given offset should exist");
+            HC_ASSERT(this->slots[slot_idx].in_use, "The slot must be taken");
+
+            this->slots[slot_idx].in_use = false;
+
+            // Take the space of the free slot directly after, if there is any
+            if (slot_idx + 1 < this->slots.size() && !this->slots[slot_idx + 1].in_use &&
+                this->slots[slot_idx + 1].size) {
+                this->slots[slot_idx] += this->slots[slot_idx + 1].size;
+                this->slots[slot_idx + 1].size = 0;
+            }
+
+            // If there is free space before the slot, take the space from the freed slot and put it there
+            if (slot_idx != 0) {
+                u32 left_free = slot_idx;
+                while (0 < left_free && !this->slots[left_free - 1].in_use)
+                    left_free--;
+
+                if (left_free != slot_idx) {
+                    this->slots[left_free] += this->slots[slot_idx].size;
+                    this->slots[slot_idx].size = 0;
+                }
+            }
         }
 
         // TODO cleanup function to remove excessive amount of empty slots maybe

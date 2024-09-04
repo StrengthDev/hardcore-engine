@@ -8,8 +8,6 @@
 
 #include <GLFW/glfw3.h>
 
-#include <core/util.hpp>
-
 namespace hc::render::device {
     struct WindowDestructionMark {
         VkInstance instance;

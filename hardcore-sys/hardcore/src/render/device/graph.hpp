@@ -4,7 +4,7 @@
 #include <optional>
 
 #include <render/renderer.h>
-#include <core/util.hpp>
+#include <util/number.hpp>
 
 namespace hc::render::device {
     enum class GraphResult : u8 {

@@ -1,10 +1,10 @@
 #pragma once
 
+#ifdef HC_LOGGING
+
 #include <sstream>
 
 #include <core/log.h>
-
-#ifdef HC_LOGGING
 
 namespace hc {
     /**

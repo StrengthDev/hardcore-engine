@@ -2,6 +2,7 @@
 
 #include <core/log.hpp>
 #include <core/window.hpp>
+#include <util/flow.hpp>
 #include <render/vars.hpp>
 #include <render/util.hpp>
 

@@ -6,7 +6,8 @@
 
 #include <GLFW/glfw3.h>
 
-#include <core/util.hpp>
+#include <util/result.hpp>
+#include <util/uncopyable.hpp>
 
 #include "heap_manager.hpp"
 #include "allocation_pool.hpp"

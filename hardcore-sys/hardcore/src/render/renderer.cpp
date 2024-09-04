@@ -8,6 +8,7 @@
 #endif // HC_HEADLESS
 
 #include <core/log.hpp>
+#include <util/flow.hpp>
 #include <render/renderer.h>
 
 #include "util.hpp"

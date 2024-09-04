@@ -2,7 +2,8 @@
 
 #include <vulkan/vulkan.h>
 
-#include <core/util.hpp>
+#include <util/number.hpp>
+#include <util/result.hpp>
 #include "memory/heap_manager.hpp"
 #include "memory/resource_pool.hpp"
 #include "memory/staging_pool.hpp"

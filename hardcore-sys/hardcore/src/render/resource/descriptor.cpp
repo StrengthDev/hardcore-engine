@@ -1,6 +1,7 @@
 #include <pch.hpp>
 
-#include <core/util.hpp>
+#include <core/log.hpp>
+#include <util/number.hpp>
 #include <render/descriptor.h>
 
 #include "descriptor.hpp"

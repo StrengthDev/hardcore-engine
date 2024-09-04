@@ -2,7 +2,7 @@
 
 #include <optional>
 
-#include <core/util.hpp>
+#include <util/number.hpp>
 
 namespace hc::render::device {
     class Scheduler {
