@@ -18,11 +18,11 @@ namespace hc::render::device::memory {
                 // Nothing, keep going
                 break;
             case HeapResult::OutOfHostMemory:
-                return Result<BufferPool, PoolResult>::err(PoolResult::OutOfHostMemory);
+                return Err(PoolResult::OutOfHostMemory);
             case HeapResult::OutOfDeviceMemory:
-                return Result<BufferPool, PoolResult>::err(PoolResult::OutOfDeviceMemory);
+                return Err(PoolResult::OutOfDeviceMemory);
             case HeapResult::UnsupportedHeap:
-                return Result<BufferPool, PoolResult>::err(PoolResult::UnsupportedHeap);
+                return Err(PoolResult::UnsupportedHeap);
                 // These are both ignored because a specific address is never requested, and no external handle is used
                 // case HeapResult::InvalidCapture:
                 // case HeapResult::InvalidHandle:
@@ -32,7 +32,7 @@ namespace hc::render::device::memory {
         BufferPool pool = BufferPool(memory, size, false);
         pool.buffer = buffer;
 
-        return Result<BufferPool, PoolResult>::ok(std::move(pool));
+        return Ok(std::move(pool));
     }
 
     void BufferPool::free(const VolkDeviceTable &fn_table, VkDevice device, HeapManager &heap_manager) noexcept {
@@ -59,11 +59,11 @@ namespace hc::render::device::memory {
                 // Nothing, keep going
                 break;
             case HeapResult::OutOfHostMemory:
-                return Result<DynamicBufferPool, PoolResult>::err(PoolResult::OutOfHostMemory);
+                return Err(PoolResult::OutOfHostMemory);
             case HeapResult::OutOfDeviceMemory:
-                return Result<DynamicBufferPool, PoolResult>::err(PoolResult::OutOfDeviceMemory);
+                return Err(PoolResult::OutOfDeviceMemory);
             case HeapResult::UnsupportedHeap:
-                return Result<DynamicBufferPool, PoolResult>::err(PoolResult::UnsupportedHeap);
+                return Err(PoolResult::UnsupportedHeap);
                 // These are both ignored because a specific address is never requested, and no external handle is used
                 // case HeapResult::InvalidCapture:
                 // case HeapResult::InvalidHandle:
@@ -74,7 +74,7 @@ namespace hc::render::device::memory {
         pool.buffer = buffer;
         pool.mapped_host_ptr = std::make_unique<void *>(nullptr);
 
-        return Result<DynamicBufferPool, PoolResult>::ok(std::move(pool));
+        return Ok(std::move(pool));
     }
 
     DynamicBufferPool::~DynamicBufferPool() {

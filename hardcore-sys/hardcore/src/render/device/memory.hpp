@@ -4,6 +4,7 @@
 
 #include <util/number.hpp>
 #include <util/result.hpp>
+#include <util/bank.hpp>
 #include "memory/heap_manager.hpp"
 #include "memory/resource_pool.hpp"
 #include "memory/staging_pool.hpp"
@@ -314,9 +315,11 @@ namespace hc::render::device {
         [[nodiscard]] Result<memory::Ref, MemoryResult> alloc(const VolkDeviceTable &fn_table, VkDevice device,
                                                               VkBufferUsageFlags flags, VkDeviceSize size);
 
-        [[nodiscard]] Result<memory::Ref, MemoryResult> alloc_dyn(const VolkDeviceTable &fn_table, VkDevice device,
-                                                                  VkBufferUsageFlags flags, VkDeviceSize size,
-                                                                  u8 frame_mod);
+        [[nodiscard]] Result<std::pair<memory::Ref, void **>, MemoryResult> alloc_dyn(const VolkDeviceTable &fn_table,
+                                                                                      VkDevice device,
+                                                                                      VkBufferUsageFlags flags,
+                                                                                      VkDeviceSize size,
+                                                                                      u8 frame_mod);
 
         void free(const VolkDeviceTable &fn_table, VkDevice device, memory::Ref ref);
 
@@ -327,7 +330,7 @@ namespace hc::render::device {
 
         memory::HeapManager heap_manager;
 
-        std::unordered_map<VkBufferUsageFlags, std::vector<memory::BufferPool>> buffer_pools;
-        std::unordered_map<VkBufferUsageFlags, std::vector<memory::DynamicBufferPool>> dynamic_buffer_pools;
+        std::unordered_map<VkBufferUsageFlags, Bank<memory::BufferPool>> buffer_pools;
+        std::unordered_map<VkBufferUsageFlags, Bank<memory::DynamicBufferPool>> dynamic_buffer_pools;
     };
 }

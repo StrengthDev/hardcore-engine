@@ -39,8 +39,9 @@ namespace hc::render::device::memory {
     }
 
     struct AllocationSpec {
-        VkDeviceSize size_needed;
+        VkDeviceSize size;
         VkDeviceSize offset;
+        VkDeviceSize padding;
         u32 slot_idx;
     };
 
@@ -85,8 +86,9 @@ namespace hc::render::device::memory {
         [[nodiscard]] AllocationSpec search(VkDeviceSize size, VkDeviceSize alignment) const {
             const u32 invalid_idx = std::numeric_limits<u32>::max();
             const AllocationSpec invalid_spec = {
-                    .size_needed = 0,
+                    .size = 0,
                     .offset = std::numeric_limits<VkDeviceSize>::max(),
+                    .padding = std::numeric_limits<VkDeviceSize>::max(),
                     .slot_idx = invalid_idx,
             };
 
@@ -123,8 +125,9 @@ namespace hc::render::device::memory {
                         this->largest_free_slot = largest_idx;
 
                     return {
-                            .size_needed = size + alignment_pad(this->slots[smallest_idx].offset, alignment),
+                            .size = size,
                             .offset = this->slots[smallest_idx].offset,
+                            .padding = alignment_pad(this->slots[smallest_idx].offset, alignment),
                             .slot_idx = smallest_idx,
                     };
                 } else {
@@ -152,8 +155,9 @@ namespace hc::render::device::memory {
                 }
 
                 return {
-                        .size_needed = size + alignment_pad(this->slots[smallest_idx].offset, alignment),
+                        .size = size,
                         .offset = this->slots[smallest_idx].offset,
+                        .padding = alignment_pad(this->slots[smallest_idx].offset, alignment),
                         .slot_idx = smallest_idx,
                 };
             }
@@ -197,30 +201,16 @@ namespace hc::render::device::memory {
         }
 
         void clear_slot(VkDeviceSize offset) {
-            u32 slot_idx = 0;
-
-            // TODO this is probably an inefficient way to look for the slot
-            for (Slot &slot: this->slots) {
-                if (offset <= slot.offset) {
-                    if (slot.offset == offset)
-                        break;
-
-                    slot_idx = this->slots.size();
-                    break;
-                }
-
-                slot_idx++;
-            }
-
-            HC_ASSERT(slot_idx != this->slots.size(), "A slot with the given offset should exist");
-            HC_ASSERT(this->slots[slot_idx].in_use, "The slot must be taken");
+            auto slot_opt = find_slot(offset);
+            HC_ASSERT(slot_opt, "A slot with the given offset should exist");
+            u32 slot_idx = *slot_opt;
 
             this->slots[slot_idx].in_use = false;
 
             // Take the space of the free slot directly after, if there is any
             if (slot_idx + 1 < this->slots.size() && !this->slots[slot_idx + 1].in_use &&
                 this->slots[slot_idx + 1].size) {
-                this->slots[slot_idx] += this->slots[slot_idx + 1].size;
+                this->slots[slot_idx].size += this->slots[slot_idx + 1].size;
                 this->slots[slot_idx + 1].size = 0;
             }
 
@@ -231,7 +221,7 @@ namespace hc::render::device::memory {
                     left_free--;
 
                 if (left_free != slot_idx) {
-                    this->slots[left_free] += this->slots[slot_idx].size;
+                    this->slots[left_free].size += this->slots[slot_idx].size;
                     this->slots[slot_idx].size = 0;
                 }
             }
@@ -240,21 +230,35 @@ namespace hc::render::device::memory {
         // TODO cleanup function to remove excessive amount of empty slots maybe
 
         /**
-         * @brief Find the slot matching the provided memory offset.
+         * @brief Find the taken slot matching the provided memory offset.
          *
          * @param offset The memory offset of the slot to be found.
          * @return The index of the slot, if one is found. If no slot matching the offset is found, return 0xFFFFFFFF.
          */
-        [[nodiscard]] u32 find_slot(VkDeviceSize offset) const noexcept {
-            VkDeviceSize total_offset = 0;
-            u32 i = 0;
-            for (; i < this->slots.size() && total_offset < offset; i++)
-                total_offset += this->slots[i].offset;
+        [[nodiscard]] std::optional<u32> find_slot(VkDeviceSize offset) const noexcept {
+            u32 slot_idx = 0;
 
-            if (total_offset == offset)
-                return i;
+            // TODO this is probably an inefficient way to look for the slot
+            for (const Slot &slot: this->slots) {
+                if (offset <= slot.offset) {
+                    if (slot.offset == offset) {
+                        if (slot.in_use)
+                            break;
+                        else
+                            return std::nullopt;
+                    }
+
+                    slot_idx = this->slots.size();
+                    break;
+                }
+
+                slot_idx++;
+            }
+
+            if (slot_idx == this->slots.size())
+                return std::nullopt;
             else
-                return std::numeric_limits<u32>::max();
+                return slot_idx;
         }
 
     private:

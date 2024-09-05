@@ -120,7 +120,7 @@ namespace hc::render::device::memory {
             missing_heaps = true;
         }
         if (missing_heaps)
-            return Result<HeapManager, HeapResult>::err(HeapResult::HeapNotFound);
+            return Err(HeapResult::HeapNotFound);
 
         HC_TRACE("Heap type indexes: "
                          << "main = " << manager.heap_indexes[static_cast<Sz>(Heap::Main)]
@@ -140,7 +140,7 @@ namespace hc::render::device::memory {
             HC_DEBUG("Upload heap is NOT host coherent");
         }
 
-        return Result<HeapManager, HeapResult>::ok(std::move(manager));
+        return Ok(std::move(manager));
     }
 
     u32 HeapManager::find_memory_type(u32 type_filter, VkMemoryPropertyFlags heap_properties) {

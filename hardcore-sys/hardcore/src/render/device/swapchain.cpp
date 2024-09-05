@@ -16,7 +16,7 @@ namespace hc::render::device {
         VkResult res = fn_table.vkCreateSwapchainKHR(device, &create_info, nullptr, &swapchain);
         if (res != VK_SUCCESS) {
             HC_ERROR("Failed to create swapchain: " << to_str(res));
-            return Result<InnerSwapchain, SwapchainResult>::err(SwapchainResult::CreationFailure);
+            return Err(SwapchainResult::CreationFailure);
         }
 
         u32 image_count = 0;
@@ -24,14 +24,14 @@ namespace hc::render::device {
         if (res != VK_SUCCESS) {
             HC_ERROR("Failed to query swapchain images: " << to_str(res));
             fn_table.vkDestroySwapchainKHR(device, swapchain, nullptr);
-            return Result<InnerSwapchain, SwapchainResult>::err(SwapchainResult::ImageAcquisitionFailure);
+            return Err(SwapchainResult::ImageAcquisitionFailure);
         }
         std::vector<VkImage> images(image_count);
         res = fn_table.vkGetSwapchainImagesKHR(device, swapchain, &image_count, images.data());
         if (res != VK_SUCCESS) {
             HC_ERROR("Failed to obtain swapchain images: " << to_str(res));
             fn_table.vkDestroySwapchainKHR(device, swapchain, nullptr);
-            return Result<InnerSwapchain, SwapchainResult>::err(SwapchainResult::ImageAcquisitionFailure);
+            return Err(SwapchainResult::ImageAcquisitionFailure);
         }
 
         std::vector<VkImageView> image_views(image_count);
@@ -58,11 +58,11 @@ namespace hc::render::device {
                     fn_table.vkDestroyImageView(device, image_views[j], nullptr);
                 }
                 fn_table.vkDestroySwapchainKHR(device, swapchain, nullptr);
-                return Result<InnerSwapchain, SwapchainResult>::err(SwapchainResult::ImageViewFailure);
+                return Err(SwapchainResult::ImageViewFailure);
             }
         }
 
-        return Result<InnerSwapchain, SwapchainResult>::ok(InnerSwapchain{
+        return Ok(InnerSwapchain{
                 .handle = swapchain,
                 .image_views = std::move(image_views)
         });
@@ -91,7 +91,7 @@ namespace hc::render::device {
                                                    << to_str(surface_capabilities.surfaceCapabilities.minImageExtent)
                                                    << " and maximum is "
                                                    << to_str(surface_capabilities.surfaceCapabilities.maxImageExtent));
-            return Result<Swapchain, SwapchainResult>::err(SwapchainResult::UnsupportedSurface);
+            return Err(SwapchainResult::UnsupportedSurface);
         }
 
         VkPresentModeKHR present_mode = surface_info.available_present_modes[0];
@@ -135,7 +135,7 @@ namespace hc::render::device {
 
         auto inner_res = create_inner_swapchain(fn_table, device, create_info);
         if (!inner_res)
-            return Result<Swapchain, SwapchainResult>::err(std::move(inner_res).err());
+            return Err(std::move(inner_res).err());
 
         Swapchain swapchain;
         swapchain.inner = std::move(inner_res).ok();
@@ -148,7 +148,7 @@ namespace hc::render::device {
         swapchain.creation_params.image_count = image_count;
         swapchain.creation_params.transform = surface_capabilities.surfaceCapabilities.currentTransform;
 
-        return Result<Swapchain, SwapchainResult>::ok(std::move(swapchain));
+        return Ok(std::move(swapchain));
     }
 
     Swapchain::~Swapchain() {
@@ -205,13 +205,12 @@ namespace hc::render::device {
         old_swapchains.pop();
     }
 
-    Result<u32, SwapchainResult>
-    Swapchain::acquire_image(const VolkDeviceTable &fn_table, VkDevice device, GLFWwindow *window, u8 frame_mod,
-                             u64 timeout) {
+    Result<u32, SwapchainResult> Swapchain::acquire_image(const VolkDeviceTable &fn_table, VkDevice device,
+                                                          GLFWwindow *window, u8 frame_mod, u64 timeout) {
         VkResult res = fn_table.vkWaitForFences(device, 1, &this->presentation_fences[frame_mod], VK_TRUE, timeout);
         if (res != VK_SUCCESS) {
             HC_ERROR("Failed to wait for presentation fence: " << to_str(res));
-            return Result<u32, SwapchainResult>::err(SwapchainResult::FenceFailure);
+            return Err(SwapchainResult::FenceFailure);
         }
 
         u32 index = std::numeric_limits<u32>::max();
@@ -221,15 +220,15 @@ namespace hc::render::device {
             HC_DEBUG("Swapchain out of date, recreating");
             SwapchainResult swapchain_result = this->recreate(fn_table, device, window);
             if (swapchain_result != SwapchainResult::Success)
-                return Result<u32, SwapchainResult>::err(std::move(swapchain_result));
+                return Err(std::move(swapchain_result));
 
-            return Result<u32, SwapchainResult>::err(SwapchainResult::SkipFrame);
+            return Err(SwapchainResult::SkipFrame);
         } else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR) {
             HC_ERROR("Failed to acquire swapchain image: " << to_str(res));
-            return Result<u32, SwapchainResult>::err(SwapchainResult::ImageAcquisitionFailure);
+            return Err(SwapchainResult::ImageAcquisitionFailure);
         }
 
-        return Result<u32, SwapchainResult>::ok(std::move(index));
+        return Ok(std::move(index));
     }
 
     SwapchainResult Swapchain::recreate(const VolkDeviceTable &fn_table, VkDevice device, GLFWwindow *window) {
