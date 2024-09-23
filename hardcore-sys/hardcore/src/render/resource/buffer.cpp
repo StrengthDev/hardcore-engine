@@ -118,9 +118,8 @@ void hc_destroy_buffer(HCBuffer *buffer) {
         return;
     }
     auto &device = devices[device_id];
-    auto frame_mod = hc::render::current_frame_mod();
 
-    device.destroy_buffer(buffer->id, frame_mod);
+    device.destroy_buffer(buffer->id);
     *buffer = INVALID_BUFFER;
 }
 
@@ -228,8 +227,7 @@ void hc_destroy_dynamic_buffer(HCDynamicBuffer *buffer) {
         return;
     }
     auto &device = devices[device_id];
-    auto frame_mod = hc::render::current_frame_mod();
 
-    device.destroy_buffer(buffer->id, frame_mod);
+    device.destroy_buffer(buffer->id);
     *buffer = INVALID_DYNAMIC_BUFFER;
 }

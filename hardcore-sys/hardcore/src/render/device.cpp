@@ -150,6 +150,7 @@ namespace hc::render {
             }, mark);
         }
         cleanup_queue.clear();
+        std::swap(cleanup_queue, this->cleanup_submissions);
 
         this->memory.unmap_ranges(this->fn_table, this->handle);
         device::MemoryResult mem_res = this->memory.flush_ranges(this->fn_table, this->handle, frame_mod);
@@ -324,12 +325,12 @@ namespace hc::render {
         }
     }
 
-    void Device::destroy_swapchain(VkInstance instance, GLFWwindow *window, u8 frame_mod) {
+    void Device::destroy_swapchain(VkInstance instance, GLFWwindow *window) {
         device::WindowDestructionMark mark = {
                 .instance = instance,
                 .window = window
         };
-        this->cleanup_queues[frame_mod].emplace_back(mark);
+        this->cleanup_submissions.emplace_back(mark);
     }
 
     Result<buffer::Params, DeviceResult>
@@ -448,7 +449,7 @@ namespace hc::render {
         return Ok(params);
     }
 
-    void Device::destroy_buffer(u64 id, u8 frame_mod) {
-        this->cleanup_queues[frame_mod].emplace_back(this->graph.remove_resource(id));
+    void Device::destroy_buffer(u64 id) {
+        this->cleanup_submissions.emplace_back(this->graph.remove_resource(id));
     }
 }

@@ -361,7 +361,7 @@ namespace hc::render {
     void destroy_swapchain(GLFWwindow *window, DeviceID device_idx) {
         // The default device may have changed meanwhile
         HC_ASSERT(device_idx != std::numeric_limits<DeviceID>::max(), "Cannot assume default device");
-        devices[device_idx].destroy_swapchain(global_instance, window, frame_mod);
+        devices[device_idx].destroy_swapchain(global_instance, window);
     }
 
     u8 max_frames_in_flight() {
@@ -399,7 +399,7 @@ int hc_render_tick() {
 }
 
 int hc_render_finish() {
-    for (u8 i = 0; i < hc::render::max_frames_in_flight_count; ++i) {
+    for (u8 i = 0; i < hc::render::max_frames_in_flight_count + 1; ++i) {
         int res = hc_render_tick();
         if (res)
             return res;

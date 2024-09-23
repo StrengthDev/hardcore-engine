@@ -47,7 +47,7 @@ namespace hc::render {
 
         [[nodiscard]] DeviceResult create_swapchain(VkInstance instance, GLFWwindow *window);
 
-        void destroy_swapchain(VkInstance instance, GLFWwindow *window, u8 frame_mod);
+        void destroy_swapchain(VkInstance instance, GLFWwindow *window);
 
         [[nodiscard]] Result<buffer::Params, DeviceResult>
         new_buffer(HCBufferKind kind, resource::Descriptor &&descriptor,
@@ -63,7 +63,7 @@ namespace hc::render {
         [[nodiscard]] Result<buffer::DynamicParams, DeviceResult>
         new_dynamic_index_buffer(HCPrimitive index_type, u64 count, bool writable, u8 frame_mod);
 
-        void destroy_buffer(u64 id, u8 frame_mod);
+        void destroy_buffer(u64 id);
 
     private:
         Device() = default;
@@ -77,6 +77,7 @@ namespace hc::render {
         std::unordered_map<GLFWwindow *, device::Swapchain> swapchains;
 
         std::vector<std::vector<device::DestructionMark>> cleanup_queues;
+        std::vector<device::DestructionMark> cleanup_submissions;
 
         ExternalHandle<VkDevice, VK_NULL_HANDLE> handle;
         VolkDeviceTable fn_table = {};
