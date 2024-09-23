@@ -6,6 +6,7 @@
 
 #include <core/log.hpp>
 
+/*
 namespace hc::device {
     const VkDeviceSize staging_buffer_size = MEGABYTES(8);
 
@@ -702,11 +703,11 @@ namespace hc::device {
         return alloc_texture<false>({w, h, 1U}, 1, 1);
     }
 }
-
+*/
 
 namespace hc::render::device {
     Result<Memory, MemoryResult> Memory::create(VkPhysicalDevice physical_device, const VolkDeviceTable &fn_table,
-                                                VkDevice device, const VkPhysicalDeviceLimits& limits) {
+                                                VkDevice device, const VkPhysicalDeviceLimits &limits) {
         auto manager = memory::HeapManager::create(physical_device);
         if (!manager)
             return Err(MemoryResult::HeapError);
@@ -724,15 +725,15 @@ namespace hc::render::device {
     }
 
     void Memory::destroy(const VolkDeviceTable &fn_table, VkDevice device) {
-        for (auto& [flags, pools] : this->buffer_pools) {
-            for (auto& [id, pool] : pools) {
+        for (auto &[flags, pools]: this->buffer_pools) {
+            for (auto &[id, pool]: pools) {
                 pool.free(fn_table, device, this->heap_manager);
             }
         }
         this->buffer_pools.clear();
 
-        for (auto& [flags, pools] : this->dynamic_buffer_pools) {
-            for (auto& [id, pool] : pools) {
+        for (auto &[flags, pools]: this->dynamic_buffer_pools) {
+            for (auto &[id, pool]: pools) {
                 pool.free(fn_table, device, this->heap_manager);
             }
         }
@@ -740,8 +741,8 @@ namespace hc::render::device {
     }
 
     MemoryResult Memory::map_ranges(const VolkDeviceTable &fn_table, VkDevice device, u8 frame_mod) {
-        for (auto& [flags, pools] : this->dynamic_buffer_pools) {
-            for (auto& [id, pool] : pools) {
+        for (auto &[flags, pools]: this->dynamic_buffer_pools) {
+            for (auto &[id, pool]: pools) {
                 memory::PoolResult res = pool.map(fn_table, device, frame_mod);
                 if (res != memory::PoolResult::Success)
                     return MemoryResult::MapError; // TODO might want to clean up already mapped ranges
@@ -752,8 +753,8 @@ namespace hc::render::device {
     }
 
     void Memory::unmap_ranges(const VolkDeviceTable &fn_table, VkDevice device) {
-        for (auto& [flags, pools] : this->dynamic_buffer_pools) {
-            for (auto& [id, pool] : pools) {
+        for (auto &[flags, pools]: this->dynamic_buffer_pools) {
+            for (auto &[id, pool]: pools) {
                 pool.unmap(fn_table, device);
             }
         }
@@ -763,8 +764,8 @@ namespace hc::render::device {
         std::vector<VkMappedMemoryRange> ranges;
 
         if (!this->heap_manager.host_coherent_dynamic_heap()) {
-            for (auto& [flags, pools] : this->dynamic_buffer_pools) {
-                for (auto& [id, pool] : pools) {
+            for (auto &[flags, pools]: this->dynamic_buffer_pools) {
+                for (auto &[id, pool]: pools) {
                     ranges.push_back(pool.mapped_range(frame_mod));
                 }
             }
@@ -818,12 +819,12 @@ namespace hc::render::device {
             this->buffer_pools.insert({flags, {}});
 
         VkDeviceSize alignment = this->alignment_of(flags);
-        auto& pools = this->buffer_pools[flags];
+        auto &pools = this->buffer_pools[flags];
         u64 pool_id = 0;
         memory::AllocationSpec spec = {};
-        for (const auto& [id, pool] : pools) {
+        for (const auto &[id, pool]: pools) {
             spec = pool.search(size, alignment);
-            if (spec.size){
+            if (spec.size) {
                 pool_id = id;
                 break;
             }
@@ -850,30 +851,34 @@ namespace hc::render::device {
             }
         }
 
+        HC_TRACE("Allocating in pool " << pool_id << ':' << flags << ", at " << spec.offset << " bytes offset, "
+                                       << spec.size << " bytes + " << spec.padding << " padding bytes");
         pools[pool_id].fill_slot(spec.slot_idx, spec.size + spec.padding);
 
         return Ok(memory::Ref{
-            .pool = pool_id,
-            .size = spec.size,
-            .offset = spec.offset,
-            .padding = spec.padding,
-            .flags = flags,
+                .buffer = pools[pool_id].handle(),
+                .pool = pool_id,
+                .pool_size = pools[pool_id].capacity(),
+                .size = spec.size,
+                .offset = spec.offset,
+                .padding = spec.padding,
+                .flags = flags,
         });
     }
 
-    Result<std::pair<memory::Ref, void**>, MemoryResult> Memory::alloc_dyn(const VolkDeviceTable &fn_table,
-                                                                           VkDevice device, VkBufferUsageFlags flags,
-                                                                           VkDeviceSize size, u8 frame_mod) {
+    Result<std::pair<memory::Ref, void **>, MemoryResult> Memory::alloc_dyn(const VolkDeviceTable &fn_table,
+                                                                            VkDevice device, VkBufferUsageFlags flags,
+                                                                            VkDeviceSize size, u8 frame_mod) {
         if (!this->dynamic_buffer_pools.contains(flags))
             this->dynamic_buffer_pools.insert({flags, {}});
 
         VkDeviceSize alignment = this->alignment_of(flags);
-        auto& pools = this->dynamic_buffer_pools[flags];
+        auto &pools = this->dynamic_buffer_pools[flags];
         u32 pool_id = 0;
         memory::AllocationSpec spec = {};
-        for (const auto& [id, pool] : pools) {
+        for (const auto &[id, pool]: pools) {
             spec = pool.search(size, alignment);
-            if (spec.size){
+            if (spec.size) {
                 pool_id = id;
                 break;
             }
@@ -881,7 +886,8 @@ namespace hc::render::device {
 
         if (!spec.size) {
             VkDeviceSize pool_size = increase_to_fit(MEBI(8), size);
-            auto pool_result = memory::DynamicBufferPool::create(fn_table, device, this->heap_manager, pool_size, flags);
+            auto pool_result = memory::DynamicBufferPool::create(fn_table, device, this->heap_manager, pool_size,
+                                                                 flags);
             if (pool_result) {
                 pool_id = pools.insert(std::move(pool_result).ok());
 
@@ -908,21 +914,32 @@ namespace hc::render::device {
             }
         }
 
+        HC_TRACE("Allocating in dynamic pool " << pool_id << ':' << flags << ", at " << spec.offset << " bytes offset, "
+                                               << spec.size << " bytes + " << spec.padding << " padding bytes");
         pools[pool_id].fill_slot(spec.slot_idx, spec.size + spec.padding);
         memory::Ref ref = {
+                .buffer = pools[pool_id].handle(),
                 .pool = pool_id,
+                .pool_size = pools[pool_id].capacity(),
                 .size = spec.size,
                 .offset = spec.offset,
                 .padding = spec.padding,
                 .flags = flags,
         };
-        void** host_ptr = pools[pool_id].host_ptr();
+        void **host_ptr = pools[pool_id].host_ptr();
 
         return Ok(std::make_pair(ref, host_ptr));
     }
 
-    void Memory::free(const VolkDeviceTable &fn_table, VkDevice device, memory::Ref ref) {
-        HC_ASSERT(this->buffer_pools.contains(ref.flags), "Pool list matching the flags must exist");
-        this->buffer_pools[ref.flags][ref.pool].clear_slot(ref.offset);
+    void Memory::free(const VolkDeviceTable &fn_table, VkDevice device, ResourceDestructionMark mark) {
+        if (mark.dynamic) {
+            HC_ASSERT(this->dynamic_buffer_pools.contains(mark.usage), "Pool list matching the flags must exist");
+            HC_TRACE("Freeing in dynamic pool " << mark.pool << ':' << mark.usage << " at offset " << mark.offset);
+            this->dynamic_buffer_pools[mark.usage][mark.pool].clear_slot(mark.offset);
+        } else {
+            HC_ASSERT(this->buffer_pools.contains(mark.usage), "Pool list matching the flags must exist");
+            HC_TRACE("Freeing in pool " << mark.pool << ':' << mark.usage << " at offset " << mark.offset);
+            this->buffer_pools[mark.usage][mark.pool].clear_slot(mark.offset);
+        }
     }
 }

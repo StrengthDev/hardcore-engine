@@ -67,8 +67,8 @@ namespace hc::render::device::memory {
                     .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
                     .pNext = nullptr,
                     .memory = this->memory,
-                    .offset = this->capacity * frame_mod,
-                    .size = this->capacity
+                    .offset = this->total_capacity * frame_mod,
+                    .size = this->total_capacity
             };
         }
 
@@ -80,7 +80,7 @@ namespace hc::render::device::memory {
         // Unique pointers cannot be copied, so there is no need to wrap this in an `Uncopyable`.
         std::unique_ptr<void *> mapped_host_ptr;
     };
-
+/*
     struct texture_slot {
         VkImage image;
         VkImageView view;
@@ -112,4 +112,5 @@ namespace hc::render::device::memory {
     private:
         u32 m_memory_type_idx = std::numeric_limits<u32>::max();
     };
+*/
 }

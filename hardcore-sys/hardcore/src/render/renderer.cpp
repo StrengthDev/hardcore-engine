@@ -386,14 +386,14 @@ namespace hc::render {
 }
 
 int hc_render_tick() {
-    u8 current_mod = hc::render::frame_mod;
+    u8 next_mod = hc::render::frame_mod + 1;
+    next_mod = next_mod < hc::render::max_frames_in_flight_count ? next_mod : 0;
 
     for (auto &device: hc::render::devices) {
-        device.tick(current_mod);
+        device.tick(hc::render::frame_mod, next_mod);
     }
 
-    current_mod++;
-    hc::render::frame_mod = current_mod < hc::render::max_frames_in_flight() ? current_mod : 0;
+    hc::render::frame_mod = next_mod;
 
     return 0;
 }

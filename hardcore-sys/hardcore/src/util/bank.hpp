@@ -35,9 +35,14 @@ public:
      * @brief Remove an element from the bank.
      *
      * @param id The id of the element to be removed.
+     * @return The removed element.
      */
-    void erase(ID id) {
+    T erase(ID id) {
+        auto i = this->map.find(id);
+        HC_ASSERT(i != this->map.end(), "Element must exist");
+        auto v = std::move(i->second);
         this->map.erase(id);
+        return std::move(v);
     }
 
     /**
@@ -53,7 +58,7 @@ public:
      *
      * @return The number of elements.
      */
-    [[nodiscard]] Sz size() {
+    [[nodiscard]] Sz size() const noexcept {
         return this->map.size();
     }
 
@@ -62,7 +67,7 @@ public:
      *
      * @return `true` if the bank is empty, `false` otherwise.
      */
-    [[nodiscard]] bool empty() {
+    [[nodiscard]] bool empty() const noexcept {
         return this->map.empty();
     }
 
@@ -72,7 +77,7 @@ public:
      * @param id The element ID to verify.
      * @return `true` if the element exists, `false` otherwise.
      */
-    [[nodiscard]] bool contains(ID id) {
+    [[nodiscard]] bool contains(ID id) const {
         return this->map.contains(id);
     }
 
@@ -82,7 +87,18 @@ public:
      * @param id The id of the element to be accessed.
      * @return A reference to the element.
      */
-    [[nodiscard]] T &operator[](ID id) {
+    [[nodiscard]] T &operator[](ID id) noexcept {
+        HC_ASSERT(this->map.contains(id), "Value matching the id must already exist");
+        return this->map.at(id);
+    }
+
+    /**
+     * @brief Access specific element.
+     *
+     * @param id The id of the element to be accessed.
+     * @return A reference to the element.
+     */
+    [[nodiscard]] const T &operator[](ID id) const noexcept {
         HC_ASSERT(this->map.contains(id), "Value matching the id must already exist");
         return this->map.at(id);
     }
@@ -92,7 +108,7 @@ public:
      *
      * @return The iterator.
      */
-    [[nodiscard]] auto begin() {
+    [[nodiscard]] auto begin() noexcept {
         return this->map.begin();
     }
 
@@ -101,7 +117,7 @@ public:
      *
      * @return The iterator.
      */
-    [[nodiscard]] auto end() {
+    [[nodiscard]] auto end() noexcept {
         return this->map.end();
     }
 
@@ -110,8 +126,8 @@ public:
      *
      * @return The iterator.
      */
-    [[nodiscard]] auto cbegin() {
-        return this->map.cbegin();
+    [[nodiscard]] auto begin() const noexcept {
+        return this->map.begin();
     }
 
     /**
@@ -119,8 +135,8 @@ public:
      *
      * @return The iterator.
      */
-    [[nodiscard]] auto cend() {
-        return this->map.cend();
+    [[nodiscard]] auto end() const noexcept {
+        return this->map.end();
     }
 
 private:

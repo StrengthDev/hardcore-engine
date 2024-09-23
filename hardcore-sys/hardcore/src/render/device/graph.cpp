@@ -7,17 +7,6 @@
 #include "graph.hpp"
 
 namespace hc::render::device {
-    /**
-     * @brief Generate the next ID for some item.
-     *
-     * @param seed The current seed to use for generation.
-     * @return The generated ID.
-     */
-    GraphItemID next_id(GraphItemID &seed) noexcept {
-        // Unsure of this is the best way to generate IDs, but in practice there should no collisions at least.
-        return seed++;
-    }
-
     Graph Graph::create(u32 graphics_queue_family, u32 compute_queue_family, u32 transfer_queue_family) {
         Sz command_queues;
         u8 graphics_idx, compute_idx, transfer_idx;
@@ -99,9 +88,7 @@ namespace hc::render::device {
         std::vector<GraphItemID> root_nodes;
         for (auto const &[resource_id, node_id]: this->outputs) {
             bool is_root = true;
-            auto node = this->nodes.find(node_id);
-            HC_ASSERT(node != this->nodes.end(), "The output should exist within the graph");
-            for (const InputResource &input: node->second.inputs) {
+            for (const InputResource &input: this->nodes[node_id].inputs) {
                 if (input.origin) {
                     is_root = false;
                     auto [it, inserted] = output_dependencies.insert(*input.origin);
@@ -118,9 +105,7 @@ namespace hc::render::device {
             dependency_stack.pop_back();
 
             bool is_root = true;
-            auto node = this->nodes.find(current_node_id);
-            HC_ASSERT(node != this->nodes.end(), "The dependency should exist within the graph");
-            for (const InputResource &input: node->second.inputs) {
+            for (const InputResource &input: this->nodes[current_node_id].inputs) {
                 if (input.origin) {
                     is_root = false;
                     auto [it, inserted] = output_dependencies.insert(*input.origin);
@@ -233,6 +218,32 @@ namespace hc::render::device {
         // TODO do NOT forget: dedicated transfer queue for host-device transfers, otherwise use the resource owning family
 
         return GraphResult::Success;
+    }
+
+    u64 Graph::add_resource(const memory::Ref &ref, bool dynamic) {
+        return this->resources.insert({
+                                              .buffer = ref.buffer,
+                                              .size = ref.size,
+                                              .frame_pad = ref.pool_size,
+                                              .offset = ref.offset + ref.padding,
+                                              .logistics = {
+                                                      .pool = ref.pool,
+                                                      .offset = ref.offset,
+                                                      .flags = ref.flags,
+                                                      .dynamic = dynamic,
+                                              },
+                                      });
+    }
+
+    ResourceDestructionMark Graph::remove_resource(u64 id) {
+        auto resource = this->resources.erase(id);
+
+        return {
+                .usage = resource.logistics.flags,
+                .pool = resource.logistics.pool,
+                .offset = resource.logistics.offset,
+                .dynamic = resource.logistics.dynamic,
+        };
     }
 
     std::size_t Graph::OutputHash::operator()(const std::pair<GraphItemID, GraphItemID> &output) const noexcept {

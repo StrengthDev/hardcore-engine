@@ -9,18 +9,20 @@
 #include "descriptor.hpp"
 
 const HCBuffer INVALID_BUFFER = {
-        .device = std::numeric_limits<DeviceID>::max(),
         .id = std::numeric_limits<GraphItemID>::max(),
-        .status = HCBufferStatus::Destroyed,
+        .size = 0,
+        .device = std::numeric_limits<DeviceID>::max(),
 };
 
 const HCDynamicBuffer INVALID_DYNAMIC_BUFFER = {
-        .base = INVALID_BUFFER,
+        .id = std::numeric_limits<GraphItemID>::max(),
+        .size = 0,
         .data = nullptr,
         .data_offset = std::numeric_limits<u64>::max(),
+        .device = std::numeric_limits<DeviceID>::max(),
 };
 
-HCBuffer hc_new_buffer(HCBufferKind kind, HCDescriptor *descriptor, u64 count, bool writable, DeviceID device) {
+HCBuffer hc_new_buffer(HCBufferKind kind, const HCDescriptor *descriptor, u64 count, bool writable, DeviceID device) {
     if (kind == HCBufferKind::Index) {
         HC_ERROR("Invalid buffer kind (call `hc_new_index_buffer` instead)");
         return INVALID_BUFFER;
@@ -50,13 +52,16 @@ HCBuffer hc_new_buffer(HCBufferKind kind, HCDescriptor *descriptor, u64 count, b
     auto &device_handle = devices[device];
 
     auto res = device_handle.new_buffer(kind, hc::render::resource::Descriptor(*descriptor), count, writable);
-    if (res) {
-        auto buffer = std::move(res).ok();
-        buffer.device = device;
-        return buffer;
-    } else {
+    if (!res) {
         return INVALID_BUFFER;
     }
+
+    auto params = std::move(res).ok();
+    return {
+            .id = params.id,
+            .size = params.size,
+            .device = device,
+    };
 }
 
 HCBuffer hc_new_index_buffer(HCPrimitive index_type, u64 count, bool writable, DeviceID device) {
@@ -81,40 +86,45 @@ HCBuffer hc_new_index_buffer(HCPrimitive index_type, u64 count, bool writable, D
     auto &device_handle = devices[device];
 
     auto res = device_handle.new_index_buffer(index_type, count, writable);
-    if (res) {
-        auto buffer = std::move(res).ok();
-        buffer.device = device;
-        return buffer;
-    } else {
+    if (!res) {
         return INVALID_BUFFER;
     }
+
+    auto params = std::move(res).ok();
+    return {
+            .id = params.id,
+            .size = params.size,
+            .device = device,
+    };
 }
 
 void hc_destroy_buffer(HCBuffer *buffer) {
     if (!buffer)
         return;
 
-    if (buffer->device == INVALID_BUFFER.device || buffer->id == INVALID_BUFFER.id ||
-        buffer->status != HCBufferStatus::Valid) {
+    if (!buffer->size) {
         HC_WARN("Attempted to destroy invalid buffer");
+        return;
     }
 
     const auto device_id = buffer->device;
     auto &devices = hc::render::device_list();
     if (devices.empty()) {
         HC_WARN("Tried to destroy buffer when global context is uninitialized");
+        return;
     }
     if (devices.size() - 1 < device_id) {
         HC_WARN("Buffer isn't owned by a valid device");
+        return;
     }
     auto &device = devices[device_id];
     auto frame_mod = hc::render::current_frame_mod();
 
-    device.destroy_buffer(*buffer, frame_mod);
+    device.destroy_buffer(buffer->id, frame_mod);
     *buffer = INVALID_BUFFER;
 }
 
-HCDynamicBuffer hc_new_dynamic_buffer(HCBufferKind kind, HCDescriptor *descriptor, u64 count, bool writable,
+HCDynamicBuffer hc_new_dynamic_buffer(HCBufferKind kind, const HCDescriptor *descriptor, u64 count, bool writable,
                                       DeviceID device) {
     if (kind == HCBufferKind::Index) {
         HC_ERROR("Invalid buffer kind (call `hc_new_dynamic_index_buffer` instead)");
@@ -143,15 +153,22 @@ HCDynamicBuffer hc_new_dynamic_buffer(HCBufferKind kind, HCDescriptor *descripto
         return INVALID_DYNAMIC_BUFFER;
     }
     auto &device_handle = devices[device];
+    auto frame_mod = hc::render::current_frame_mod();
 
-    auto res = device_handle.new_dynamic_buffer(kind, hc::render::resource::Descriptor(*descriptor), count, writable);
-    if (res) {
-        auto buffer = std::move(res).ok();
-        buffer.base.device = device;
-        return buffer;
-    } else {
+    auto res = device_handle.new_dynamic_buffer(kind, hc::render::resource::Descriptor(*descriptor), count, writable,
+                                                frame_mod);
+    if (!res) {
         return INVALID_DYNAMIC_BUFFER;
     }
+
+    auto params = std::move(res).ok();
+    return {
+            .id = params.id,
+            .size = params.size,
+            .data = params.data,
+            .data_offset = params.data_offset,
+            .device = device,
+    };
 }
 
 HCDynamicBuffer hc_new_dynamic_index_buffer(HCPrimitive index_type, u64 count, bool writable, DeviceID device) {
@@ -174,37 +191,45 @@ HCDynamicBuffer hc_new_dynamic_index_buffer(HCPrimitive index_type, u64 count, b
         return INVALID_DYNAMIC_BUFFER;
     }
     auto &device_handle = devices[device];
+    auto frame_mod = hc::render::current_frame_mod();
 
-    auto res = device_handle.new_dynamic_index_buffer(index_type, count, writable);
-    if (res) {
-        auto buffer = std::move(res).ok();
-        buffer.base.device = device;
-        return buffer;
-    } else {
+    auto res = device_handle.new_dynamic_index_buffer(index_type, count, writable, frame_mod);
+    if (!res) {
         return INVALID_DYNAMIC_BUFFER;
     }
+
+    auto params = std::move(res).ok();
+    return {
+            .id = params.id,
+            .size = params.size,
+            .data = params.data,
+            .data_offset = params.data_offset,
+            .device = device,
+    };
 }
 
 void hc_destroy_dynamic_buffer(HCDynamicBuffer *buffer) {
     if (!buffer)
         return;
 
-    if (buffer->base.device == INVALID_BUFFER.device || buffer->base.id == INVALID_BUFFER.id ||
-        buffer->base.status != HCBufferStatus::Valid) {
+    if (!buffer->size) {
         HC_WARN("Attempted to destroy invalid buffer");
+        return;
     }
 
-    const auto device_id = buffer->base.device;
+    const auto device_id = buffer->device;
     auto &devices = hc::render::device_list();
     if (devices.empty()) {
         HC_WARN("Tried to destroy buffer when global context is uninitialized");
+        return;
     }
     if (devices.size() - 1 < device_id) {
         HC_WARN("Buffer isn't owned by a valid device");
+        return;
     }
     auto &device = devices[device_id];
     auto frame_mod = hc::render::current_frame_mod();
 
-    device.destroy_dynamic_buffer(*buffer, frame_mod);
+    device.destroy_buffer(buffer->id, frame_mod);
     *buffer = INVALID_DYNAMIC_BUFFER;
 }

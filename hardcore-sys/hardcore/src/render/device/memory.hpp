@@ -5,15 +5,15 @@
 #include <util/number.hpp>
 #include <util/result.hpp>
 #include <util/bank.hpp>
+
+#include "destruction_mark.hpp"
 #include "memory/heap_manager.hpp"
 #include "memory/resource_pool.hpp"
-#include "memory/staging_pool.hpp"
+//#include "memory/staging_pool.hpp"
 #include "memory/reference.hpp"
 
-#include <render/memory_reference.hpp>
-#include <render/resource.hpp>
-
 namespace hc::render::device {
+    /*
     // for operations such as allocations, which happen outside of device functions, memory needs access to some device
     // data, such as the VkDevice handle for operations like vkAllocateMemory
     struct random_access_device_data {
@@ -281,6 +281,7 @@ namespace hc::render::device {
         std::vector<texture_upload_pool> m_tex_upload_pools;
         bool m_uploads_pending = false;
     };
+    */
 
     enum class MemoryResult : u8 {
         Success = 0, //!< Success.
@@ -321,7 +322,15 @@ namespace hc::render::device {
                                                                                       VkDeviceSize size,
                                                                                       u8 frame_mod);
 
-        void free(const VolkDeviceTable &fn_table, VkDevice device, memory::Ref ref);
+        void free(const VolkDeviceTable &fn_table, VkDevice device, ResourceDestructionMark mark);
+
+        [[nodiscard]] inline bool host_coherent_dynamic_heap() const noexcept {
+            return this->heap_manager.host_coherent_dynamic_heap();
+        }
+
+        [[nodiscard]] inline bool host_coherent_upload_heap() const noexcept {
+            return this->heap_manager.host_coherent_upload_heap();
+        }
 
     private:
         [[nodiscard]] VkDeviceSize alignment_of(VkBufferUsageFlags flags) const noexcept;

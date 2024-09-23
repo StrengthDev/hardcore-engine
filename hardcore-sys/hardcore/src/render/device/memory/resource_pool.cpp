@@ -83,7 +83,8 @@ namespace hc::render::device::memory {
 
     PoolResult DynamicBufferPool::map(const VolkDeviceTable &fn_table, VkDevice device, u8 frame_mod) {
         HC_ASSERT(this->mapped_host_ptr == nullptr, "Memory already mapped");
-        VkResult res = fn_table.vkMapMemory(device, this->memory, this->capacity * frame_mod, this->capacity, 0,
+        VkResult res = fn_table.vkMapMemory(device, this->memory, this->total_capacity * frame_mod,
+                                            this->total_capacity, 0,
                                             this->mapped_host_ptr.get());
 
         switch (res) {
@@ -104,7 +105,7 @@ namespace hc::render::device::memory {
         fn_table.vkUnmapMemory(device, this->memory);
         this->mapped_host_ptr = nullptr;
     }
-
+/*
     texture_slot
     create_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements &out_memory_requirements) {
         VkImage image;
@@ -201,7 +202,7 @@ namespace hc::render::device::memory {
                                          aligned_offset(this->slots[slot_idx].offset, alignment)),
                        "Failed to bind image to memory");
     }
-
+*/
 #ifdef TODO
 
     struct dynamic_texture {

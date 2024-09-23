@@ -36,8 +36,8 @@ enum HCComposition {
  * @brief A description of a descriptor's field.
  */
 struct HCField {
-    HCPrimitive kind; //!< The basic data type of the field.
-    HCComposition composition; //!< The composition of the field.
+    enum HCPrimitive kind; //!< The basic data type of the field.
+    enum HCComposition composition; //!< The composition of the field.
 };
 
 /**
@@ -56,9 +56,9 @@ enum HCAlignment {
  * instance, and `hc_destroy_descriptor` used to destroy the instance.
  */
 struct HCDescriptor {
-    HCField *fields;
-    uint32_t field_count; //!< The number of fields. This value MUST be treated as const and never be changed.
-    HCAlignment alignment;
+    struct HCField *fields;
+    size_t field_count; //!< The number of fields. This value MUST be treated as const and never be changed.
+    enum HCAlignment alignment;
 };
 
 /**
@@ -69,7 +69,7 @@ struct HCDescriptor {
  * @param field_count The number of fields in the descriptor.
  * @return The allocated descriptor.
  */
-struct HCDescriptor hc_create_descriptor(uint32_t field_count);
+struct HCDescriptor hc_create_descriptor(size_t field_count);
 
 /**
  * @brief Destroys a `HCDescriptor`.

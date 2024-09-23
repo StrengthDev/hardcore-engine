@@ -4,7 +4,11 @@
 #include <optional>
 
 #include <render/renderer.h>
+#include <render/device/memory/reference.hpp>
 #include <util/number.hpp>
+#include <util/bank.hpp>
+
+#include "destruction_mark.hpp"
 
 namespace hc::render::device {
     enum class GraphResult : u8 {
@@ -47,6 +51,22 @@ namespace hc::render::device {
     };
 
     /**
+     * @brief A graph resource.
+     */
+    struct Resource {
+        VkBuffer buffer; //!< The buffer where this resource is located.
+        VkDeviceSize size; //!< The size in bytes of this resource.
+        VkDeviceSize frame_pad; //!< The value used to calculate the offset to the currently active area of this resource's buffer.
+        VkDeviceSize offset; //!< The offset to this resource within its buffer's currently active area. (Includes alignment padding)
+        struct Logistics {
+            u64 pool; //!< The id of the memory pool this resource is allocated in. (Excludes alignment padding)
+            VkDeviceSize offset; //!< The offset of this resource inside its respective memory pool.
+            VkBufferUsageFlags flags; //!< The usage flags of this resource.
+            bool dynamic; //!< Flag indicating if the resource is dynamic.
+        } logistics; //!< Data used for purposes of cleanup.
+    };
+
+    /**
      * @brief An acyclic computational graph.
      */
     class Graph {
@@ -72,7 +92,7 @@ namespace hc::render::device {
          *
          * @return GraphResult::Success if the graph was successfully compiled, otherwise an appropriate error value.
          */
-        GraphResult compile();
+        [[nodiscard]] GraphResult compile();
 
         /**
          * @brief Check if the graph has already been compiled.
@@ -89,6 +109,10 @@ namespace hc::render::device {
         void clear_commands() noexcept;
 
         [[nodiscard]] GraphResult record() const noexcept;
+
+        [[nodiscard]] u64 add_resource(const memory::Ref &ref, bool dynamic);
+
+        [[nodiscard]] ResourceDestructionMark remove_resource(u64 id);
 
     private:
         Graph(u8 graphics_idx, u8 compute_idx, u8 transfer_idx, Sz command_queues);
@@ -112,13 +136,10 @@ namespace hc::render::device {
         [[nodiscard]] std::pair<std::unordered_set<GraphItemID>, std::vector<GraphItemID>>
         filter_unused_nodes() const noexcept;
 
-        GraphItemID node_key_seed = 0; //!< The current seed used to generate the next node ID.
-        GraphItemID resource_key_seed = 0; //!< The current seed used to generate the next resource ID.
-
         // It is assumed the nodes in the graph never form a cycle
 
-        std::unordered_map<GraphItemID, Node> nodes; //!< The collection of nodes that compose the graph.
-        std::unordered_map<GraphItemID, Node> resources; //!< The collection of graph resources, used by nodes.
+        Bank<Node> nodes; //!< The collection of nodes that compose the graph.
+        Bank<Resource> resources; //!< The collection of graph resources, used by nodes.
 
         u8 graphics_idx = std::numeric_limits<u8>::max(); //!< The index of the graphics command list in `commands`.
         u8 compute_idx = std::numeric_limits<u8>::max(); //!< The index of the compute command list in `commands`.

@@ -98,6 +98,14 @@ namespace hc::render {
         }
         device.scheduler = std::move(*scheduler);
 
+        auto memory_res = device::Memory::create(physical_handle, device.fn_table, handle, device.properties.limits);
+        if (!memory_res) {
+            HC_ERROR("Failed to create device memory");
+            device.fn_table.vkDestroyDevice(handle, nullptr);
+            return std::nullopt;
+        }
+        device.memory = std::move(memory_res).ok();
+
         device.graph = device::Graph::create(device.scheduler.graphics_queue_family(),
                                              device.scheduler.compute_queue_family(),
                                              device.scheduler.transfer_queue_family());
@@ -105,50 +113,22 @@ namespace hc::render {
         device.physical_handle = physical_handle;
         device.handle = handle;
         device.cleanup_queues = std::vector<std::vector<device::DestructionMark>>(max_frames_in_flight());
-
+        HC_DEBUG(device.memory.host_coherent_dynamic_heap());
         return device;
     }
 
-    void Device::destroy() {
+    Device::~Device() {
         if (this->handle != VK_NULL_HANDLE) {
+            this->memory.destroy(this->fn_table, this->handle);
 //            this->scheduler.destroy();
             this->fn_table.vkDestroyDevice(this->handle, nullptr);
-            this->physical_handle = VK_NULL_HANDLE;
-            this->handle = VK_NULL_HANDLE;
+            this->physical_handle.destroy();
+            this->handle.destroy();
         }
     }
 
-    Device::~Device() {
-        this->destroy();
-    }
-
-    Device::Device(Device &&other) noexcept:
-            physical_handle(std::exchange(other.physical_handle, VK_NULL_HANDLE)),
-            properties(other.properties), features(other.features),
-            scheduler(std::move(other.scheduler)),
-            swapchains(std::move(other.swapchains)),
-            cleanup_queues(std::move(other.cleanup_queues)),
-            handle(std::exchange(other.handle, VK_NULL_HANDLE)),
-            fn_table(std::exchange(other.fn_table, {})) {
-
-    }
-
-    Device &Device::operator=(Device &&other) noexcept {
-        this->destroy();
-
-        this->physical_handle = std::exchange(other.physical_handle, VK_NULL_HANDLE);
-        this->properties = other.properties;
-        this->features = other.features;
-        this->scheduler = std::move(other.scheduler);
-        this->swapchains = std::move(other.swapchains);
-        this->cleanup_queues = std::move(other.cleanup_queues);
-        this->handle = std::exchange(other.handle, VK_NULL_HANDLE);
-        this->fn_table = std::exchange(other.fn_table, {});
-
-        return *this;
-    }
-
-    void Device::tick(u8 frame_mod) {
+    // TODO this should return a result
+    void Device::tick(u8 frame_mod, u8 next_frame_mod) {
         // Destroy objects marked for destruction that are no longer being used
         auto &cleanup_queue = this->cleanup_queues[frame_mod];
         for (auto &mark: cleanup_queue) {
@@ -164,9 +144,23 @@ namespace hc::render {
                                   "A swapchain matching the mark's window should exist");
                         this->swapchains.at(swapchain_mark.window).destroy_old(this->fn_table, this->handle);
                     },
+                    [this](device::ResourceDestructionMark resource_mark) {
+                        this->memory.free(this->fn_table, this->handle, resource_mark);
+                    },
             }, mark);
         }
         cleanup_queue.clear();
+
+        this->memory.unmap_ranges(this->fn_table, this->handle);
+        device::MemoryResult mem_res = this->memory.flush_ranges(this->fn_table, this->handle, frame_mod);
+        if (mem_res != device::MemoryResult::Success) {
+            HC_ERROR("Failed to flush memory ranges");
+            mem_res = this->memory.map_ranges(this->fn_table, this->handle, next_frame_mod);
+            if (mem_res != device::MemoryResult::Success) {
+                HC_ERROR("Failed to map memory ranges");
+            }
+            return;
+        }
 
         device::GraphResult graph_res = this->graph.compile();
         HC_ASSERT(graph_res == device::GraphResult::Success, "Graph compilation should always succeed");
@@ -181,6 +175,11 @@ namespace hc::render {
 //        }
 
 //        this->graph.record();
+
+        mem_res = this->memory.map_ranges(this->fn_table, this->handle, next_frame_mod);
+        if (mem_res != device::MemoryResult::Success) {
+            HC_ERROR("Failed to map memory ranges");
+        }
     }
 
     const char *Device::name() const noexcept {
@@ -333,38 +332,123 @@ namespace hc::render {
         this->cleanup_queues[frame_mod].emplace_back(mark);
     }
 
-    Result<HCBuffer, DeviceResult> Device::new_buffer(HCBufferKind kind, resource::Descriptor &&descriptor, u64 count,
-                                                      bool writable) {
+    Result<buffer::Params, DeviceResult>
+    Device::new_buffer(HCBufferKind kind, resource::Descriptor &&descriptor, u64 count,
+                       bool writable) {
         HC_ASSERT(kind != HCBufferKind::Index, "`new_index_buffer` should be used to create index buffers");
         HC_ASSERT(count, "Must have something to allocate");
-        return Result<HCBuffer, DeviceResult>();
+
+        VkBufferUsageFlags flags = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        switch (kind) {
+            case Vertex:
+                flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+                break;
+            case Uniform:
+                flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+                break;
+            case Storage:
+                flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+                break;
+            default: HC_UNREACHABLE("No other resource kind should appear here");
+        }
+        if (writable)
+            flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+
+        auto alloc_res = this->memory.alloc(this->fn_table, this->handle, flags, descriptor.size() * count);
+        if (!alloc_res) {
+            return Err(DeviceResult::AllocFailure);
+        }
+        buffer::Params params = {};
+        params.size = alloc_res.ok().size;
+
+        params.id = this->graph.add_resource(std::move(alloc_res).ok(), false);
+
+        return Ok(params);
     }
 
-    Result<HCBuffer, DeviceResult> Device::new_index_buffer(HCPrimitive index_type, u64 count, bool writable) {
+    Result<buffer::Params, DeviceResult> Device::new_index_buffer(HCPrimitive index_type, u64 count, bool writable) {
         HC_ASSERT(count, "Must have something to allocate");
-        return Result<HCBuffer, DeviceResult>();
+
+        VkBufferUsageFlags flags = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+        if (writable)
+            flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+
+        auto alloc_res = this->memory.alloc(this->fn_table, this->handle, flags, resource::size_of(index_type));
+        if (!alloc_res) {
+            return Err(DeviceResult::AllocFailure);
+        }
+        buffer::Params params = {};
+        params.size = alloc_res.ok().size;
+
+        params.id = this->graph.add_resource(std::move(alloc_res).ok(), false);
+
+        return Ok(params);
     }
 
-    void Device::destroy_buffer(const HCBuffer &buffer, u8 frame_mod) {
-
-    }
-
-    Result<HCDynamicBuffer, DeviceResult> Device::new_dynamic_buffer(HCBufferKind kind,
-                                                                     resource::Descriptor &&descriptor, u64 count,
-                                                                     bool writable) {
+    Result<buffer::DynamicParams, DeviceResult>
+    Device::new_dynamic_buffer(HCBufferKind kind, resource::Descriptor &&descriptor, u64 count, bool writable,
+                               u8 frame_mod) {
         HC_ASSERT(kind != HCBufferKind::Index,
                   "`new_dynamic_index_buffer` should be used to create dynamic index buffers");
         HC_ASSERT(count, "Must have something to allocate");
-        return Result<HCDynamicBuffer, DeviceResult>();
+
+        VkBufferUsageFlags flags = 0;
+        switch (kind) {
+            case Vertex:
+                flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+                break;
+            case Uniform:
+                flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+                break;
+            case Storage:
+                flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+                break;
+            default: HC_UNREACHABLE("No other resource kind should appear here");
+        }
+        if (writable)
+            flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+
+        auto alloc_res = this->memory.alloc_dyn(this->fn_table, this->handle, flags, descriptor.size() * count,
+                                                frame_mod);
+        if (!alloc_res) {
+            return Err(DeviceResult::AllocFailure);
+        }
+        auto [ref, ptr] = std::move(alloc_res).ok();
+        buffer::DynamicParams params = {};
+        params.size = ref.size;
+        params.data = ptr;
+        params.data_offset = ref.offset + ref.padding;
+
+        params.id = this->graph.add_resource(ref, true);
+
+        return Ok(params);
     }
 
-    Result<HCDynamicBuffer, DeviceResult> Device::new_dynamic_index_buffer(HCPrimitive index_type, u64 count,
-                                                                           bool writable) {
+    Result<buffer::DynamicParams, DeviceResult>
+    Device::new_dynamic_index_buffer(HCPrimitive index_type, u64 count, bool writable, u8 frame_mod) {
         HC_ASSERT(count, "Must have something to allocate");
-        return Result<HCDynamicBuffer, DeviceResult>();
+
+        VkBufferUsageFlags flags = VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+        if (writable)
+            flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+
+        auto alloc_res = this->memory.alloc_dyn(this->fn_table, this->handle, flags, resource::size_of(index_type),
+                                                frame_mod);
+        if (!alloc_res) {
+            return Err(DeviceResult::AllocFailure);
+        }
+        auto [ref, ptr] = std::move(alloc_res).ok();
+        buffer::DynamicParams params = {};
+        params.size = ref.size;
+        params.data = ptr;
+        params.data_offset = ref.offset + ref.padding;
+
+        params.id = this->graph.add_resource(ref, true);
+
+        return Ok(params);
     }
 
-    void Device::destroy_dynamic_buffer(const HCDynamicBuffer &buffer, u8 frame_mod) {
-
+    void Device::destroy_buffer(u64 id, u8 frame_mod) {
+        this->cleanup_queues[frame_mod].emplace_back(this->graph.remove_resource(id));
     }
 }

@@ -18,13 +18,20 @@ namespace hc::render::device {
         GLFWwindow *window;
     };
 
+    struct ResourceDestructionMark {
+        VkBufferUsageFlags usage;
+        u64 pool;
+        VkDeviceSize offset;
+        bool dynamic;
+    };
+
     /**
      * @brief A variant which may contain any of the deletion marks.
      */
-    typedef std::variant<WindowDestructionMark, SwapchainDestructionMark> DestructionMark;
+    typedef std::variant<WindowDestructionMark, SwapchainDestructionMark, ResourceDestructionMark> DestructionMark;
 
     /**
-     * @brief A helper type used vor visiting a variant.
+     * @brief A helper type used for visiting a variant.
      *
      * @tparam Ts The types of the function overloads, these are typically inferred from the visit call. A function
      * which deduces it's argument using `auto` may be used for a "default" handler.

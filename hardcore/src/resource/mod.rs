@@ -5,10 +5,12 @@ use std::ops::{Deref, DerefMut};
 pub use mesh::*;
 pub use texture::*;
 
-mod descriptor;
+mod buffer;
+pub mod descriptor;
 mod generic;
 mod mesh;
 mod texture;
+pub mod vertex;
 
 /// Structures holding device local data only directly accessible by the device.
 pub mod local {

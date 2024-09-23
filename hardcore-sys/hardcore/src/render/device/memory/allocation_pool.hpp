@@ -8,10 +8,13 @@
 
 #include <util/flow.hpp>
 #include <util/number.hpp>
+#include <util/trait.hpp>
 
 // The way this is implemented is a bit overly complex, but it's done this way to avoid using virtual inheritance
 
 namespace hc::render::device::memory {
+    const u32 INITIAL_SLOTS = 16;
+
     /**
      * @brief This function calculates the amount of bytes necessary to add to the given offset, in order for it to be
      * aligned to the given alignment.
@@ -92,7 +95,7 @@ namespace hc::render::device::memory {
                     .slot_idx = invalid_idx,
             };
 
-            if (this->capacity < size)
+            if (this->total_capacity < size)
                 return invalid_spec;
 
             if (this->slots.size() - 1 < this->largest_free_slot || this->slots[this->largest_free_slot].in_use) {
@@ -176,7 +179,7 @@ namespace hc::render::device::memory {
             HC_ASSERT(slot_idx < this->slots.size(), "Slot index out of bounds");
             HC_ASSERT(!this->slots[slot_idx].in_use, "Slot must not already be in use");
             HC_ASSERT(size <= this->slots[slot_idx].size, "Allocation size greater than slot size");
-            HC_ASSERT((slot_idx == 0) | this->slots[slot_idx - 1].in_use, "Slot before a selected slot must be in use");
+            HC_ASSERT((slot_idx == 0) || this->slots[slot_idx - 1].in_use, "Slot before a selected slot must be in use");
 
             if (size < this->slots[slot_idx].size) {
                 if (slot_idx + 1 < this->slots.size()) {
@@ -261,18 +264,42 @@ namespace hc::render::device::memory {
                 return slot_idx;
         }
 
-    private:
-        void insert(u32 index) {
-            static_assert(InstantiatedFalse<T>::value, "Unimplemented slot type");
+        /**
+         * @brief Get the pool's total capacity in bytes.
+         *
+         * @return The pool's capacity.
+         */
+        VkDeviceSize capacity() const noexcept {
+            return this->total_capacity;
         }
 
-        void rotate_right(u32 start, u32 n, u32 end) {
-            static_assert(InstantiatedFalse<T>::value, "Unimplemented slot type");
+    private:
+        void insert(u32 index) {
+            this->slots.insert(this->slots.begin() + index, {});
+
+            if constexpr (is_std_vector<ExtraSlots>::value)
+                this->extra_slots.insert(this->extra_slots.begin() + index, {});
+        }
+
+        void rotate_right(u32 begin, u32 n, u32 end) {
+            const u32 size = this->slots.size();
+
+            auto begin_it = this->slots.rbegin() + (size - 1 - end);
+            auto middle_it = begin_it + n;
+            auto end_it = this->slots.rbegin() + (size - begin);
+            std::rotate(begin_it, middle_it, end_it);
+
+            if constexpr (is_std_vector<ExtraSlots>::value) {
+                auto e_begin_it = this->extra_slots.rbegin() + (size - 1 - end);
+                auto e_middle_it = e_begin_it + n;
+                auto e_end_it = this->extra_slots.rbegin() + (size - begin);
+                std::rotate(e_begin_it, e_middle_it, e_end_it);
+            }
         }
 
     protected:
         AllocationPool(VkDeviceMemory memory, VkDeviceSize size, bool per_frame_allocation = false) :
-                memory(memory), capacity(size), per_frame_allocation(per_frame_allocation) {
+                memory(memory), total_capacity(size), slots(INITIAL_SLOTS), per_frame_allocation(per_frame_allocation) {
             this->slots[0].in_use = false;
             this->slots[0].offset = 0;
             this->slots[0].size = size;
@@ -283,6 +310,9 @@ namespace hc::render::device::memory {
                 this->slots[i].offset = size;
                 this->slots[i].size = 0;
             }
+
+            if constexpr (is_std_vector<ExtraSlots>::value)
+                this->extra_slots = ExtraSlotSolver<T>::type(INITIAL_SLOTS);
         }
 
         void free_memory(const VolkDeviceTable &fn_table, VkDevice device, HeapManager &heap_manager) noexcept {
@@ -293,7 +323,7 @@ namespace hc::render::device::memory {
         }
 
         ExternalHandle<VkDeviceMemory, VK_NULL_HANDLE> memory;
-        VkDeviceSize capacity = 0;
+        VkDeviceSize total_capacity = 0; //!< The pool's total capacity in bytes.
 
         std::vector<Slot> slots;
 
@@ -304,37 +334,4 @@ namespace hc::render::device::memory {
         using ExtraSlots = ExtraSlotSolver<T>::type;
         ExtraSlots extra_slots;
     };
-
-    template<>
-    void AllocationPool<NullSlot>::insert(u32 index) {
-        this->slots.insert(this->slots.begin() + index, {});
-    }
-
-    template<>
-    void AllocationPool<TextureSlot>::insert(u32 index) {
-        this->slots.insert(this->slots.begin() + index, {});
-        this->extra_slots.insert(this->extra_slots.begin() + index, {});
-    }
-
-    template<>
-    void AllocationPool<NullSlot>::rotate_right(u32 begin, u32 n, u32 end) {
-        const u32 size = this->slots.size();
-        auto begin_it = this->slots.rbegin() + (size - 1 - end);
-        auto middle_it = begin_it + n;
-        auto end_it = this->slots.rbegin() + (size - begin);
-        std::rotate(begin_it, middle_it, end_it);
-    }
-
-    template<>
-    void AllocationPool<TextureSlot>::rotate_right(u32 begin, u32 n, u32 end) {
-        const u32 size = this->slots.size();
-        auto begin_it = this->slots.rbegin() + (size - 1 - end);
-        auto middle_it = begin_it + n;
-        auto end_it = this->slots.rbegin() + (size - begin);
-        std::rotate(begin_it, middle_it, end_it);
-        auto e_begin_it = this->extra_slots.rbegin() + (size - 1 - end);
-        auto e_middle_it = e_begin_it + n;
-        auto e_end_it = this->extra_slots.rbegin() + (size - begin);
-        std::rotate(e_begin_it, e_middle_it, e_end_it);
-    }
 }

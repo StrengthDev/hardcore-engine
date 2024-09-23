@@ -19,6 +19,13 @@ public:
      */
     constexpr explicit Ok(T &&value) : value(std::move(value)) {}
 
+    /**
+     * @brief Create an success from an success value.
+     *
+     * @param value The success value.
+     */
+    constexpr explicit Ok(const T &value) : value(value) {}
+
     Ok() = delete;
 
     Ok(const Ok &) = delete;
@@ -58,6 +65,13 @@ public:
      * @param value The error value.
      */
     constexpr explicit Err(T &&value) : value(std::move(value)) {}
+
+    /**
+     * @brief Create an error from an error value.
+     *
+     * @param value The error value.
+     */
+    constexpr explicit Err(const T &value) : value(value) {}
 
     Err() = delete;
 

@@ -1,21 +1,13 @@
 #pragma once
 
-#include <render/renderer.h>
-#include <render/descriptor.h>
+#include "renderer.h"
+#include "descriptor.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
 
 #include <stdint.h>
-
-/**
-* @brief The status of a data buffer.
-*/
-enum HCBufferStatus {
-    Valid, //!< A valid buffer.
-    Destroyed, //!< A destroyed buffer.
-};
 
 /**
  * @brief The type of a data buffer.
@@ -58,13 +50,14 @@ enum HCBufferKind {
  * create a new instance, and `hc_destroy_buffer` used to destroy the instance.
  */
 struct HCBuffer {
+    uint64_t id; //!< The ID of this buffer within the device.
+    size_t size; //!< The amount of usable memory occupied by this buffer, in bytes.
     DeviceID device; //!< The ID of the device which this buffer belongs to.
-    GraphItemID id; //!< The ID of this buffer within the device.
-    HCBufferStatus status; //!< The current status of this buffer.
 };
 
-struct HCBuffer hc_new_buffer(enum HCBufferKind kind, struct HCDescriptor *descriptor, uint64_t count, bool writable,
-                              DeviceID device);
+struct HCBuffer
+hc_new_buffer(enum HCBufferKind kind, const struct HCDescriptor *descriptor, uint64_t count, bool writable,
+              DeviceID device);
 
 struct HCBuffer hc_new_index_buffer(enum HCPrimitive index_type, uint64_t count, bool writable, DeviceID device);
 
@@ -82,13 +75,16 @@ void hc_destroy_buffer(struct HCBuffer *buffer);
  * should be used to create a new instance, and `hc_destroy_dynamic_buffer` used to destroy the instance.
  */
 struct HCDynamicBuffer {
-    HCBuffer base; //!< The base data of this dynamic buffer.
-    void *data; //!< A pointer to the underlying buffer backing this buffer's data, to which the host has direct access.
-    uint64_t data_offset; //!< The offset to this buffer's data within the underlying buffer which backs this one.
+    uint64_t id; //!< The ID of this buffer within the device.
+    size_t size; //!< The amount of usable memory occupied by this buffer, in bytes.
+    void **data; //!< A pointer to the underlying buffer backing this buffer's data, to which the host has direct access.
+    size_t data_offset; //!< The offset to this buffer's data within the underlying buffer which backs this one.
+    DeviceID device; //!< The ID of the device which this buffer belongs to.
 };
 
-struct HCDynamicBuffer hc_new_dynamic_buffer(enum HCBufferKind kind, struct HCDescriptor *descriptor, uint64_t count,
-                                             bool writable, DeviceID device);
+struct HCDynamicBuffer
+hc_new_dynamic_buffer(enum HCBufferKind kind, const struct HCDescriptor *descriptor, uint64_t count,
+                      bool writable, DeviceID device);
 
 struct HCDynamicBuffer hc_new_dynamic_index_buffer(enum HCPrimitive index_type, uint64_t count, bool writable,
                                                    DeviceID device);

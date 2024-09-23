@@ -49,13 +49,14 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::time::Instant;
 use tracing::{error, info, info_span, Instrument};
 
-use hardcore_sys::InitParams;
-
+use crate::context_token::{ContextToken, ContextTokenError};
 use crate::event::Event;
 use crate::layer::{Context, Layer};
 use crate::native::vulkan_debug_callback;
 use crate::sync::{Mutex, RwLock};
+use hardcore_sys::InitParams;
 
+mod context_token;
 pub mod event;
 pub mod input;
 pub mod layer;
@@ -116,6 +117,7 @@ pub enum CoreError {
         /// The error code returned.
         code: i32,
     },
+
     /// The function isn't getting executed on the main thread.
     #[error("the function isn't getting executed on the main thread")]
     NotMain,
@@ -127,6 +129,10 @@ pub enum CoreError {
     /// The provided string could not be converted into a C string.
     #[error("the provided string could not be converted into a C string")]
     InvalidString(#[from] std::ffi::NulError),
+
+    /// Context not initialised.
+    #[error(transparent)]
+    ContextToken(#[from] ContextTokenError),
 }
 
 /// Initialise the library context.
@@ -167,6 +173,9 @@ pub fn init(app: ApplicationDescriptor) -> Result<(), CoreError> {
     if res < 0 {
         Err(CoreError::System { code: res })
     } else {
+        ContextToken::init_context().inspect_err(|_| {
+            unsafe { hardcore_sys::term() };
+        })?;
         Ok(())
     }
 }
@@ -177,6 +186,7 @@ pub fn init(app: ApplicationDescriptor) -> Result<(), CoreError> {
 /// Once this function is called, [`init`] must be called once again before other library functions.
 pub fn terminate() -> Result<(), CoreError> {
     let res: i32 = unsafe { hardcore_sys::term() };
+    ContextToken::terminate_context()?;
 
     if res < 0 {
         Err(CoreError::System { code: res })

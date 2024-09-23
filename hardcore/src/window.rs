@@ -2,6 +2,7 @@
 
 // TODO add example
 
+use crate::context_token::{ContextDependent, ContextToken, ContextTokenError};
 use hardcore_sys::{
     destroy_window, new_window, set_window_char_callback, set_window_char_mods_callback,
     set_window_close_callback, set_window_cursor_enter_callback,
@@ -21,13 +22,19 @@ pub enum WindowError {
     /// Failed to initialise window, this may indicate that the context has not been initialised yet.
     #[error("failed to create a new window")]
     Initialisation,
+
     /// Could turn provided string slice into a valid [`CString`].
     #[error("could turn provided string slice into a valid C string")]
     InvalidName(#[from] NulError),
+
+    /// Context not initialised.
+    #[error(transparent)]
+    ContextToken(#[from] ContextTokenError),
 }
 
 /// A high-level abstraction over an *OS* window.
 pub struct Window {
+    context_token: ContextToken,
     handle: hardcore_sys::Window,
 }
 
@@ -40,6 +47,8 @@ impl Window {
         pos_y: Option<i32>,
         name: &str,
     ) -> Result<Self, WindowError> {
+        let token = ContextToken::new()?;
+
         let c_name = CString::new(name)?;
 
         let params = hardcore_sys::WindowParams {
@@ -75,10 +84,14 @@ impl Window {
             set_window_char_callback(ptr, Some(callback::char));
             set_window_char_mods_callback(ptr, Some(callback::char_mods));
             set_window_drop_callback(ptr, Some(callback::drop));
+
             handle
         };
 
-        Ok(Self { handle })
+        Ok(Self {
+            context_token: token,
+            handle,
+        })
     }
 
     /// Return this window's id.
@@ -91,14 +104,21 @@ impl Window {
 
 impl Drop for Window {
     fn drop(&mut self) {
-        let ptr = addr_of_mut!(self.handle);
-        unsafe {
-            destroy_window(ptr);
+        if self.context_token.valid() {
+            unsafe {
+                destroy_window(addr_of_mut!(self.handle));
+            }
         }
     }
 }
 
 unsafe impl Send for Window {}
+
+impl ContextDependent for Window {
+    fn valid(&self) -> bool {
+        self.context_token.valid()
+    }
+}
 
 mod callback {
     use crate::emit_event;
