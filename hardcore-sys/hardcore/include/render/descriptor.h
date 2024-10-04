@@ -20,16 +20,31 @@ enum HCPrimitive {
     I64, //!< A 64-bit integer.
     F32, //!< A 32-bit floating point number.
     F64, //!< A 64-bit floating point number.
+    B32, //!< A 32-bit boolean value.
 };
 
 /**
  * @brief The composition of a descriptor's field.
+ *
+ * ### Note on matrices
+ *
+ * The matrix layout used here matches the one used in GLSL, that is, a MatNxM matrix has N columns and M rows,
+ * which is backward from convention in mathematics.
  */
 enum HCComposition {
     Scalar, //!< A singular value.
     Vec2, //!< A 2 element vector/array of values.
     Vec3, //!< A 3 element vector/array of values.
     Vec4, //!< A 4 element vector/array of values.
+    Mat2x2, //!< A 2x2 matrix of values.
+    Mat2x3, //!< A 2x3 matrix of values.
+    Mat2x4, //!< A 2x4 matrix of values.
+    Mat3x2, //!< A 3x2 matrix of values.
+    Mat3x3, //!< A 3x3 matrix of values.
+    Mat3x4, //!< A 3x4 matrix of values.
+    Mat4x2, //!< A 4x2 matrix of values.
+    Mat4x3, //!< A 4x3 matrix of values.
+    Mat4x4, //!< A 4x4 matrix of values.
 };
 
 /**

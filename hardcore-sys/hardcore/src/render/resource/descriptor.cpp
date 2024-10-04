@@ -17,6 +17,7 @@ Sz size_of(HCPrimitive primitive) {
         case U32:
         case I32:
         case F32:
+        case B32:
             return 4;
         case U64:
         case I64:
@@ -35,9 +36,28 @@ Sz count_of(HCComposition composition) {
             return 3;
         case Vec4:
             return 4;
+        case Mat2x2:
+            return 4;
+        case Mat2x3:
+            return 6;
+        case Mat2x4:
+            return 8;
+        case Mat3x2:
+            return 6;
+        case Mat3x3:
+            return 9;
+        case Mat3x4:
+            return 12;
+        case Mat4x2:
+            return 8;
+        case Mat4x3:
+            return 12;
+        case Mat4x4:
+            return 16;
     }
 }
 
+// TODO this may need to be revised based on the alignment https://www.khronos.org/opengl/wiki/Interface_Block_(GLSL)#Memory_layout
 Sz size_of(const HCField *fields, Sz count) {
     Sz total = 0;
     for (Sz i = 0; i < count; ++i) {

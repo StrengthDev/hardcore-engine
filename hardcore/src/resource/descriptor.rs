@@ -31,6 +31,8 @@ pub enum Primitive {
     F32,
     /// A 64-bit floating point number.
     F64,
+    /// A 32-bit boolean value.
+    B32,
 }
 
 impl Primitive {
@@ -38,9 +40,13 @@ impl Primitive {
         match self {
             Primitive::U8 | Primitive::I8 => 1,
             Primitive::U16 | Primitive::I16 => 2,
-            Primitive::U32 | Primitive::I32 | Primitive::F32 => 4,
+            Primitive::U32 | Primitive::I32 | Primitive::F32 | Primitive::B32 => 4,
             Primitive::U64 | Primitive::I64 | Primitive::F64 => 8,
         }
+    }
+
+    pub fn is_valid_index(&self) -> bool {
+        matches!(self, Primitive::U8 | Primitive::U16 | Primitive::U32)
     }
 }
 
@@ -59,6 +65,7 @@ impl TryFrom<hardcore_sys::Primitive> for Primitive {
             hardcore_sys::Primitive::I64 => Ok(Primitive::I64),
             hardcore_sys::Primitive::F32 => Ok(Primitive::F32),
             hardcore_sys::Primitive::F64 => Ok(Primitive::F64),
+            hardcore_sys::Primitive::B32 => Ok(Primitive::B32),
             _ => Err(PrimitiveError::InvalidValue),
         }
     }
@@ -77,6 +84,7 @@ impl From<Primitive> for hardcore_sys::Primitive {
             Primitive::I64 => hardcore_sys::Primitive::I64,
             Primitive::F32 => hardcore_sys::Primitive::F32,
             Primitive::F64 => hardcore_sys::Primitive::F64,
+            Primitive::B32 => hardcore_sys::Primitive::B32,
         }
     }
 }
@@ -88,6 +96,11 @@ pub enum CompositionError {
 }
 
 /// The composition of a descriptor's field.
+///
+/// ### Note on matrices
+///
+/// The matrix layout used here matches the one used in GLSL, that is, a MatNxM matrix has N
+/// columns and M rows, which is backward from convention in mathematics.
 #[derive(Copy, Clone)]
 pub enum Composition {
     /// A singular value.
@@ -98,6 +111,24 @@ pub enum Composition {
     Vec3,
     /// A 4 element vector/array of values.
     Vec4,
+    /// A 2x2 matrix of values.
+    Mat2x2,
+    /// A 2x3 matrix of values.
+    Mat2x3,
+    /// A 2x4 matrix of values.
+    Mat2x4,
+    /// A 3x2 matrix of values.
+    Mat3x2,
+    /// A 3x3 matrix of values.
+    Mat3x3,
+    /// A 3x4 matrix of values.
+    Mat3x4,
+    /// A 4x2 matrix of values.
+    Mat4x2,
+    /// A 4x3 matrix of values.
+    Mat4x3,
+    /// A 4x4 matrix of values.
+    Mat4x4,
 }
 
 impl Composition {
@@ -106,7 +137,12 @@ impl Composition {
             Composition::Scalar => 1,
             Composition::Vec2 => 2,
             Composition::Vec3 => 3,
-            Composition::Vec4 => 4,
+            Composition::Vec4 | Composition::Mat2x2 => 4,
+            Composition::Mat2x3 | Composition::Mat3x2 => 6,
+            Composition::Mat2x4 | Composition::Mat4x2 => 8,
+            Composition::Mat4x3 | Composition::Mat3x4 => 12,
+            Composition::Mat3x3 => 9,
+            Composition::Mat4x4 => 16,
         }
     }
 }
@@ -120,6 +156,15 @@ impl TryFrom<hardcore_sys::Composition> for Composition {
             hardcore_sys::Composition::Vec2 => Ok(Composition::Vec2),
             hardcore_sys::Composition::Vec3 => Ok(Composition::Vec3),
             hardcore_sys::Composition::Vec4 => Ok(Composition::Vec4),
+            hardcore_sys::Composition::Mat2x2 => Ok(Composition::Mat2x2),
+            hardcore_sys::Composition::Mat2x3 => Ok(Composition::Mat2x3),
+            hardcore_sys::Composition::Mat2x4 => Ok(Composition::Mat2x4),
+            hardcore_sys::Composition::Mat3x2 => Ok(Composition::Mat3x2),
+            hardcore_sys::Composition::Mat3x3 => Ok(Composition::Mat3x3),
+            hardcore_sys::Composition::Mat3x4 => Ok(Composition::Mat3x4),
+            hardcore_sys::Composition::Mat4x2 => Ok(Composition::Mat4x2),
+            hardcore_sys::Composition::Mat4x3 => Ok(Composition::Mat4x3),
+            hardcore_sys::Composition::Mat4x4 => Ok(Composition::Mat4x4),
             _ => Err(CompositionError::InvalidValue),
         }
     }
@@ -132,6 +177,15 @@ impl From<Composition> for hardcore_sys::Composition {
             Composition::Vec2 => hardcore_sys::Composition::Vec2,
             Composition::Vec3 => hardcore_sys::Composition::Vec3,
             Composition::Vec4 => hardcore_sys::Composition::Vec4,
+            Composition::Mat2x2 => hardcore_sys::Composition::Mat2x2,
+            Composition::Mat2x3 => hardcore_sys::Composition::Mat2x3,
+            Composition::Mat2x4 => hardcore_sys::Composition::Mat2x4,
+            Composition::Mat3x2 => hardcore_sys::Composition::Mat3x2,
+            Composition::Mat3x3 => hardcore_sys::Composition::Mat3x3,
+            Composition::Mat3x4 => hardcore_sys::Composition::Mat3x4,
+            Composition::Mat4x2 => hardcore_sys::Composition::Mat4x2,
+            Composition::Mat4x3 => hardcore_sys::Composition::Mat4x3,
+            Composition::Mat4x4 => hardcore_sys::Composition::Mat4x4,
         }
     }
 }
@@ -151,6 +205,12 @@ struct Field {
     kind: Primitive,
     /// The composition of the field.
     composition: Composition,
+}
+
+impl Field {
+    pub fn size(&self) -> usize {
+        self.kind.size() * self.composition.count()
+    }
 }
 
 impl TryFrom<hardcore_sys::Field> for Field {
@@ -195,6 +255,19 @@ impl Descriptor {
         })
     }
 
+    pub fn push_field(&mut self, field: Field) {
+        self.fields.push(field)
+    }
+
+    // TODO this may need to be revised based on the alignment https://www.khronos.org/opengl/wiki/Interface_Block_(GLSL)#Memory_layout
+    pub fn size(&self) -> usize {
+        self.fields
+            .iter()
+            .map(|f| f.size())
+            .reduce(|f0, f1| f0 + f1)
+            .unwrap_or(0)
+    }
+
     pub(crate) fn c_desc(&self) -> Result<CDescriptor, CDescriptorError> {
         let mut c_desc = CDescriptor::create(self.fields.len())?;
 
@@ -217,6 +290,7 @@ pub(crate) struct CDescriptor {
 }
 
 impl CDescriptor {
+    // TODO rename constructor type functions to new
     fn create(field_count: usize) -> Result<Self, CDescriptorError> {
         let desc = unsafe { hardcore_sys::create_descriptor(field_count) };
 
