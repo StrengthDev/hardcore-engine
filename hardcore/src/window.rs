@@ -4,13 +4,13 @@
 
 use crate::context_token::{ContextDependent, ContextToken, ContextTokenError};
 use hardcore_sys::{
-    destroy_window, new_window, set_window_char_callback, set_window_char_mods_callback,
-    set_window_close_callback, set_window_cursor_enter_callback,
-    set_window_cursor_position_callback, set_window_drop_callback, set_window_focus_callback,
-    set_window_framebuffer_callback, set_window_key_callback, set_window_maximize_callback,
-    set_window_minimize_callback, set_window_mouse_button_callback, set_window_position_callback,
-    set_window_refresh_callback, set_window_scale_callback, set_window_scroll_callback,
-    set_window_size_callback,
+	destroy_window, new_window, set_window_char_callback, set_window_char_mods_callback,
+	set_window_close_callback, set_window_cursor_enter_callback,
+	set_window_cursor_position_callback, set_window_drop_callback, set_window_focus_callback,
+	set_window_framebuffer_callback, set_window_key_callback, set_window_maximize_callback,
+	set_window_minimize_callback, set_window_mouse_button_callback, set_window_position_callback,
+	set_window_refresh_callback, set_window_scale_callback, set_window_scroll_callback,
+	set_window_size_callback,
 };
 use std::ffi::{c_int, CString, NulError};
 use std::ptr::addr_of_mut;
@@ -41,6 +41,7 @@ pub struct Window {
 impl Window {
     /// Instantiate a new window.
     pub fn new(
+        device: u32,
         width: u32,
         height: u32,
         pos_x: Option<i32>,
@@ -52,6 +53,7 @@ impl Window {
         let c_name = CString::new(name)?;
 
         let params = hardcore_sys::WindowParams {
+            device,
             width,
             height,
             pos_x: pos_x.unwrap_or(i32::MAX) as c_int,
@@ -121,14 +123,14 @@ impl ContextDependent for Window {
 }
 
 mod callback {
-    use crate::emit_event;
-    use crate::event::{Event, WindowEvent};
-    use crate::input::{ButtonAction, KeyboardKey, Modifiers, MouseButton};
-    use std::ffi::{c_char, c_int, c_uint, CStr};
-    use std::path::PathBuf;
-    use tracing::error;
+	use crate::emit_event;
+	use crate::event::{Event, WindowEvent};
+	use crate::input::{ButtonAction, KeyboardKey, Modifiers, MouseButton};
+	use std::ffi::{c_char, c_int, c_uint, CStr};
+	use std::path::PathBuf;
+	use tracing::error;
 
-    pub(super) unsafe extern "C" fn position(id: usize, x: c_int, y: c_int) {
+	pub(super) unsafe extern "C" fn position(id: usize, x: c_int, y: c_int) {
         if let Err(e) = emit_event(Event::Window {
             id,
             event: WindowEvent::Position { x, y },

@@ -13,30 +13,26 @@
 #include "device.hpp"
 
 namespace hc::render {
-    enum class InstanceResult : u32 {
-        Success = 0,
-        VolkError,
-        VulkanInstanceError,
-        DebugCallbackError,
-        DeviceError,
-        NoDevicesFound,
-        SurfaceFailure,
-        Uninitialised,
-        OutOfBounds,
-        Unimplemented,
-    };
+	enum class InstanceResult : u32 {
+		Success = 0,
+		VolkError,
+		VulkanInstanceError,
+		DebugCallbackError,
+		DeviceError,
+		NoDevicesFound,
+		SurfaceFailure,
+		Uninitialised,
+		OutOfBounds,
+		Unimplemented,
+	};
 
-    InstanceResult init(const HCApplicationDescriptor &app, const HCRenderParams &params);
+	InstanceResult init(const HCApplicationDescriptor &app, const HCRenderParams &params);
 
-    InstanceResult term();
+	InstanceResult term();
 
-    InstanceResult create_swapchain(GLFWwindow *window, u32 device_idx);
+	VkInstance instance();
 
-    void destroy_swapchain(GLFWwindow *window, u32 device_idx);
+	std::vector<Device> &device_list() noexcept;
 
-    std::vector<Device> &device_list() noexcept;
-
-    Result<Device *, InstanceResult> device_at(u32 id) noexcept;
-
-    u32 default_device();
+	Result<Device *, InstanceResult> device_at(u32 id) noexcept;
 }

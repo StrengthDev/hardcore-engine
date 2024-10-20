@@ -8,18 +8,18 @@
 #include "../vars.hpp"
 #include "descriptor.hpp"
 
-const HCBuffer INVALID_BUFFER = {
-        .id = std::numeric_limits<u64>::max(),
-        .size = 0,
-        .device = std::numeric_limits<u32>::max(),
+static constexpr HCBuffer INVALID_BUFFER = {
+    .id = std::numeric_limits<u64>::max(),
+    .size = 0,
+    .device = std::numeric_limits<u32>::max(),
 };
 
-const HCDynamicBuffer INVALID_DYNAMIC_BUFFER = {
-        .id = std::numeric_limits<u64>::max(),
-        .size = 0,
-        .data = nullptr,
-        .data_offset = std::numeric_limits<u64>::max(),
-        .device = std::numeric_limits<u32>::max(),
+static constexpr HCDynamicBuffer INVALID_DYNAMIC_BUFFER = {
+    .id = std::numeric_limits<u64>::max(),
+    .size = 0,
+    .data = nullptr,
+    .data_offset = std::numeric_limits<u64>::max(),
+    .device = std::numeric_limits<u32>::max(),
 };
 
 HCBuffer hc_new_buffer(HCBufferKind kind, const HCDescriptor *descriptor, u64 count, bool writable, u32 device) {
@@ -52,9 +52,9 @@ HCBuffer hc_new_buffer(HCBufferKind kind, const HCDescriptor *descriptor, u64 co
 
     auto params = std::move(res).ok();
     return {
-            .id = params.id,
-            .size = params.size,
-            .device = device,
+        .id = params.id,
+        .size = params.size,
+        .device = device,
     };
 }
 
@@ -80,9 +80,9 @@ HCBuffer hc_new_index_buffer(HCPrimitive index_type, u64 count, bool writable, u
 
     auto params = std::move(res).ok();
     return {
-            .id = params.id,
-            .size = params.size,
-            .device = device,
+        .id = params.id,
+        .size = params.size,
+        .device = device,
     };
 }
 
@@ -138,11 +138,11 @@ HCDynamicBuffer hc_new_dynamic_buffer(HCBufferKind kind, const HCDescriptor *des
 
     auto params = std::move(res).ok();
     return {
-            .id = params.id,
-            .size = params.size,
-            .data = params.data,
-            .data_offset = params.data_offset,
-            .device = device,
+        .id = params.id,
+        .size = params.size,
+        .data = params.data,
+        .data_offset = params.data_offset,
+        .device = device,
     };
 }
 
@@ -169,11 +169,11 @@ HCDynamicBuffer hc_new_dynamic_index_buffer(HCPrimitive index_type, u64 count, b
 
     auto params = std::move(res).ok();
     return {
-            .id = params.id,
-            .size = params.size,
-            .data = params.data,
-            .data_offset = params.data_offset,
-            .device = device,
+        .id = params.id,
+        .size = params.size,
+        .data = params.data,
+        .data_offset = params.data_offset,
+        .device = device,
     };
 }
 

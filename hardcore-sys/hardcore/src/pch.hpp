@@ -6,6 +6,7 @@
 #include <iostream>
 #include <limits>
 #include <queue>
+#include <ranges>
 #include <set>
 #include <shared_mutex>
 #include <sstream>
