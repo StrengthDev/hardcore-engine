@@ -76,8 +76,7 @@ void hc_destroy_buffer(struct HCBuffer *buffer);
 struct HCDynamicBuffer {
 	uint64_t id; //!< The ID of this buffer within the device.
 	size_t size; //!< The amount of usable memory occupied by this buffer, in bytes.
-	void **data;
-	//!< A pointer to the underlying buffer backing this buffer's data, to which the host has direct access.
+	void **data; //!< A pointer to the underlying buffer backing this buffer's data.
 	size_t data_offset; //!< The offset to this buffer's data within the underlying buffer which backs this one.
 	uint32_t device; //!< The ID of the device which this buffer belongs to.
 };

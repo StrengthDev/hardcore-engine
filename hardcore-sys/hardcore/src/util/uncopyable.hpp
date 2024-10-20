@@ -16,31 +16,34 @@
 template<typename T, T DEFAULT>
 class Uncopyable {
 public:
-    Uncopyable() = default;
+	Uncopyable() = default;
 
-    /**
-     * @brief Implicit value constructor.
-     *
-     * @param value The value to assign to this uncopyable variable.
-     */
-    Uncopyable(const T &value) : value(value) {} // NOLINT intentionally implicit
+	/**
+	* @brief Implicit value constructor.
+	*
+	* @param value The value to assign to this uncopyable variable.
+	*/
 
-    Uncopyable(const Uncopyable &) = delete;
+	Uncopyable(const T &value) : value(value) { ; } // NOLINT intentionally implicit
 
-    Uncopyable &operator=(const Uncopyable &) = delete;
+	Uncopyable(const Uncopyable &) = delete;
 
-    Uncopyable(Uncopyable &&other) noexcept: value(std::exchange(other.value, DEFAULT)) {}
+	Uncopyable &operator=(const Uncopyable &) = delete;
 
-    Uncopyable &operator=(Uncopyable &&other) noexcept {
-        this->value = std::exchange(other.value, DEFAULT);
-    }
+	Uncopyable(Uncopyable &&other) noexcept: value(std::exchange(other.value, DEFAULT)) {
+	}
 
-    operator T() const { return value; } // NOLINT intentionally implicit
+	Uncopyable &operator=(Uncopyable &&other) noexcept {
+		this->value = std::exchange(other.value, DEFAULT);
+		return *this;
+	}
 
-    operator T &() { return value; } // NOLINT intentionally implicit
+	operator T() const { return value; } // NOLINT intentionally implicit
+
+	operator T &() { return value; } // NOLINT intentionally implicit
 
 private:
-    T value = DEFAULT;
+	T value = DEFAULT;
 };
 
 /**
@@ -59,42 +62,43 @@ private:
 template<typename T, T DEFAULT>
 class ExternalHandle {
 public:
-    ExternalHandle() = default;
+	ExternalHandle() = default;
 
-    /**
-     * @brief Implicit value constructor.
-     *
-     * @param value The value to assign to this external handle.
-     */
-    ExternalHandle(const T &value) : value(value) {} // NOLINT intentionally implicit
+	/**
+	* @brief Implicit value constructor.
+	*
+	* @param value The value to assign to this external handle.
+	*/
+	ExternalHandle(const T &value) : value(value) { ; } // NOLINT intentionally implicit
 
-    ~ExternalHandle() {
-        HC_ASSERT(this->value == DEFAULT, "Inner value must be externally cleaned up");
-    }
+	~ExternalHandle() {
+		HC_ASSERT(this->value == DEFAULT, "Inner value must be externally cleaned up");
+	}
 
-    ExternalHandle(const ExternalHandle &) = delete;
+	ExternalHandle(const ExternalHandle &) = delete;
 
-    ExternalHandle &operator=(const ExternalHandle &) = delete;
+	ExternalHandle &operator=(const ExternalHandle &) = delete;
 
-    ExternalHandle(ExternalHandle &&other) noexcept: value(std::exchange(other.value, DEFAULT)) {}
+	ExternalHandle(ExternalHandle &&other) noexcept: value(std::exchange(other.value, DEFAULT)) {
+	}
 
-    ExternalHandle &operator=(ExternalHandle &&other) noexcept {
-        HC_ASSERT(this->value == DEFAULT, "Inner value cannot be overwritten if already assigned");
-        this->value = std::exchange(other.value, DEFAULT);
-        return *this;
-    }
+	ExternalHandle &operator=(ExternalHandle &&other) noexcept {
+		HC_ASSERT(this->value == DEFAULT, "Inner value cannot be overwritten if already assigned");
+		this->value = std::exchange(other.value, DEFAULT);
+		return *this;
+	}
 
-    operator T() const { return value; } // NOLINT intentionally implicit
+	operator T() const { return value; } // NOLINT intentionally implicit
 
-    operator T &() { return value; } // NOLINT intentionally implicit
+	operator T &() { return value; } // NOLINT intentionally implicit
 
-    /**
-     * @brief "Destroy" this handle by setting it to the default value.
-     */
-    void destroy() {
-        this->value = DEFAULT;
-    }
+	/**
+	* @brief "Destroy" this handle by setting it to the default value.
+	*/
+	void destroy() {
+		this->value = DEFAULT;
+	}
 
 private:
-    T value = DEFAULT;
+	T value = DEFAULT;
 };

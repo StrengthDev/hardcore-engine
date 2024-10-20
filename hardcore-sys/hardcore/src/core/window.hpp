@@ -7,9 +7,9 @@
 #include <GLFW/glfw3.h>
 
 namespace hc::window {
-    void destroy(GLFWwindow *window);
+	void destroy(GLFWwindow *window);
 
-    bool is_resizing(GLFWwindow *window);
+	bool is_resizing(GLFWwindow *window);
 }
 
 #endif // HC_HEADLESS

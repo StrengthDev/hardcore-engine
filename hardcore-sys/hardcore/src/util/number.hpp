@@ -58,14 +58,14 @@
  */
 #define GIBI(value) (MEBI(value) << 10)
 
-typedef std::uint8_t u8; //!< Short alias for a 8 bit unsigned integer.
-typedef std::uint16_t u16; //!< Short alias for a 16 bit unsigned integer.
-typedef std::uint32_t u32; //!< Short alias for a 32 bit unsigned integer.
-typedef std::uint64_t u64; //!< Short alias for a 64 bit unsigned integer.
+typedef std::uint8_t u8; //!< Short alias for an 8-bit unsigned integer.
+typedef std::uint16_t u16; //!< Short alias for a 16-bit unsigned integer.
+typedef std::uint32_t u32; //!< Short alias for a 32-bit unsigned integer.
+typedef std::uint64_t u64; //!< Short alias for a 64-bit unsigned integer.
 
-typedef std::int8_t i8; //!< Short alias for a 8 bit integer.
-typedef std::int16_t i16; //!< Short alias for a 16 bit integer.
-typedef std::int32_t i32; //!< Short alias for a 32 bit integer.
-typedef std::int64_t i64; //!< Short alias for a 64 bit integer.
+typedef std::int8_t i8; //!< Short alias for an 8-bit integer.
+typedef std::int16_t i16; //!< Short alias for a 16-bit integer.
+typedef std::int32_t i32; //!< Short alias for a 32-bit integer.
+typedef std::int64_t i64; //!< Short alias for a 64-bit integer.
 
 typedef std::size_t Sz; //!< Short alias for the standard size type. (`std::size_t`)

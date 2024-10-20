@@ -10,11 +10,11 @@ extern "C" {
  * Applicable to both log events and spans.
  */
 enum HCLogKind {
-    Trace, //!< Designates very low priority, often extremely verbose, information.
-    Debug, //!< Designates lower priority information.
-    Info, //!< Designates useful information.
-    Warn, //!< Designates hazardous situations.
-    Error, //!< Designates very serious errors.
+	Trace, //!< Designates very low priority, often extremely verbose, information.
+	Debug, //!< Designates lower priority information.
+	Info, //!< Designates useful information.
+	Warn, //!< Designates hazardous situations.
+	Error, //!< Designates very serious errors.
 };
 
 /**

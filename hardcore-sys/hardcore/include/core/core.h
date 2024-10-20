@@ -15,21 +15,22 @@ extern "C" {
  * @brief A descriptor used to identify an application by its name and version.
  */
 struct HCApplicationDescriptor {
-    const char *name; //!< The name of the application.
-    uint32_t major; //!< The major version of the application.
-    uint32_t minor; //!< The minor version of the application.
-    uint32_t patch; //!< The patch version of the application.
+	const char *name; //!< The name of the application.
+	uint32_t major; //!< The major version of the application.
+	uint32_t minor; //!< The minor version of the application.
+	uint32_t patch; //!< The patch version of the application.
 };
 
 /**
  * @brief Initialisation parameters for a new Hardcore context.
  */
 struct HCInitParams {
-    struct HCApplicationDescriptor app; //!< A descriptor of the currently running program/application.
-    struct HCRenderParams render_params; //!< Initialisation parameters for the rendering portion of the Hardcore context.
-    HCLogFn log_fn; //!< The function the context should use for emitting log events.
-    HCStartSpanFn start_span_fn; //!< The function the context should use for starting spans.
-    HCEndSpanFn end_span_fn; //!< The function the context should use for ending spans.
+	struct HCApplicationDescriptor app; //!< A descriptor of the currently running program/application.
+	struct HCRenderParams render_params;
+	//!< Initialisation parameters for the rendering portion of the Hardcore context.
+	HCLogFn log_fn; //!< The function the context should use for emitting log events.
+	HCStartSpanFn start_span_fn; //!< The function the context should use for starting spans.
+	HCEndSpanFn end_span_fn; //!< The function the context should use for ending spans.
 };
 
 /**

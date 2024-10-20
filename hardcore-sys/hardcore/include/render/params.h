@@ -46,8 +46,8 @@ typedef void (*HCVulkanDebugCallbackFn)(enum HCLogKind kind, int scope, const ch
  * @brief Initialisation parameters for the rendering portion of the Hardcore context.
  */
 struct HCRenderParams {
-    uint32_t max_frames_in_flight; //!< The maximum number of frames that may be getting rendered at once.
-    HCVulkanDebugCallbackFn debug_callback; //!< The function that Vulkan should use for emitting debug events.
+	uint32_t max_frames_in_flight; //!< The maximum number of frames that may be getting rendered at once.
+	HCVulkanDebugCallbackFn debug_callback; //!< The function that Vulkan should use for emitting debug events.
 };
 
 #ifdef __cplusplus

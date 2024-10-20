@@ -646,4 +646,3 @@ void hc_set_window_drop_callback(struct HCWindow *window, HCWindowDropCallback c
 #endif // __cplusplus
 
 #endif // HC_HEADLESS
-
