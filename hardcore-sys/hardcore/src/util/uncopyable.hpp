@@ -24,7 +24,7 @@ public:
 	* @param value The value to assign to this uncopyable variable.
 	*/
 
-	Uncopyable(const T &value) : value(value) { ; } // NOLINT intentionally implicit
+	Uncopyable(const T &value) : value(value) { ; } // NOLINT(*-explicit-constructor) intentionally implicit
 
 	Uncopyable(const Uncopyable &) = delete;
 
@@ -38,9 +38,9 @@ public:
 		return *this;
 	}
 
-	operator T() const { return value; } // NOLINT intentionally implicit
+	operator T() const { return value; } // NOLINT(*-explicit-constructor) intentionally implicit
 
-	operator T &() { return value; } // NOLINT intentionally implicit
+	operator T &() { return value; } // NOLINT(*-explicit-constructor) intentionally implicit
 
 private:
 	T value = DEFAULT;
@@ -69,7 +69,7 @@ public:
 	*
 	* @param value The value to assign to this external handle.
 	*/
-	ExternalHandle(const T &value) : value(value) { ; } // NOLINT intentionally implicit
+	ExternalHandle(const T &value) : value(value) { ; } // NOLINT(*-explicit-constructor) intentionally implicit
 
 	~ExternalHandle() {
 		HC_ASSERT(this->value == DEFAULT, "Inner value must be externally cleaned up");
@@ -88,9 +88,9 @@ public:
 		return *this;
 	}
 
-	operator T() const { return value; } // NOLINT intentionally implicit
+	operator T() const { return value; } // NOLINT(*-explicit-constructor) intentionally implicit
 
-	operator T &() { return value; } // NOLINT intentionally implicit
+	operator T &() { return value; } // NOLINT(*-explicit-constructor) intentionally implicit
 
 	/**
 	* @brief "Destroy" this handle by setting it to the default value.
