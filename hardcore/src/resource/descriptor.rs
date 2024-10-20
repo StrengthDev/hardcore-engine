@@ -200,11 +200,11 @@ pub enum FieldError {
 
 /// A description of a descriptor's field.
 #[derive(Copy, Clone)]
-struct Field {
+pub struct Field {
     /// The basic data type of the field.
-    kind: Primitive,
+    pub kind: Primitive,
     /// The composition of the field.
-    composition: Composition,
+    pub composition: Composition,
 }
 
 impl Field {

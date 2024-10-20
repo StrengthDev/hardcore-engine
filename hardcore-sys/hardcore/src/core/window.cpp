@@ -329,7 +329,7 @@ namespace hc {
  */
 struct StaticWindow {
     Sz id = std::numeric_limits<Sz>::max();
-    DeviceID owning_device = std::numeric_limits<u32>::max();
+    u32 owning_device = std::numeric_limits<u32>::max();
     bool resizing = false;
     HCWindowPositionCallback position_callback = nullptr;
     HCWindowSizeCallback size_callback = nullptr;
@@ -395,7 +395,7 @@ HCWindow hc_new_window(HCWindowParams params) {
         return HCWindow{.handle = nullptr, .id = 0};
     }
 
-    DeviceID device = hc::render::default_device();
+    u32 device = hc::render::default_device();
     hc::render::InstanceResult res = hc::render::create_swapchain(window, device);
     if (res != hc::render::InstanceResult::Success) {
         HC_ERROR("Failed to create swapchain");
@@ -454,7 +454,7 @@ void hc_destroy_window(HCWindow *window) {
     glfwSetCharModsCallback(handle, nullptr);
     glfwSetDropCallback(handle, nullptr);
 
-    DeviceID device;
+    u32 device;
     {
         std::shared_lock lock(window_mutex);
         StaticWindow &static_window = window_map.at(handle);

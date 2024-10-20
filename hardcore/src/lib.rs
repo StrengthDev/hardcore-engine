@@ -50,13 +50,15 @@ use tokio::time::Instant;
 use tracing::{error, info, info_span, Instrument};
 
 use crate::context_token::{ContextToken, ContextTokenError};
+use crate::device::Device;
 use crate::event::Event;
 use crate::layer::{Context, Layer};
 use crate::native::vulkan_debug_callback;
 use crate::sync::{Mutex, RwLock};
 use hardcore_sys::InitParams;
 
-mod context_token;
+pub mod context_token;
+mod device;
 pub mod event;
 pub mod input;
 pub mod layer;
@@ -255,6 +257,7 @@ async fn core_run() -> Result<(), CoreError> {
         .build()?;
     let mut last_frame = Instant::now();
     let mut context = Context::new(worker_rt.handle().clone());
+    context.devices = (0..Device::count()).map(Device::new).collect();
     while RUNNING.load(Ordering::SeqCst) {
         let span = info_span!("Frame", frame = context.frame);
 

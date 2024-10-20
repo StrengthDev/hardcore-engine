@@ -54,8 +54,8 @@ namespace hc::render::device {
     bool Graph::validate_graph() const noexcept {
         // Check for missing dependencies
 
-        std::unordered_set<GraphItemID> node_dependencies;
-        std::unordered_set<GraphItemID> resource_dependencies;
+        std::unordered_set<u64> node_dependencies;
+        std::unordered_set<u64> resource_dependencies;
         for (const auto &[id, node]: this->nodes) {
             for (const InputResource &input: node.inputs) {
                 resource_dependencies.insert(input.id);
@@ -63,14 +63,14 @@ namespace hc::render::device {
                     node_dependencies.insert(*input.origin);
             }
         }
-        for (const GraphItemID id: node_dependencies) {
+        for (const u64 id: node_dependencies) {
             if (!this->nodes.contains(id)) {
                 HC_ERROR("Invalid device graph, node dependency does not exist "
                          "(this may happen because an operation call was destroyed while still being used)");
                 return false;
             }
         }
-        for (const GraphItemID id: resource_dependencies) {
+        for (const u64 id: resource_dependencies) {
             if (!this->nodes.contains(id)) {
                 HC_ERROR("Invalid device graph, resource dependency does not exist "
                          "(this may happen because a resource was destroyed while still being used)");
@@ -81,11 +81,11 @@ namespace hc::render::device {
         return true;
     }
 
-    std::pair<std::unordered_set<GraphItemID>, std::vector<GraphItemID>> Graph::filter_unused_nodes() const noexcept {
-        std::vector<GraphItemID> dependency_stack;
-        std::unordered_set<GraphItemID> output_dependencies;
+    std::pair<std::unordered_set<u64>, std::vector<u64>> Graph::filter_unused_nodes() const noexcept {
+        std::vector<u64> dependency_stack;
+        std::unordered_set<u64> output_dependencies;
         // Can assume that this will only contain unique root nodes, because the stack will never have duplicates
-        std::vector<GraphItemID> root_nodes;
+        std::vector<u64> root_nodes;
         for (auto const &[resource_id, node_id]: this->outputs) {
             bool is_root = true;
             for (const InputResource &input: this->nodes[node_id].inputs) {
@@ -101,7 +101,7 @@ namespace hc::render::device {
                 root_nodes.push_back(node_id);
         }
         while (!dependency_stack.empty()) {
-            const GraphItemID current_node_id = dependency_stack.back();
+            const u64 current_node_id = dependency_stack.back();
             dependency_stack.pop_back();
 
             bool is_root = true;
@@ -137,12 +137,12 @@ namespace hc::render::device {
 
         auto [output_dependencies, root_nodes] = this->filter_unused_nodes();
 
-        std::queue<GraphItemID> pending_queue;
-        std::unordered_set<GraphItemID> pending_set;
-        std::unordered_set<GraphItemID> pushed_nodes;
-        std::vector<GraphItemID> push_batch;
+        std::queue<u64> pending_queue;
+        std::unordered_set<u64> pending_set;
+        std::unordered_set<u64> pushed_nodes;
+        std::vector<u64> push_batch;
 
-        for (const GraphItemID node: root_nodes) {
+        for (const u64 node: root_nodes) {
             auto [it, inserted] = pending_set.insert(node);
             if (inserted)
                 pending_queue.push(node);
@@ -152,7 +152,7 @@ namespace hc::render::device {
         while (pushed_nodes.size() < output_dependencies.size()) {
             Sz check_count = pending_queue.size();
             while (0 < check_count) {
-                GraphItemID node = pending_queue.front();
+                u64 node = pending_queue.front();
                 pending_queue.pop();
 
                 // Check if node is ready to be pushed (all of its dependencies have been pushed)
@@ -167,7 +167,7 @@ namespace hc::render::device {
                     pending_set.erase(node);
                     push_batch.push_back(node);
                     for (const OutputResource &output: this->nodes[node].outputs) {
-                        for (const GraphItemID dependent: output.dependents) {
+                        for (const u64 dependent: output.dependents) {
                             // Only nodes that do meaningful work are pushed
                             if (output_dependencies.contains(dependent)) {
                                 auto [it, inserted] = pending_set.insert(dependent);
@@ -182,7 +182,7 @@ namespace hc::render::device {
                 check_count--;
             }
 
-            for (const GraphItemID node: push_batch) {
+            for (const u64 node: push_batch) {
                 pushed_nodes.insert(node);
                 // TODO add commands
             }
@@ -246,7 +246,7 @@ namespace hc::render::device {
         };
     }
 
-    std::size_t Graph::OutputHash::operator()(const std::pair<GraphItemID, GraphItemID> &output) const noexcept {
+    std::size_t Graph::OutputHash::operator()(const std::pair<u64, u64> &output) const noexcept {
         return output.first ^ reverse_bits(output.second);
     }
 }

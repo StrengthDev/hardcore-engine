@@ -113,7 +113,7 @@ namespace hc::render {
         device.physical_handle = physical_handle;
         device.handle = handle;
         device.cleanup_queues = std::vector<std::vector<device::DestructionMark>>(max_frames_in_flight());
-        HC_DEBUG(device.memory.host_coherent_dynamic_heap());
+
         return device;
     }
 

@@ -21,16 +21,16 @@ namespace hc::render::device {
      * @brief A node's input resource.
      */
     struct InputResource {
-        GraphItemID id = std::numeric_limits<GraphItemID>::max(); //!< The ID of the resource in the graph.
-        std::optional<GraphItemID> origin; //!< The key of the graph node which wrote to this resource, if any did.
+        u64 id = std::numeric_limits<u64>::max(); //!< The ID of the resource in the graph.
+        std::optional<u64> origin; //!< The key of the graph node which wrote to this resource, if any did.
     };
 
     /**
      * @brief A node's output resource.
      */
     struct OutputResource {
-        GraphItemID id = std::numeric_limits<GraphItemID>::max(); //!< The ID of the resource in the graph.
-        std::vector<GraphItemID> dependents; //!< The list of nodes depending on this resource.
+        u64 id = std::numeric_limits<u64>::max(); //!< The ID of the resource in the graph.
+        std::vector<u64> dependents; //!< The list of nodes depending on this resource.
     };
 
     enum class NodeType : u8 {
@@ -133,7 +133,7 @@ namespace hc::render::device {
          * @return A pair containing the set of used nodes, and a list of relevant root nodes (also included within
          * the used nodes, it is also guaranteed that there are no duplicate root nodes in the list).
          */
-        [[nodiscard]] std::pair<std::unordered_set<GraphItemID>, std::vector<GraphItemID>>
+        [[nodiscard]] std::pair<std::unordered_set<u64>, std::vector<u64>>
         filter_unused_nodes() const noexcept;
 
         // It is assumed the nodes in the graph never form a cycle
@@ -151,7 +151,7 @@ namespace hc::render::device {
          * @brief Custom hash function for the output type.
          */
         struct OutputHash {
-            std::size_t operator()(const std::pair<GraphItemID, GraphItemID> &output) const noexcept;
+            std::size_t operator()(const std::pair<u64, u64> &output) const noexcept;
         };
 
         /**
@@ -159,7 +159,7 @@ namespace hc::render::device {
          *
          * Each item is a pair of ID's, the first being the resource ID and the second the last node that writes to it.
          */
-        std::unordered_set<std::pair<GraphItemID, GraphItemID>, OutputHash> outputs;
+        std::unordered_set<std::pair<u64, u64>, OutputHash> outputs;
     };
 
 }

@@ -5,12 +5,16 @@ use std::ops::{Deref, DerefMut};
 pub use mesh::*;
 pub use texture::*;
 
-mod buffer;
+pub mod buffer;
 pub mod descriptor;
 mod generic;
 mod mesh;
 mod texture;
-pub mod vertex;
+
+mod descriptor_macros;
+mod vertex;
+
+pub use crate::resource::vertex::*;
 
 /// Structures holding device local data only directly accessible by the device.
 pub mod local {

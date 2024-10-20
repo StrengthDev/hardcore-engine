@@ -15,6 +15,7 @@
 //! it will probably make layer management easier and ties well with the way events are handle by
 //! layers in the stack (layers at the top get to try handling events first).
 
+use crate::device::Device;
 use crate::event::Event;
 
 /// An abstract application layer, used to represent some component of the application.
@@ -51,6 +52,9 @@ pub struct Context {
     /// How long it took to process the previous frame, in seconds.
     pub delta_time: f64,
 
+    /// The list of devices available for use.
+    pub devices: Vec<Device>,
+
     /// A runtime which may be used by layers to spawn tasks.
     pub worker_pool: tokio::runtime::Handle,
 }
@@ -62,6 +66,7 @@ impl Context {
             current_layer_idx: 0,
             frame: 0,
             delta_time: 0.0,
+            devices: vec![],
             worker_pool,
         }
     }

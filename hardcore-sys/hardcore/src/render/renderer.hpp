@@ -21,19 +21,22 @@ namespace hc::render {
         DeviceError,
         NoDevicesFound,
         SurfaceFailure,
+        Uninitialised,
+        OutOfBounds,
         Unimplemented,
-        // TODO: add more errors, depending on what failed exactly, create Result type
     };
 
     InstanceResult init(const HCApplicationDescriptor &app, const HCRenderParams &params);
 
     InstanceResult term();
 
-    InstanceResult create_swapchain(GLFWwindow *window, DeviceID device_idx);
+    InstanceResult create_swapchain(GLFWwindow *window, u32 device_idx);
 
-    void destroy_swapchain(GLFWwindow *window, DeviceID device_idx);
+    void destroy_swapchain(GLFWwindow *window, u32 device_idx);
 
     std::vector<Device> &device_list() noexcept;
 
-    DeviceID default_device();
+    Result<Device *, InstanceResult> device_at(u32 id) noexcept;
+
+    u32 default_device();
 }

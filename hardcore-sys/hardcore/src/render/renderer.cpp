@@ -10,6 +10,7 @@
 #include <core/log.hpp>
 #include <util/flow.hpp>
 #include <render/renderer.h>
+#include <render/device.h>
 
 #include "util.hpp"
 
@@ -33,7 +34,7 @@ namespace hc::render {
     static VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
     static HCVulkanDebugCallbackFn user_debug_callback = nullptr;
     static std::vector<Device> devices;
-    static DeviceID default_device_idx = std::numeric_limits<DeviceID>::max();
+    static u32 default_device_idx = std::numeric_limits<u32>::max();
 
     VkResult layer_support(const std::vector<const char *> &layer_names, std::vector<bool> &out_found_layers) {
         u32 layer_count;
@@ -336,13 +337,13 @@ namespace hc::render {
         volkFinalize();
 
         max_frames_in_flight_count = std::numeric_limits<u8>::max();
-        default_device_idx = std::numeric_limits<DeviceID>::max();
+        default_device_idx = std::numeric_limits<u32>::max();
 
         return InstanceResult::Success;
     }
 
-    InstanceResult create_swapchain(GLFWwindow *window, DeviceID device_idx) {
-        if (device_idx == std::numeric_limits<DeviceID>::max()) {
+    InstanceResult create_swapchain(GLFWwindow *window, u32 device_idx) {
+        if (device_idx == std::numeric_limits<u32>::max()) {
             device_idx = default_device_idx;
         }
 
@@ -358,9 +359,9 @@ namespace hc::render {
         }
     }
 
-    void destroy_swapchain(GLFWwindow *window, DeviceID device_idx) {
+    void destroy_swapchain(GLFWwindow *window, u32 device_idx) {
         // The default device may have changed meanwhile
-        HC_ASSERT(device_idx != std::numeric_limits<DeviceID>::max(), "Cannot assume default device");
+        HC_ASSERT(device_idx != std::numeric_limits<u32>::max(), "Cannot assume default device");
         devices[device_idx].destroy_swapchain(global_instance, window);
     }
 
@@ -380,7 +381,21 @@ namespace hc::render {
         return devices;
     }
 
-    DeviceID default_device() {
+    Result<Device *, InstanceResult> device_at(u32 id) noexcept {
+        if (devices.empty()) {
+            HC_ERROR("No global instance currently initialised");
+            return Err(InstanceResult::Uninitialised);
+        }
+
+        if (devices.size() <= id) {
+            HC_ERROR("Device index out of bounds");
+            return Err(InstanceResult::OutOfBounds);
+        }
+
+        return Ok(&devices[id]);
+    }
+
+    u32 default_device() {
         return default_device_idx;
     }
 }
@@ -406,4 +421,17 @@ int hc_render_finish() {
     }
 
     return 0;
+}
+
+u32 hc_device_count() {
+    return static_cast<u32>(hc::render::device_list().size());
+}
+
+const char *hc_device_name(u32 device) {
+    auto res = hc::render::device_at(device);
+    if (!res)
+        return nullptr;
+    auto device_ptr = res.ok();
+
+    return device_ptr->name();
 }

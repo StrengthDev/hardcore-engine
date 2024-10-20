@@ -73,7 +73,13 @@ impl ContextToken {
 
 /// Instances of objects implementing this trait are only valid for the lifetime of the context
 /// which was active at the time of their creation.
-pub(crate) trait ContextDependent {
+pub trait ContextDependent: private::Sealed {
     /// Check if this instance is valid within the current context.
     fn valid(&self) -> bool;
+}
+
+impl<T> private::Sealed for T where T: ContextDependent {}
+
+mod private {
+    pub trait Sealed {}
 }
