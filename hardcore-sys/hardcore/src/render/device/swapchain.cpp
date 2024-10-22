@@ -74,7 +74,7 @@ namespace hc::render::device {
 			}
 			swapchain.image_views.clear();
 			fn_table.vkDestroySwapchainKHR(device, swapchain.handle, nullptr);
-			swapchain.handle = VK_NULL_HANDLE;
+			swapchain.handle.destroy();
 		}
 	}
 
@@ -157,37 +157,6 @@ namespace hc::render::device {
 				"Must call Swapchain::destroy before Swapchain object is destroyed");
 	}
 
-	Swapchain::Swapchain(Swapchain &&other) noexcept: inner(std::exchange(other.inner, {.handle = VK_NULL_HANDLE})),
-													surface(std::exchange(other.surface, VK_NULL_HANDLE)),
-													surface_format(std::move(other.surface_format)),
-													present_mode(other.present_mode),
-													extent(std::move(other.extent)),
-													viewport(std::move(other.viewport)),
-													scissor(std::move(other.scissor)),
-													creation_params(std::move(other.creation_params)),
-													presentation_fences(std::move(other.presentation_fences)),
-													image_semaphores(std::move(other.image_semaphores)),
-													old_swapchains(std::move(other.old_swapchains)) {
-	}
-
-	Swapchain &Swapchain::operator=(Swapchain &&other) noexcept {
-		HC_ASSERT(this->inner.handle == VK_NULL_HANDLE, "Must call Swapchain::destroy before move assignment");
-
-		this->inner = std::exchange(other.inner, {.handle = VK_NULL_HANDLE});
-		this->surface = std::exchange(other.surface, VK_NULL_HANDLE);
-		this->surface_format = std::move(other.surface_format);
-		this->present_mode = other.present_mode;
-		this->extent = std::move(other.extent);
-		this->viewport = std::move(other.viewport);
-		this->scissor = std::move(other.scissor);
-		this->creation_params = std::move(other.creation_params);
-		this->presentation_fences = std::move(other.presentation_fences);
-		this->image_semaphores = std::move(other.image_semaphores);
-		this->old_swapchains = std::move(other.old_swapchains);
-
-		return *this;
-	}
-
 	void Swapchain::destroy(VkInstance instance, const VolkDeviceTable &fn_table, VkDevice device) {
 		while (!this->old_swapchains.empty()) {
 			destroy_inner_swapchain(fn_table, device, this->old_swapchains.front());
@@ -198,6 +167,7 @@ namespace hc::render::device {
 			destroy_inner_swapchain(fn_table, device, this->inner);
 
 		vkDestroySurfaceKHR(instance, this->surface, nullptr);
+		this->surface.destroy();
 	}
 
 	void Swapchain::destroy_old(const VolkDeviceTable &fn_table, VkDevice device) {
