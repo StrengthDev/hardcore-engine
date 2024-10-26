@@ -4,6 +4,8 @@
 
 #include "flow.hpp"
 
+// TODO rename to Unique
+
 /**
  * @brief An uncopyable value.
  *

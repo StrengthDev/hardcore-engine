@@ -8,6 +8,7 @@ use hardcore::event::{Event, WindowEvent};
 use hardcore::input::{ButtonAction, MouseButton};
 use hardcore::layer::{Context, Layer};
 use hardcore::resource::VertexBuffer;
+use hardcore::shader::{Shader, ShaderStage};
 use hardcore::window::Window;
 use hardcore::{init, push_layer, run, stop, terminate, ApplicationDescriptor};
 
@@ -15,6 +16,8 @@ struct FractalLayer {
     _window: Window,
     obj: Option<VertexBuffer<false>>,
     flag: bool,
+    vert_shader: Shader,
+    frag_shader: Shader,
 }
 
 impl FractalLayer {
@@ -24,6 +27,16 @@ impl FractalLayer {
                 .expect("Failed to create window"),
             obj: None,
             flag: false,
+            vert_shader: Shader::try_from_source(
+                include_str!("resources/shaders/shader.vert"),
+                ShaderStage::Vertex,
+            )
+            .expect("Failed to create shader"),
+            frag_shader: Shader::try_from_source(
+                include_str!("resources/shaders/shader.frag"),
+                ShaderStage::Fragment,
+            )
+            .expect("Failed to create shader"),
         }
     }
 }

@@ -64,6 +64,7 @@ pub mod input;
 pub mod layer;
 mod native;
 pub mod resource;
+pub mod shader;
 mod sync;
 pub mod window;
 

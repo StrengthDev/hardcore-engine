@@ -11,10 +11,11 @@ publish = true
 
 [dependencies]
 async-trait = "0.1.77"
+glslang = { version = "0.6.1", optional = true }
 hardcore-sys = { path = "../hardcore-sys" }
 parking_lot = { version = "0.12.1", features = ["send_guard"], optional = true }
 thiserror = "1.0.57"
-tokio = { version = "1.36.0", features = ["rt", "rt-multi-thread", "sync", "signal", "time"] }
+tokio = { version = "1.36.0", features = ["fs", "io-util", "rt", "rt-multi-thread", "sync", "signal", "time"] }
 tracing = "0.1.40"
 
 [dev-dependencies]
@@ -23,6 +24,7 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
 [features]
 headless = ["hardcore-sys/headless"]
-no_logs = ["hardcore-sys/no_logs"]
-validation = ["hardcore-sys/validation"]
+tracing = ["hardcore-sys/tracing"]
 parking_lot = ["dep:parking_lot", "tracing-subscriber/parking_lot", "tokio/parking_lot"]
+shader-compilation = ["dep:glslang"]
+validation = ["hardcore-sys/validation"]

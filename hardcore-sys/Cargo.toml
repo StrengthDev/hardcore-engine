@@ -14,11 +14,11 @@ publish = true
 link-cplusplus = "1.0.9"
 
 [build-dependencies]
-bindgen = "0.69.4"
+bindgen = "0.70.1"
 cmake = "0.1.50"
 regex = "1.10.3"
 
 [features]
 headless = []
-no_logs = []
+tracing = []
 validation = []

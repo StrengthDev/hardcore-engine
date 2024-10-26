@@ -23,12 +23,13 @@ fn main() {
     #[cfg(all(target_family = "windows", debug_assertions))]
     config.cxxflag("/ZI");
 
+    // TODO change feature to something additive, like "graphics", "rendering" or "window"
     #[cfg(feature = "headless")]
     {
         config.define("HARDCORE_HEADLESS", "ON");
     }
 
-    #[cfg(feature = "no_logs")]
+    #[cfg(not(feature = "tracing"))]
     {
         config.define("HARDCORE_LOGS", "OFF");
     }

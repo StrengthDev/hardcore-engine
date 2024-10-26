@@ -6,3 +6,4 @@
 #include "render/device.h"
 #include "render/buffer.h"
 #include "render/descriptor.h"
+#include "render/shader.h"
