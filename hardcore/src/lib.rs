@@ -41,6 +41,7 @@
 #![warn(missing_docs)]
 
 use std::cell::Cell;
+use std::fmt::{Display, Formatter};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use thiserror::Error;
@@ -63,10 +64,26 @@ pub mod event;
 pub mod input;
 pub mod layer;
 mod native;
+pub mod render;
 pub mod resource;
 pub mod shader;
 mod sync;
 pub mod window;
+
+/// Hardcore's version.
+pub static VERSION: Version = Version {
+    major: const_unwrap(u32::from_str_radix(env!("CARGO_PKG_VERSION_MAJOR"), 10), 0),
+    minor: const_unwrap(u32::from_str_radix(env!("CARGO_PKG_VERSION_MINOR"), 10), 0),
+    patch: const_unwrap(u32::from_str_radix(env!("CARGO_PKG_VERSION_PATCH"), 10), 0),
+};
+
+const fn const_unwrap(result: Result<u32, std::num::ParseIntError>, default: u32) -> u32 {
+    if let Ok(value) = result {
+        value
+    } else {
+        default
+    }
+}
 
 static RUNNING: AtomicBool = AtomicBool::new(false);
 static LAYER_TX: RwLock<Option<UnboundedSender<Box<dyn Layer>>>> = RwLock::new(None);
@@ -87,20 +104,33 @@ enum ThreadKind {
     Worker,
 }
 
+/// A version value.
+#[derive(Clone, Debug)]
+pub struct Version {
+    /// The major version.
+    pub major: u32,
+
+    /// The minor version.
+    pub minor: u32,
+
+    /// The patch version.
+    pub patch: u32,
+}
+
+impl Display for Version {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(format!("v{}.{}.{}", self.major, self.minor, self.patch).as_str())
+    }
+}
+
 /// A descriptor used to identify an application by its name and version.
 #[derive(Clone)]
 pub struct ApplicationDescriptor<'a> {
     /// The name of the application.
     pub name: &'a str,
 
-    /// The major version of the application.
-    pub major: u32,
-
-    /// The minor version of the application.
-    pub minor: u32,
-
-    /// The patch version of the application.
-    pub patch: u32,
+    /// The version of the application.
+    pub version: Version,
 }
 
 /// An error within the core **Hardcore** functionality.
@@ -142,6 +172,8 @@ pub enum CoreError {
 ///
 /// This function must be called before any other library functions may be used.
 pub fn init(app: ApplicationDescriptor) -> Result<(), CoreError> {
+    info!("hardcore {VERSION}");
+
     let (tx, rx) = unbounded_channel();
     let _ = LAYER_TX.write().insert(tx);
     let _ = LAYER_RX.lock().insert(rx);
@@ -153,9 +185,11 @@ pub fn init(app: ApplicationDescriptor) -> Result<(), CoreError> {
 
     let descriptor = hardcore_sys::ApplicationDescriptor {
         name: c_name.into_raw(),
-        major: app.major,
-        minor: app.minor,
-        patch: app.patch,
+        version: hardcore_sys::Version {
+            major: app.version.major,
+            minor: app.version.minor,
+            patch: app.version.patch,
+        },
     };
 
     let render_params = hardcore_sys::RenderParams {

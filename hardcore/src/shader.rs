@@ -1,5 +1,5 @@
-#![allow(E0004)]
-
+use crate::render::vulkan_version;
+use crate::Version;
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::Path;
@@ -218,6 +218,34 @@ impl From<ShaderStage> for glslang::ShaderStage {
     }
 }
 
+#[cfg(feature = "shader-compilation")]
+#[derive(Copy, Clone, Debug, Default)]
+pub enum SpirvVersion {
+    SPIRV1_0,
+    SPIRV1_1,
+    SPIRV1_2,
+    SPIRV1_3,
+    SPIRV1_4,
+    SPIRV1_5,
+    #[default]
+    SPIRV1_6,
+}
+
+#[cfg(feature = "shader-compilation")]
+impl From<SpirvVersion> for glslang::SpirvVersion {
+    fn from(value: SpirvVersion) -> Self {
+        match value {
+            SpirvVersion::SPIRV1_0 => glslang::SpirvVersion::SPIRV1_0,
+            SpirvVersion::SPIRV1_1 => glslang::SpirvVersion::SPIRV1_1,
+            SpirvVersion::SPIRV1_2 => glslang::SpirvVersion::SPIRV1_2,
+            SpirvVersion::SPIRV1_3 => glslang::SpirvVersion::SPIRV1_3,
+            SpirvVersion::SPIRV1_4 => glslang::SpirvVersion::SPIRV1_4,
+            SpirvVersion::SPIRV1_5 => glslang::SpirvVersion::SPIRV1_5,
+            SpirvVersion::SPIRV1_6 => glslang::SpirvVersion::SPIRV1_6,
+        }
+    }
+}
+
 pub struct Shader {
     inner: hardcore_sys::Shader,
     stage: ShaderStage,
@@ -262,35 +290,64 @@ impl Shader {
     }
 
     #[cfg(feature = "shader-compilation")]
-    pub fn compile(source: &str, stage: ShaderStage) -> Result<Vec<u32>, ShaderError> {
+    pub fn compile(
+        source: &str,
+        stage: ShaderStage,
+        spirv_version: SpirvVersion,
+    ) -> Result<Vec<u32>, ShaderError> {
         trace!("Compiling \"{stage:?}\" shader source to SPIR-V..");
 
-        use glslang::{Compiler, CompilerOptions, ShaderInput, ShaderSource};
+        use glslang::{
+            Compiler, CompilerOptions, ShaderInput, ShaderSource, Target, VulkanVersion,
+        };
 
         let compiler = Compiler::acquire().ok_or(ShaderError::NoCompiler)?;
+        let vulkan = match vulkan_version() {
+            Version {
+                major: 1,
+                minor,
+                patch: 0,
+            } => match minor {
+                0 => VulkanVersion::Vulkan1_0,
+                1 => VulkanVersion::Vulkan1_1,
+                2 => VulkanVersion::Vulkan1_2,
+                3 => VulkanVersion::Vulkan1_3,
+                _ => unreachable!("All Vulkan versions should be handled"),
+            },
+            Version { .. } => unreachable!("All Vulkan versions should be handled"),
+        };
+        let options = CompilerOptions {
+            target: Target::Vulkan {
+                version: vulkan,
+                spirv_version: spirv_version.into(),
+            },
+            ..Default::default()
+        };
         let source = ShaderSource::from(source);
 
-        let input = ShaderInput::new(
-            &source,
-            stage.into(),
-            &CompilerOptions::default(),
-            None,
-            None,
-        )?;
+        let input = ShaderInput::new(&source, stage.into(), &options, None, None)?;
         let shader = glslang::Shader::new(compiler, input)?;
 
         Ok(shader.compile()?)
     }
 
     #[cfg(feature = "shader-compilation")]
-    pub fn try_from_source(source: &str, stage: ShaderStage) -> Result<Shader, ShaderError> {
-        Shader::try_from_bytecode(Shader::compile(source, stage)?.as_slice(), stage)
+    pub fn try_from_source(
+        source: &str,
+        stage: ShaderStage,
+        spirv_version: SpirvVersion,
+    ) -> Result<Shader, ShaderError> {
+        Shader::try_from_bytecode(
+            Shader::compile(source, stage, spirv_version)?.as_slice(),
+            stage,
+        )
     }
 
     #[cfg(feature = "shader-compilation")]
     pub async fn try_from_source_file<P: AsRef<Path>>(
         path: P,
         stage_hint: Option<ShaderStage>,
+        spirv_version: SpirvVersion,
     ) -> Result<Shader, ShaderError> {
         let stage = if let Some(stage) = stage_hint {
             stage
@@ -302,7 +359,7 @@ impl Shader {
         let mut source = String::new();
         file.read_to_string(&mut source).await?;
 
-        Shader::try_from_source(&source, stage)
+        Shader::try_from_source(&source, stage, spirv_version)
     }
 
     pub fn stage(&self) -> ShaderStage {

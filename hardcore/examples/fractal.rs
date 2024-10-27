@@ -7,10 +7,11 @@ use tracing_subscriber::EnvFilter;
 use hardcore::event::{Event, WindowEvent};
 use hardcore::input::{ButtonAction, MouseButton};
 use hardcore::layer::{Context, Layer};
+use hardcore::render::vulkan_version;
 use hardcore::resource::VertexBuffer;
 use hardcore::shader::{Shader, ShaderStage};
 use hardcore::window::Window;
-use hardcore::{init, push_layer, run, stop, terminate, ApplicationDescriptor};
+use hardcore::{init, push_layer, run, stop, terminate, ApplicationDescriptor, Version};
 
 struct FractalLayer {
     _window: Window,
@@ -30,11 +31,13 @@ impl FractalLayer {
             vert_shader: Shader::try_from_source(
                 include_str!("resources/shaders/shader.vert"),
                 ShaderStage::Vertex,
+                Default::default(),
             )
             .expect("Failed to create shader"),
             frag_shader: Shader::try_from_source(
                 include_str!("resources/shaders/shader.frag"),
                 ShaderStage::Fragment,
+                Default::default(),
             )
             .expect("Failed to create shader"),
         }
@@ -46,6 +49,7 @@ impl Layer for FractalLayer {
     async fn tick(&mut self, context: &Context) {
         if self.flag {
             self.flag = false;
+            debug!("Vulkan {}", vulkan_version());
             for (i, device) in context.devices.iter().enumerate() {
                 debug!("Device {i} name: {}", device.name())
             }
@@ -117,11 +121,14 @@ fn main() {
 
     init(ApplicationDescriptor {
         name: "Hardcore Fractal sample",
-        major: env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap(),
-        minor: env!("CARGO_PKG_VERSION_MINOR").parse().unwrap(),
-        patch: env!("CARGO_PKG_VERSION_PATCH").parse().unwrap(),
+        version: Version {
+            major: env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap(),
+            minor: env!("CARGO_PKG_VERSION_MINOR").parse().unwrap(),
+            patch: env!("CARGO_PKG_VERSION_PATCH").parse().unwrap(),
+        },
     })
     .expect("Failed to initialise library");
+    let _test = &hardcore::VERSION;
     push_layer(FractalLayer::new()).expect("Failed to send fractal layer");
     run().expect("Failed to run main loop");
     terminate().expect("Failed to terminate library");

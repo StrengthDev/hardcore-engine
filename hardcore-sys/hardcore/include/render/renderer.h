@@ -1,10 +1,12 @@
 #pragma once
 
+#include "../core/version.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
 
-#include <stdint.h>
+extern const struct HCVersion HC_VULKAN_VERSION; //!< The version of Vulkan that is used.
 
 /**
 * @brief Process one frame.
