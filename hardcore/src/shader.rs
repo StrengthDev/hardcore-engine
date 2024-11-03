@@ -1,12 +1,9 @@
-use crate::render::vulkan_version;
-use crate::Version;
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::Path;
 use thiserror::Error;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, BufReader};
-use tracing::trace;
 
 #[derive(Error, Debug)]
 pub enum ShaderError {
@@ -174,78 +171,6 @@ impl From<ShaderStage> for hardcore_sys::ShaderStage {
     }
 }
 
-#[cfg(feature = "shader-compilation")]
-impl From<glslang::ShaderStage> for ShaderStage {
-    fn from(value: glslang::ShaderStage) -> Self {
-        match value {
-            glslang::ShaderStage::Vertex => ShaderStage::Vertex,
-            glslang::ShaderStage::Fragment => ShaderStage::Fragment,
-            glslang::ShaderStage::Compute => ShaderStage::Compute,
-            glslang::ShaderStage::Mesh => ShaderStage::Mesh,
-            glslang::ShaderStage::TesselationControl => ShaderStage::TesselationControl,
-            glslang::ShaderStage::TesselationEvaluation => ShaderStage::TesselationEvaluation,
-            glslang::ShaderStage::Geometry => ShaderStage::Geometry,
-            glslang::ShaderStage::Task => ShaderStage::Task,
-            glslang::ShaderStage::RayGeneration => ShaderStage::RayGeneration,
-            glslang::ShaderStage::Intersect => ShaderStage::RayIntersection,
-            glslang::ShaderStage::AnyHit => ShaderStage::RayAnyHit,
-            glslang::ShaderStage::ClosestHit => ShaderStage::RayClosestHit,
-            glslang::ShaderStage::Miss => ShaderStage::RayMiss,
-            glslang::ShaderStage::Callable => ShaderStage::RayCallable,
-        }
-    }
-}
-
-#[cfg(feature = "shader-compilation")]
-impl From<ShaderStage> for glslang::ShaderStage {
-    fn from(value: ShaderStage) -> Self {
-        match value {
-            ShaderStage::Vertex => glslang::ShaderStage::Vertex,
-            ShaderStage::Fragment => glslang::ShaderStage::Fragment,
-            ShaderStage::Compute => glslang::ShaderStage::Compute,
-            ShaderStage::Mesh => glslang::ShaderStage::Mesh,
-            ShaderStage::TesselationControl => glslang::ShaderStage::TesselationControl,
-            ShaderStage::TesselationEvaluation => glslang::ShaderStage::TesselationEvaluation,
-            ShaderStage::Geometry => glslang::ShaderStage::Geometry,
-            ShaderStage::Task => glslang::ShaderStage::Task,
-            ShaderStage::RayGeneration => glslang::ShaderStage::RayGeneration,
-            ShaderStage::RayIntersection => glslang::ShaderStage::Intersect,
-            ShaderStage::RayAnyHit => glslang::ShaderStage::AnyHit,
-            ShaderStage::RayClosestHit => glslang::ShaderStage::ClosestHit,
-            ShaderStage::RayMiss => glslang::ShaderStage::Miss,
-            ShaderStage::RayCallable => glslang::ShaderStage::Callable,
-        }
-    }
-}
-
-#[cfg(feature = "shader-compilation")]
-#[derive(Copy, Clone, Debug, Default)]
-pub enum SpirvVersion {
-    SPIRV1_0,
-    SPIRV1_1,
-    SPIRV1_2,
-    SPIRV1_3,
-    SPIRV1_4,
-    SPIRV1_5,
-    #[default]
-    SPIRV1_6,
-}
-
-#[cfg(feature = "shader-compilation")]
-impl From<SpirvVersion> for glslang::SpirvVersion {
-    fn from(value: SpirvVersion) -> Self {
-        match value {
-            SpirvVersion::SPIRV1_0 => glslang::SpirvVersion::SPIRV1_0,
-            SpirvVersion::SPIRV1_1 => glslang::SpirvVersion::SPIRV1_1,
-            SpirvVersion::SPIRV1_2 => glslang::SpirvVersion::SPIRV1_2,
-            SpirvVersion::SPIRV1_3 => glslang::SpirvVersion::SPIRV1_3,
-            SpirvVersion::SPIRV1_4 => glslang::SpirvVersion::SPIRV1_4,
-            SpirvVersion::SPIRV1_5 => glslang::SpirvVersion::SPIRV1_5,
-            SpirvVersion::SPIRV1_6 => glslang::SpirvVersion::SPIRV1_6,
-        }
-    }
-}
-
 pub struct Shader {
     inner: hardcore_sys::Shader,
     stage: ShaderStage,
@@ -289,80 +214,177 @@ impl Shader {
         Shader::try_from_bytecode(&bytecode, stage)
     }
 
-    #[cfg(feature = "shader-compilation")]
-    pub fn compile(
-        source: &str,
-        stage: ShaderStage,
-        spirv_version: SpirvVersion,
-    ) -> Result<Vec<u32>, ShaderError> {
-        trace!("Compiling \"{stage:?}\" shader source to SPIR-V..");
-
-        use glslang::{
-            Compiler, CompilerOptions, ShaderInput, ShaderSource, Target, VulkanVersion,
-        };
-
-        let compiler = Compiler::acquire().ok_or(ShaderError::NoCompiler)?;
-        let vulkan = match vulkan_version() {
-            Version {
-                major: 1,
-                minor,
-                patch: 0,
-            } => match minor {
-                0 => VulkanVersion::Vulkan1_0,
-                1 => VulkanVersion::Vulkan1_1,
-                2 => VulkanVersion::Vulkan1_2,
-                3 => VulkanVersion::Vulkan1_3,
-                _ => unreachable!("All Vulkan versions should be handled"),
-            },
-            Version { .. } => unreachable!("All Vulkan versions should be handled"),
-        };
-        let options = CompilerOptions {
-            target: Target::Vulkan {
-                version: vulkan,
-                spirv_version: spirv_version.into(),
-            },
-            ..Default::default()
-        };
-        let source = ShaderSource::from(source);
-
-        let input = ShaderInput::new(&source, stage.into(), &options, None, None)?;
-        let shader = glslang::Shader::new(compiler, input)?;
-
-        Ok(shader.compile()?)
-    }
-
-    #[cfg(feature = "shader-compilation")]
-    pub fn try_from_source(
-        source: &str,
-        stage: ShaderStage,
-        spirv_version: SpirvVersion,
-    ) -> Result<Shader, ShaderError> {
-        Shader::try_from_bytecode(
-            Shader::compile(source, stage, spirv_version)?.as_slice(),
-            stage,
-        )
-    }
-
-    #[cfg(feature = "shader-compilation")]
-    pub async fn try_from_source_file<P: AsRef<Path>>(
-        path: P,
-        stage_hint: Option<ShaderStage>,
-        spirv_version: SpirvVersion,
-    ) -> Result<Shader, ShaderError> {
-        let stage = if let Some(stage) = stage_hint {
-            stage
-        } else {
-            ShaderStage::try_from(path.as_ref())?
-        };
-
-        let mut file = File::open(path).await?;
-        let mut source = String::new();
-        file.read_to_string(&mut source).await?;
-
-        Shader::try_from_source(&source, stage, spirv_version)
-    }
-
     pub fn stage(&self) -> ShaderStage {
         self.stage
     }
 }
+
+#[cfg(feature = "shader-compilation")]
+mod shader_compilation {
+    use crate::render::vulkan_version;
+    use crate::shader::{Shader, ShaderError, ShaderStage};
+    use crate::Version;
+    use std::path::Path;
+    use tokio::fs::File;
+    use tokio::io::AsyncReadExt;
+    use tracing::trace;
+
+    impl From<glslang::ShaderStage> for ShaderStage {
+        fn from(value: glslang::ShaderStage) -> Self {
+            match value {
+                glslang::ShaderStage::Vertex => ShaderStage::Vertex,
+                glslang::ShaderStage::Fragment => ShaderStage::Fragment,
+                glslang::ShaderStage::Compute => ShaderStage::Compute,
+                glslang::ShaderStage::Mesh => ShaderStage::Mesh,
+                glslang::ShaderStage::TesselationControl => ShaderStage::TesselationControl,
+                glslang::ShaderStage::TesselationEvaluation => ShaderStage::TesselationEvaluation,
+                glslang::ShaderStage::Geometry => ShaderStage::Geometry,
+                glslang::ShaderStage::Task => ShaderStage::Task,
+                glslang::ShaderStage::RayGeneration => ShaderStage::RayGeneration,
+                glslang::ShaderStage::Intersect => ShaderStage::RayIntersection,
+                glslang::ShaderStage::AnyHit => ShaderStage::RayAnyHit,
+                glslang::ShaderStage::ClosestHit => ShaderStage::RayClosestHit,
+                glslang::ShaderStage::Miss => ShaderStage::RayMiss,
+                glslang::ShaderStage::Callable => ShaderStage::RayCallable,
+            }
+        }
+    }
+
+    impl From<ShaderStage> for glslang::ShaderStage {
+        fn from(value: ShaderStage) -> Self {
+            match value {
+                ShaderStage::Vertex => glslang::ShaderStage::Vertex,
+                ShaderStage::Fragment => glslang::ShaderStage::Fragment,
+                ShaderStage::Compute => glslang::ShaderStage::Compute,
+                ShaderStage::Mesh => glslang::ShaderStage::Mesh,
+                ShaderStage::TesselationControl => glslang::ShaderStage::TesselationControl,
+                ShaderStage::TesselationEvaluation => glslang::ShaderStage::TesselationEvaluation,
+                ShaderStage::Geometry => glslang::ShaderStage::Geometry,
+                ShaderStage::Task => glslang::ShaderStage::Task,
+                ShaderStage::RayGeneration => glslang::ShaderStage::RayGeneration,
+                ShaderStage::RayIntersection => glslang::ShaderStage::Intersect,
+                ShaderStage::RayAnyHit => glslang::ShaderStage::AnyHit,
+                ShaderStage::RayClosestHit => glslang::ShaderStage::ClosestHit,
+                ShaderStage::RayMiss => glslang::ShaderStage::Miss,
+                ShaderStage::RayCallable => glslang::ShaderStage::Callable,
+            }
+        }
+    }
+
+    /// A [SPIR-V] version.
+    ///
+    /// [SPIR-V]: https://registry.khronos.org/SPIR-V/
+    #[derive(Copy, Clone, Debug, Default)]
+    pub enum SpirvVersion {
+        /// SPIR-V version `1.0`.
+        V1_0,
+
+        /// SPIR-V version `1.1`.
+        V1_1,
+
+        /// SPIR-V version `1.2`.
+        V1_2,
+
+        /// SPIR-V version `1.3`.
+        V1_3,
+
+        /// SPIR-V version `1.4`.
+        V1_4,
+
+        /// SPIR-V version `1.5`.
+        V1_5,
+
+        /// SPIR-V version `1.6`.
+        #[default]
+        V1_6,
+    }
+
+    impl From<SpirvVersion> for glslang::SpirvVersion {
+        fn from(value: SpirvVersion) -> Self {
+            match value {
+                SpirvVersion::V1_0 => glslang::SpirvVersion::SPIRV1_0,
+                SpirvVersion::V1_1 => glslang::SpirvVersion::SPIRV1_1,
+                SpirvVersion::V1_2 => glslang::SpirvVersion::SPIRV1_2,
+                SpirvVersion::V1_3 => glslang::SpirvVersion::SPIRV1_3,
+                SpirvVersion::V1_4 => glslang::SpirvVersion::SPIRV1_4,
+                SpirvVersion::V1_5 => glslang::SpirvVersion::SPIRV1_5,
+                SpirvVersion::V1_6 => glslang::SpirvVersion::SPIRV1_6,
+            }
+        }
+    }
+
+    impl Shader {
+        pub fn compile(
+            source: &str,
+            stage: ShaderStage,
+            spirv_version: SpirvVersion,
+        ) -> Result<Vec<u32>, ShaderError> {
+            trace!("Compiling \"{stage:?}\" shader source to SPIR-V..");
+
+            use glslang::{
+                Compiler, CompilerOptions, ShaderInput, ShaderSource, Target, VulkanVersion,
+            };
+
+            let compiler = Compiler::acquire().ok_or(ShaderError::NoCompiler)?;
+            let vulkan = match vulkan_version() {
+                Version {
+                    major: 1,
+                    minor,
+                    patch: 0,
+                } => match minor {
+                    0 => VulkanVersion::Vulkan1_0,
+                    1 => VulkanVersion::Vulkan1_1,
+                    2 => VulkanVersion::Vulkan1_2,
+                    3 => VulkanVersion::Vulkan1_3,
+                    _ => unreachable!("All Vulkan versions should be handled"),
+                },
+                Version { .. } => unreachable!("All Vulkan versions should be handled"),
+            };
+            let options = CompilerOptions {
+                target: Target::Vulkan {
+                    version: vulkan,
+                    spirv_version: spirv_version.into(),
+                },
+                ..Default::default()
+            };
+            let source = ShaderSource::from(source);
+
+            let input = ShaderInput::new(&source, stage.into(), &options, None, None)?;
+            let shader = glslang::Shader::new(compiler, input)?;
+
+            Ok(shader.compile()?)
+        }
+
+        pub fn try_from_source(
+            source: &str,
+            stage: ShaderStage,
+            spirv_version: SpirvVersion,
+        ) -> Result<Shader, ShaderError> {
+            Shader::try_from_bytecode(
+                Shader::compile(source, stage, spirv_version)?.as_slice(),
+                stage,
+            )
+        }
+
+        pub async fn try_from_source_file<P: AsRef<Path>>(
+            path: P,
+            stage_hint: Option<ShaderStage>,
+            spirv_version: SpirvVersion,
+        ) -> Result<Shader, ShaderError> {
+            let stage = if let Some(stage) = stage_hint {
+                stage
+            } else {
+                ShaderStage::try_from(path.as_ref())?
+            };
+
+            let mut file = File::open(path).await?;
+            let mut source = String::new();
+            file.read_to_string(&mut source).await?;
+
+            Shader::try_from_source(&source, stage, spirv_version)
+        }
+    }
+}
+
+#[cfg(feature = "shader-compilation")]
+pub use shader_compilation::*;
