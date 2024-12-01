@@ -33,7 +33,7 @@ impl FractalLayer {
                 ShaderStage::Vertex,
                 Default::default(),
             )
-            .expect("Failed to create shader"),
+            .expect("Failed to create shaders"),
             frag_shader: Shader::try_from_source(
                 include_str!("resources/shaders/shader.frag"),
                 ShaderStage::Fragment,

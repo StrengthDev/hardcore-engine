@@ -1,6 +1,6 @@
 use crate::Version;
 
-/// Get the version of Vulkan that is in use.
+/// Get the version of Vulkan that is used.
 pub fn vulkan_version() -> Version {
     Version {
         major: unsafe { hardcore_sys::VULKAN_VERSION.major },

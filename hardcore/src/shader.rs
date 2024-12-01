@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::Path;
+use std::ptr;
 use thiserror::Error;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, BufReader};
@@ -219,6 +220,12 @@ impl Shader {
     }
 }
 
+impl Drop for Shader {
+    fn drop(&mut self) {
+        unsafe { hardcore_sys::destroy_shader(ptr::addr_of_mut!(self.inner)) }
+    }
+}
+
 #[cfg(feature = "shader-compilation")]
 mod shader_compilation {
     use crate::render::vulkan_version;
@@ -336,9 +343,9 @@ mod shader_compilation {
                     1 => VulkanVersion::Vulkan1_1,
                     2 => VulkanVersion::Vulkan1_2,
                     3 => VulkanVersion::Vulkan1_3,
-                    _ => unreachable!("All Vulkan versions should be handled"),
+                    _ => unreachable!("All Vulkan versions must be handled"),
                 },
-                Version { .. } => unreachable!("All Vulkan versions should be handled"),
+                Version { .. } => unreachable!("All Vulkan versions must be handled"),
             };
             let options = CompilerOptions {
                 target: Target::Vulkan {

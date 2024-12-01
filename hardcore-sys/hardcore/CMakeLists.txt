@@ -17,13 +17,17 @@ option(HARDCORE_VALIDATION "enable Vulkan validation layers" OFF)
 
 set(VULKAN_HEADERS_INSTALL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/Vulkan-Headers")
 add_subdirectory(thirdparty/volk)
+set(SPIRV_REFLECT_EXECUTABLE OFF)
+set(SPIRV_REFLECT_STATIC_LIB ON)
+add_subdirectory(thirdparty/SPIRV-Reflect)
 
 list(APPEND PRIVATE_INCLUDES
         "src"
         "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/volk"
         "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/Vulkan-Headers/include"
+        "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/SPIRV-Reflect"
 )
-list(APPEND LIB_OBJECTS $<TARGET_OBJECTS:volk>)
+list(APPEND LIB_OBJECTS $<TARGET_OBJECTS:volk> $<TARGET_OBJECTS:spirv-reflect-static>)
 
 if (HARDCORE_HEADLESS)
     add_compile_definitions(HC_HEADLESS)

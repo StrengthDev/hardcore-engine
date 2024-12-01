@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <bitset>
+#include <functional>
 #include <iostream>
 #include <limits>
 #include <queue>

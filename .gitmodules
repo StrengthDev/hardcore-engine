@@ -7,3 +7,6 @@
 [submodule "hardcore-sys/hardcore/thirdparty/Vulkan-Headers"]
 	path = hardcore-sys/hardcore/thirdparty/Vulkan-Headers
 	url = https://github.com/KhronosGroup/Vulkan-Headers.git
+[submodule "hardcore-sys/hardcore/thirdparty/SPIRV-Reflect"]
+	path = hardcore-sys/hardcore/thirdparty/SPIRV-Reflect
+	url = https://github.com/KhronosGroup/SPIRV-Reflect.git
