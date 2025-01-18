@@ -369,7 +369,7 @@ void hc_poll_events() {
 	// Unsure if this needed, as callbacks should only be called from within glfwPollEvents.
 	std::unique_lock lock(window_mutex);
 	// Set resizing to false, in order to allow swapchains to be recreated.
-	for (auto &[window, static_window]: window_map) {
+	for (auto& static_window : window_map | std::views::values) {
 		static_window.resizing = false;
 	}
 }

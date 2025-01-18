@@ -1,5 +1,4 @@
-use crate::context_token::ContextDependent;
-use crate::layer::Context;
+use crate::context::Context;
 use crate::resource::buffer::{
     Buffer, BufferError, CBuffer, CDynamicBuffer, DynamicBuffer, LayoutBuffer, MappedSlice,
     ShaderWritableBuffer, VertexBufferLike,
@@ -7,75 +6,66 @@ use crate::resource::buffer::{
 use crate::resource::descriptor::Descriptor;
 use std::num::NonZeroU64;
 
-pub struct VertexBuffer<const WRITABLE: bool> {
-    inner: CBuffer,
+pub struct VertexBuffer<'c, const WRITABLE: bool> {
+    inner: CBuffer<'c>,
 }
 
-impl<const WRITABLE: bool> VertexBuffer<WRITABLE> {
-    pub fn create(
-        descriptor: &Descriptor,
-        count: NonZeroU64,
+impl<'c, const WRITABLE: bool> VertexBuffer<'c, WRITABLE> {
+    pub(crate) fn create<'d>(
         device: u32,
-    ) -> Result<VertexBuffer<WRITABLE>, BufferError> {
-        Ok(VertexBuffer::<WRITABLE> {
+        descriptor: &'d Descriptor,
+        count: NonZeroU64,
+    ) -> Result<VertexBuffer<'c, WRITABLE>, BufferError>
+    where
+        'c: 'd,
+    {
+        Ok(VertexBuffer::<'c, WRITABLE> {
             inner: CBuffer::create(
+                device,
                 hardcore_sys::BufferKind::Vertex,
                 descriptor,
                 count,
                 WRITABLE,
-                device,
             )?,
         })
     }
 }
 
-impl<const WRITABLE: bool> ContextDependent for VertexBuffer<WRITABLE> {
-    fn valid(&self) -> bool {
-        self.inner.valid()
-    }
-}
-
-impl<const WRITABLE: bool> Buffer for VertexBuffer<WRITABLE> {
+impl<'c, const WRITABLE: bool> Buffer for VertexBuffer<'c, WRITABLE> {
     fn id(&self) -> u64 {
         self.inner.id()
     }
 }
 
-impl<const WRITABLE: bool> LayoutBuffer for VertexBuffer<WRITABLE> {
+impl<'c, const WRITABLE: bool> LayoutBuffer for VertexBuffer<'c, WRITABLE> {
     fn layout(&self) -> &Descriptor {
         self.inner.layout()
     }
 }
 
-impl<const WRITABLE: bool> VertexBufferLike for VertexBuffer<WRITABLE> {}
+impl<'c, const WRITABLE: bool> VertexBufferLike for VertexBuffer<'c, WRITABLE> {}
 
-impl ShaderWritableBuffer for VertexBuffer<true> {}
+impl<'c> ShaderWritableBuffer for VertexBuffer<'c, true> {}
 
 pub struct DynamicVertexBuffer {
     inner: CDynamicBuffer,
 }
 
 impl DynamicVertexBuffer {
-    pub fn create(
+    pub(crate) fn create(
+        device: u32,
         descriptor: &Descriptor,
         count: NonZeroU64,
-        device: u32,
     ) -> Result<DynamicVertexBuffer, BufferError> {
         Ok(DynamicVertexBuffer {
             inner: CDynamicBuffer::create(
+                device,
                 hardcore_sys::BufferKind::Vertex,
                 descriptor,
                 count,
                 false,
-                device,
             )?,
         })
-    }
-}
-
-impl ContextDependent for DynamicVertexBuffer {
-    fn valid(&self) -> bool {
-        self.inner.valid()
     }
 }
 

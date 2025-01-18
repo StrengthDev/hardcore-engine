@@ -1,5 +1,4 @@
-use crate::context_token::{ContextDependent, ContextToken, ContextTokenError};
-use crate::layer::Context;
+use crate::context::Context;
 use crate::resource::descriptor::{CDescriptorError, Descriptor, Primitive};
 use hardcore_sys;
 use std::marker::PhantomData;
@@ -12,15 +11,15 @@ use thiserror::Error;
 pub enum BufferError {
     #[error(transparent)]
     Descriptor(#[from] CDescriptorError),
+
     #[error("Invalid index type")]
     Index,
-    #[error(transparent)]
-    Context(#[from] ContextTokenError),
+
     #[error("Failed to create new buffer")]
     Initialisation,
 }
 
-pub trait Buffer: ContextDependent {
+pub trait Buffer {
     fn id(&self) -> u64;
 }
 
@@ -38,25 +37,26 @@ impl BufferContentKind {
     }
 }
 
-pub(crate) struct CBuffer {
-    context_token: ContextToken,
+pub(crate) struct CBuffer<'c> {
     content_kind: BufferContentKind,
     handle: hardcore_sys::Buffer,
+    context: PhantomData<&'c hardcore_sys::Buffer>,
 }
 
-impl CBuffer {
-    pub(crate) fn create(
+impl<'c> CBuffer<'c> {
+    pub(crate) fn create<'d>(
+        device: u32,
         kind: hardcore_sys::BufferKind,
-        descriptor: &Descriptor,
+        descriptor: &'d Descriptor,
         count: NonZeroU64,
         writable: bool,
-        device: u32,
-    ) -> Result<Self, BufferError> {
-        let token = ContextToken::new()?;
-
+    ) -> Result<Self, BufferError>
+    where
+        'c: 'd,
+    {
         let handle = unsafe {
             let c_desc = descriptor.c_desc()?;
-            hardcore_sys::new_buffer(kind, c_desc.handle(), count.into(), writable, device)
+            hardcore_sys::new_buffer(device, kind, c_desc.handle(), count.into(), writable)
         };
 
         if handle.size == 0 {
@@ -64,35 +64,33 @@ impl CBuffer {
         }
 
         Ok(CBuffer {
-            context_token: token,
             content_kind: BufferContentKind::Layout(descriptor.clone()),
             handle,
+            context: PhantomData,
         })
     }
 
     pub(crate) fn create_index(
+        device: u32,
         kind: Primitive,
         count: NonZeroU64,
         writable: bool,
-        device: u32,
     ) -> Result<Self, BufferError> {
         if !kind.is_valid_index() {
             return Err(BufferError::Index);
         }
 
-        let token = ContextToken::new()?;
-
         let handle =
-            unsafe { hardcore_sys::new_index_buffer(kind.into(), count.into(), writable, device) };
+            unsafe { hardcore_sys::new_index_buffer(device, kind.into(), count.into(), writable) };
 
         if handle.size == 0 {
             return Err(BufferError::Initialisation);
         }
 
         Ok(CBuffer {
-            context_token: token,
             content_kind: BufferContentKind::Index(kind),
             handle,
+            context: PhantomData,
         })
     }
 
@@ -119,23 +117,15 @@ impl CBuffer {
     }
 }
 
-impl Drop for CBuffer {
+impl<'c> Drop for CBuffer<'c> {
     fn drop(&mut self) {
-        if self.context_token.valid() {
-            unsafe { hardcore_sys::destroy_buffer(ptr::addr_of_mut!(self.handle)) }
-        }
-    }
-}
-
-impl ContextDependent for CBuffer {
-    fn valid(&self) -> bool {
-        self.context_token.valid()
+        unsafe { hardcore_sys::destroy_buffer(ptr::addr_of_mut!(self.handle)) }
     }
 }
 
 pub struct MappedSlice<'a, T> {
     ptr: *mut [T],
-    phantom_data: PhantomData<&'a ()>,
+    phantom_data: PhantomData<&'a T>,
 }
 
 impl<'a, T> Deref for MappedSlice<'a, T> {
@@ -159,24 +149,21 @@ pub trait DynamicBuffer: Buffer {
 }
 
 pub(crate) struct CDynamicBuffer {
-    context_token: ContextToken,
     content_kind: BufferContentKind,
     handle: hardcore_sys::DynamicBuffer,
 }
 
 impl CDynamicBuffer {
     pub(crate) fn create(
+        device: u32,
         kind: hardcore_sys::BufferKind,
         descriptor: &Descriptor,
         count: NonZeroU64,
         writable: bool,
-        device: u32,
     ) -> Result<Self, BufferError> {
-        let token = ContextToken::new()?;
-
         let handle = unsafe {
             let c_desc = descriptor.c_desc()?;
-            hardcore_sys::new_dynamic_buffer(kind, c_desc.handle(), count.into(), writable, device)
+            hardcore_sys::new_dynamic_buffer(device, kind, c_desc.handle(), count.into(), writable)
         };
 
         if handle.size == 0 {
@@ -184,26 +171,23 @@ impl CDynamicBuffer {
         }
 
         Ok(CDynamicBuffer {
-            context_token: token,
             content_kind: BufferContentKind::Layout(descriptor.clone()),
             handle,
         })
     }
 
     pub(crate) fn create_index(
+        device: u32,
         kind: Primitive,
         count: NonZeroU64,
         writable: bool,
-        device: u32,
     ) -> Result<Self, BufferError> {
         if !kind.is_valid_index() {
             return Err(BufferError::Index);
         }
 
-        let token = ContextToken::new()?;
-
         let handle = unsafe {
-            hardcore_sys::new_dynamic_index_buffer(kind.into(), count.into(), writable, device)
+            hardcore_sys::new_dynamic_index_buffer(device, kind.into(), count.into(), writable)
         };
 
         if handle.size == 0 {
@@ -211,7 +195,6 @@ impl CDynamicBuffer {
         }
 
         Ok(CDynamicBuffer {
-            context_token: token,
             content_kind: BufferContentKind::Index(kind),
             handle,
         })
@@ -240,8 +223,6 @@ impl CDynamicBuffer {
     }
 
     fn host_ptr(&self) -> Result<*mut u8, BufferError> {
-        self.context_token.ok()?;
-
         let ptr = unsafe { self.handle.data.read().byte_add(self.handle.data_offset) };
         Ok(ptr.cast())
     }
@@ -256,15 +237,7 @@ impl CDynamicBuffer {
 
 impl Drop for CDynamicBuffer {
     fn drop(&mut self) {
-        if self.context_token.valid() {
-            unsafe { hardcore_sys::destroy_dynamic_buffer(ptr::addr_of_mut!(self.handle)) }
-        }
-    }
-}
-
-impl ContextDependent for CDynamicBuffer {
-    fn valid(&self) -> bool {
-        self.context_token.valid()
+        unsafe { hardcore_sys::destroy_dynamic_buffer(ptr::addr_of_mut!(self.handle)) }
     }
 }
 

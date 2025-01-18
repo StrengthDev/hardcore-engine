@@ -1,33 +1,34 @@
-use async_trait::async_trait;
 use std::num::NonZeroU64;
 use tracing::{debug, trace};
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
+use hardcore::context::Context;
 use hardcore::event::{Event, WindowEvent};
 use hardcore::input::{ButtonAction, MouseButton};
-use hardcore::layer::{Context, Layer};
+use hardcore::layer::Layer;
 use hardcore::render::vulkan_version;
 use hardcore::resource::VertexBuffer;
 use hardcore::shader::{Shader, ShaderStage};
 use hardcore::window::Window;
-use hardcore::{init, push_layer, run, stop, terminate, ApplicationDescriptor, Version};
+use hardcore::{ApplicationDescriptor, Instance, Version};
 
-struct FractalLayer {
-    _window: Window,
-    obj: Option<VertexBuffer<false>>,
-    flag: bool,
+struct FractalLayer<'c> {
+    _window: Option<Window<'c>>,
+    obj: Option<VertexBuffer<'c, false>>,
+    print_signal: bool,
+    action_signal: bool,
     vert_shader: Shader,
     frag_shader: Shader,
 }
 
-impl FractalLayer {
-    fn new() -> Self {
-        Self {
-            _window: Window::new(0, 1920, 1080, None, None, "Hardcore sample - Fractal")
-                .expect("Failed to create window"),
+impl<'c> FractalLayer<'c> {
+    fn new(context: &mut Context<'c>) -> Self {
+        let mut s = Self {
+            _window: None,
             obj: None,
-            flag: false,
+            print_signal: false,
+            action_signal: false,
             vert_shader: Shader::try_from_source(
                 include_str!("resources/shaders/shader.vert"),
                 ShaderStage::Vertex,
@@ -40,19 +41,41 @@ impl FractalLayer {
                 Default::default(),
             )
             .expect("Failed to create shader"),
-        }
+        };
+
+        s._window = Some(
+            context.devices[0]
+                .create_window(&s, 1920, 1080, None, None, "Hardcore sample - Fractal")
+                .expect("Failed to create window"),
+        );
+
+        s
     }
 }
 
-#[async_trait]
-impl Layer for FractalLayer {
-    async fn tick(&mut self, context: &Context) {
-        if self.flag {
-            self.flag = false;
+impl<'c> Layer<'c> for FractalLayer<'c> {
+    fn tick(&mut self, context: &mut Context<'c>) {
+        if self.print_signal {
+            self.print_signal = false;
             debug!("Vulkan {}", vulkan_version());
             for (i, device) in context.devices.iter().enumerate() {
                 debug!("Device {i} name: {}", device.name())
             }
+        }
+
+        if self.action_signal {
+            if self.obj.is_none() {
+                let desc = hardcore::descriptor![float];
+                let _ = self.obj.insert(
+                    context.devices[0]
+                        .create_vertex_buffer(self, &desc, NonZeroU64::new(1000).unwrap())
+                        .expect("Failed to allocate vertex buffer"),
+                );
+            } else {
+                self.obj.take();
+            }
+
+            self.action_signal = false;
         }
 
         // if let Some(x) = &self.obj {
@@ -61,7 +84,7 @@ impl Layer for FractalLayer {
         // nothing
     }
 
-    async fn handle_event(&mut self, event: &Event) -> bool {
+    fn handle_event(&mut self, context: &mut Context<'c>, event: &Event) -> bool {
         trace!("Event: {event:?}");
         match event {
             Event::Window {
@@ -73,15 +96,7 @@ impl Layer for FractalLayer {
                     },
                 ..
             } => {
-                if self.obj.is_none() {
-                    let desc = hardcore::descriptor![float];
-                    let _ = self.obj.insert(
-                        VertexBuffer::<false>::create(&desc, NonZeroU64::new(1000).unwrap(), 0)
-                            .expect("Failed to allocate vertex buffer"),
-                    );
-                } else {
-                    self.obj.take();
-                }
+                self.action_signal = true;
             }
             Event::Window {
                 event:
@@ -91,12 +106,12 @@ impl Layer for FractalLayer {
                         ..
                     },
                 ..
-            } => self.flag = true,
+            } => self.print_signal = true,
             Event::Window {
                 event: WindowEvent::Close,
                 ..
             } => {
-                stop();
+                context.exit();
             }
             _ => { /* nothing */ }
         }
@@ -119,7 +134,7 @@ fn main() {
         .event_format(format)
         .init();
 
-    init(ApplicationDescriptor {
+    let instance = Instance::create(ApplicationDescriptor {
         name: "Hardcore Fractal sample",
         version: Version {
             major: env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap(),
@@ -128,8 +143,10 @@ fn main() {
         },
     })
     .expect("Failed to initialise library");
-    let _test = &hardcore::VERSION;
-    push_layer(FractalLayer::new()).expect("Failed to send fractal layer");
-    run().expect("Failed to run main loop");
-    terminate().expect("Failed to terminate library");
+    instance
+        .run(move |context| {
+            let layer = FractalLayer::new(context);
+            context.push_layer(layer);
+        })
+        .expect("Failed to run main loop");
 }

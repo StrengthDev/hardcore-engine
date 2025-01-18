@@ -15,17 +15,16 @@
 //! it will probably make layer management easier and ties well with the way events are handle by
 //! layers in the stack (layers at the top get to try handling events first).
 
-use crate::device::Device;
+use crate::context::Context;
 use crate::event::Event;
 
 /// An abstract application layer, used to represent some component of the application.
-#[async_trait::async_trait]
-pub trait Layer: Send {
+pub trait Layer<'c> {
     /// Update this layer for the current frame.
     ///
     /// This function is called once per frame, with the timing depending on this layer's position
     /// in the stack, bottom layers get updated first while top layers get updated last.
-    async fn tick(&mut self, context: &Context);
+    fn tick(&mut self, context: &mut Context<'c>);
 
     /// Try to handle a system event.
     ///
@@ -33,41 +32,5 @@ pub trait Layer: Send {
     ///
     /// **`true`** if the layer has handled the event, **`false`** otherwise. If the event was
     /// handled, then it won't get propagated further down the layer stack.
-    async fn handle_event(&mut self, event: &Event) -> bool;
-}
-
-/// Global context information to be passed to a layer during execution.
-pub struct Context {
-    /// The current number of layers in the global context.
-    pub layer_count: usize,
-
-    /// The current layer's index in the global context's layer stack.
-    pub current_layer_idx: usize,
-
-    /// The current frame.
-    ///
-    /// Frame count begins when the [main loop][crate::run] starts, and is reset when it ends.
-    pub frame: usize,
-
-    /// How long it took to process the previous frame, in seconds.
-    pub delta_time: f64,
-
-    /// The list of devices available for use.
-    pub devices: Vec<Device>,
-
-    /// A runtime which may be used by layers to spawn tasks.
-    pub worker_pool: tokio::runtime::Handle,
-}
-
-impl Context {
-    pub(crate) fn new(worker_pool: tokio::runtime::Handle) -> Self {
-        Self {
-            layer_count: 0,
-            current_layer_idx: 0,
-            frame: 0,
-            delta_time: 0.0,
-            devices: vec![],
-            worker_pool,
-        }
-    }
+    fn handle_event(&mut self, context: &mut Context<'c>, event: &Event) -> bool;
 }

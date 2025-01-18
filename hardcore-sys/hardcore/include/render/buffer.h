@@ -9,7 +9,7 @@ extern "C" {
 #include <stdint.h>
 
 /**
- * @brief The type of a data buffer.
+ * @brief The type of data buffer.
  */
 enum HCBufferKind {
 	/**
@@ -55,10 +55,10 @@ struct HCBuffer {
 };
 
 struct HCBuffer
-hc_new_buffer(enum HCBufferKind kind, const struct HCDescriptor *descriptor, uint64_t count, bool writable,
-			uint32_t device);
+hc_new_buffer(uint32_t device, enum HCBufferKind kind, const struct HCDescriptor *descriptor, uint64_t count,
+              bool writable);
 
-struct HCBuffer hc_new_index_buffer(enum HCPrimitive index_type, uint64_t count, bool writable, uint32_t device);
+struct HCBuffer hc_new_index_buffer(uint32_t device, enum HCPrimitive index_type, uint64_t count, bool writable);
 
 void hc_destroy_buffer(struct HCBuffer *buffer);
 
@@ -82,11 +82,11 @@ struct HCDynamicBuffer {
 };
 
 struct HCDynamicBuffer
-hc_new_dynamic_buffer(enum HCBufferKind kind, const struct HCDescriptor *descriptor, uint64_t count,
-					bool writable, uint32_t device);
+hc_new_dynamic_buffer(uint32_t device, enum HCBufferKind kind, const struct HCDescriptor *descriptor,
+                      uint64_t count, bool writable);
 
-struct HCDynamicBuffer hc_new_dynamic_index_buffer(enum HCPrimitive index_type, uint64_t count, bool writable,
-													uint32_t device);
+struct HCDynamicBuffer hc_new_dynamic_index_buffer(uint32_t device, enum HCPrimitive index_type, uint64_t count,
+                                                   bool writable);
 
 void hc_destroy_dynamic_buffer(struct HCDynamicBuffer *buffer);
 

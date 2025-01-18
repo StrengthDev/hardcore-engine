@@ -22,7 +22,7 @@ static constexpr HCDynamicBuffer INVALID_DYNAMIC_BUFFER = {
 	.device = std::numeric_limits<u32>::max(),
 };
 
-HCBuffer hc_new_buffer(HCBufferKind kind, const HCDescriptor *descriptor, u64 count, bool writable, u32 device) {
+HCBuffer hc_new_buffer(u32 device, HCBufferKind kind, const HCDescriptor *descriptor, u64 count, bool writable) {
 	if (kind == HCBufferKind::Index) {
 		HC_ERROR("Invalid buffer kind (call `hc_new_index_buffer` instead)");
 		return INVALID_BUFFER;
@@ -58,7 +58,7 @@ HCBuffer hc_new_buffer(HCBufferKind kind, const HCDescriptor *descriptor, u64 co
 	};
 }
 
-HCBuffer hc_new_index_buffer(HCPrimitive index_type, u64 count, bool writable, u32 device) {
+HCBuffer hc_new_index_buffer(u32 device, HCPrimitive index_type, u64 count, bool writable) {
 	if (index_type != HCPrimitive::U8 && index_type != HCPrimitive::U16 && index_type != HCPrimitive::U32) {
 		HC_ERROR("Invalid index type");
 		return INVALID_BUFFER;
@@ -105,8 +105,8 @@ void hc_destroy_buffer(HCBuffer *buffer) {
 	*buffer = INVALID_BUFFER;
 }
 
-HCDynamicBuffer hc_new_dynamic_buffer(HCBufferKind kind, const HCDescriptor *descriptor, u64 count, bool writable,
-									u32 device) {
+HCDynamicBuffer hc_new_dynamic_buffer(u32 device, HCBufferKind kind, const HCDescriptor *descriptor, u64 count,
+                                      bool writable) {
 	if (kind == HCBufferKind::Index) {
 		HC_ERROR("Invalid buffer kind (call `hc_new_dynamic_index_buffer` instead)");
 		return INVALID_DYNAMIC_BUFFER;
@@ -146,7 +146,7 @@ HCDynamicBuffer hc_new_dynamic_buffer(HCBufferKind kind, const HCDescriptor *des
 	};
 }
 
-HCDynamicBuffer hc_new_dynamic_index_buffer(HCPrimitive index_type, u64 count, bool writable, u32 device) {
+HCDynamicBuffer hc_new_dynamic_index_buffer(u32 device, HCPrimitive index_type, u64 count, bool writable) {
 	if (index_type != HCPrimitive::U8 && index_type != HCPrimitive::U16 && index_type != HCPrimitive::U32) {
 		HC_ERROR("Invalid index type");
 		return INVALID_DYNAMIC_BUFFER;

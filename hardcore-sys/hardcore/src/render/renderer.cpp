@@ -206,7 +206,7 @@ namespace hc::render {
 #endif // HC_LOGGING
 
         std::vector<bool> found_extensions(extensions.size());
-        std::fill(found_extensions.begin(), found_extensions.end(), false);
+        std::ranges::fill(found_extensions, false);
         VK_CHECK_RETURN(extension_support(nullptr, extensions, found_extensions));
         for (u32 i = 0; i < extensions.size(); i++) {
             HC_INFO("Using extension " << extensions[i]);

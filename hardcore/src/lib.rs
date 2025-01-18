@@ -16,14 +16,14 @@
 //! follows, in order:
 //!
 //! 1. Popping layers from the [layer stack], according to calls to [`pop_layer`] and [`pop_layers`]
-//! in the previous frame;
+//!    in the previous frame;
 //! 2. Pushing new layers into the [layer stack], according to calls to [`push_layer`] in the
-//! previous frame;
+//!    previous frame;
 //! 3. [`Event`] handling, each event goes through the [layer stack] ([`Layer::handle_event`] is
-//! called), from top to bottom, until the end of the stack or until a layer handles
-//! the event (until the call to [`Layer::handle_event`] returns true);
+//!    called), from top to bottom, until the end of the stack or until a layer handles
+//!    the event (until the call to [`Layer::handle_event`] returns true);
 //! 4. Application logic, each [`Layer`] is updated ([`Layer::tick`] is called), from the bottom to
-//! the top of the stack;
+//!    the top of the stack;
 //! 5. Rendering logic and synchronisation;
 //!
 //! Before starting the main loop,
@@ -42,23 +42,24 @@
 
 use std::cell::Cell;
 use std::fmt::{Display, Formatter};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::marker::PhantomData;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
+use crate::device::Device;
+use crate::event::Event;
+use crate::layer::Layer;
+use crate::native::vulkan_debug_callback;
+use crate::sync::{Mutex, RwLock};
+use crate::window::GLFWCall;
+use context::Context;
+use hardcore_sys::InitParams;
 use thiserror::Error;
 use tokio::runtime::Builder;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tokio::time::Instant;
-use tracing::{error, info, info_span, Instrument};
+use tracing::{error, info, info_span};
 
-use crate::context_token::{ContextToken, ContextTokenError};
-use crate::device::Device;
-use crate::event::Event;
-use crate::layer::{Context, Layer};
-use crate::native::vulkan_debug_callback;
-use crate::sync::{Mutex, RwLock};
-use hardcore_sys::InitParams;
-
-pub mod context_token;
+pub mod context;
 mod device;
 pub mod event;
 pub mod input;
@@ -85,12 +86,10 @@ const fn const_unwrap(result: Result<u32, std::num::ParseIntError>, default: u32
     }
 }
 
-static RUNNING: AtomicBool = AtomicBool::new(false);
-static LAYER_TX: RwLock<Option<UnboundedSender<Box<dyn Layer>>>> = RwLock::new(None);
-static LAYER_RX: Mutex<Option<UnboundedReceiver<Box<dyn Layer>>>> = Mutex::new(None);
-static POP_LAYER_COUNT: AtomicUsize = AtomicUsize::new(0);
 static EVENT_TX: RwLock<Option<UnboundedSender<Event>>> = RwLock::new(None);
 static EVENT_RX: Mutex<Option<UnboundedReceiver<Event>>> = Mutex::new(None);
+static GLFW_CALL_TX: RwLock<Option<UnboundedSender<GLFWCall>>> = RwLock::new(None);
+static GLFW_CALL_RX: Mutex<Option<UnboundedReceiver<GLFWCall>>> = Mutex::new(None);
 
 thread_local! {static THREAD_KIND: Cell<ThreadKind> = const { Cell::new(ThreadKind::Uninitialised) }}
 
@@ -162,126 +161,138 @@ pub enum CoreError {
     /// The provided string could not be converted into a C string.
     #[error("the provided string could not be converted into a C string")]
     InvalidString(#[from] std::ffi::NulError),
-
-    /// Context not initialised.
-    #[error(transparent)]
-    ContextToken(#[from] ContextTokenError),
 }
 
-/// Initialise the library context.
-///
-/// This function must be called before any other library functions may be used.
-pub fn init(app: ApplicationDescriptor) -> Result<(), CoreError> {
-    info!("hardcore {VERSION}");
+pub struct Instance {
+    /// Dummy member.
+    ///
+    /// Used to make Instance not [`Send`] and not [`Sync`].
+    not_send_sync: PhantomData<*const ()>,
+}
 
-    let (tx, rx) = unbounded_channel();
-    let _ = LAYER_TX.write().insert(tx);
-    let _ = LAYER_RX.lock().insert(rx);
-    let (tx, rx) = unbounded_channel();
-    let _ = EVENT_TX.write().insert(tx);
-    let _ = EVENT_RX.lock().insert(rx);
+impl Instance {
+    /// Initialise the library context.
+    ///
+    /// This function must be called before any other library functions may be used.
+    pub fn create(app: ApplicationDescriptor) -> Result<Instance, CoreError> {
+        std::thread::current()
+            .name()
+            .map_or(true, move |name| name == "main")
+            .then_some(())
+            .ok_or(CoreError::NotMain)?;
 
-    let c_name = std::ffi::CString::new(app.name)?;
+        THREAD_KIND.set(ThreadKind::Main);
 
-    let descriptor = hardcore_sys::ApplicationDescriptor {
-        name: c_name.into_raw(),
-        version: hardcore_sys::Version {
-            major: app.version.major,
-            minor: app.version.minor,
-            patch: app.version.patch,
-        },
-    };
+        info!("hardcore {VERSION}");
 
-    let render_params = hardcore_sys::RenderParams {
-        max_frames_in_flight: 2,
-        debug_callback: Some(vulkan_debug_callback),
-    };
+        let (tx, rx) = unbounded_channel();
+        let _ = EVENT_TX.write().insert(tx);
+        let _ = EVENT_RX.lock().insert(rx);
 
-    let params = InitParams {
-        app: descriptor,
-        render_params,
-        log_fn: Some(native::log),
-        start_span_fn: Some(native::start_span),
-        end_span_fn: Some(native::end_span),
-    };
+        let (tx, rx) = unbounded_channel();
+        let _ = GLFW_CALL_TX.write().insert(tx);
+        let _ = GLFW_CALL_RX.lock().insert(rx);
 
-    let res: i32 = unsafe { hardcore_sys::init(params) };
+        let c_name = std::ffi::CString::new(app.name)?;
 
-    if res < 0 {
-        Err(CoreError::System { code: res })
-    } else {
-        ContextToken::init_context().inspect_err(|_| {
-            unsafe { hardcore_sys::term() };
-        })?;
+        let descriptor = hardcore_sys::ApplicationDescriptor {
+            name: c_name.into_raw(),
+            version: hardcore_sys::Version {
+                major: app.version.major,
+                minor: app.version.minor,
+                patch: app.version.patch,
+            },
+        };
+
+        let render_params = hardcore_sys::RenderParams {
+            max_frames_in_flight: 2,
+            debug_callback: Some(vulkan_debug_callback),
+        };
+
+        let params = InitParams {
+            app: descriptor,
+            render_params,
+            log_fn: Some(native::log),
+            start_span_fn: Some(native::start_span),
+            end_span_fn: Some(native::end_span),
+        };
+
+        let res: i32 = unsafe { hardcore_sys::init(params) };
+
+        if res < 0 {
+            Err(CoreError::System { code: res })
+        } else {
+            Ok(Instance {
+                not_send_sync: PhantomData,
+            })
+        }
+    }
+
+    /// The main loop function.
+    ///
+    /// This function **MUST** be called in the *main* thread in a non-async environment.
+    pub fn run(&self, initialize: fn(context: &mut Context)) -> Result<(), CoreError> {
+        if EVENT_TX.read().is_none() {
+            return Err(CoreError::Uninitialised);
+        }
+
+        let mut glfw_call_rx = {
+            let mut event_lock = GLFW_CALL_RX.lock();
+            event_lock.take().ok_or(CoreError::Uninitialised)?
+        };
+
+        info!("Starting main loop");
+
+        let core_rt = Builder::new_multi_thread()
+            .thread_name("core")
+            .on_thread_start(|| THREAD_KIND.set(ThreadKind::Core))
+            .worker_threads(1)
+            .enable_all()
+            .build()?;
+
+        let core_thread = core_rt.spawn_blocking(move || core_run(initialize));
+
+        while !core_thread.is_finished() {
+            while let Ok(call) = glfw_call_rx.try_recv() {
+                if call.execute().is_err() {
+                    error!("Failed to send GLFW call results to calling thread");
+                }
+            }
+
+            unsafe { hardcore_sys::poll_events() }
+        }
+
+        core_rt.block_on(core_thread)??;
+
+        info!("Main loop finished");
+
         Ok(())
     }
 }
 
-/// Terminate the library.
-///
-/// Doesn't have to be called if the program is exiting.
-/// Once this function is called, [`init`] must be called once again before other library functions.
-pub fn terminate() -> Result<(), CoreError> {
-    let res: i32 = unsafe { hardcore_sys::term() };
-    ContextToken::terminate_context()?;
+impl Drop for Instance {
+    fn drop(&mut self) {
+        let res: i32 = unsafe { hardcore_sys::term() };
 
-    if res < 0 {
-        Err(CoreError::System { code: res })
-    } else {
-        Ok(())
+        if res < 0 {
+            error!("Failed to properly terminate instance (error: {res})");
+        }
     }
-}
-
-/// The main loop function.
-///
-/// This function **MUST** be called in the *main* thread in a non-async environment.
-pub fn run() -> Result<(), CoreError> {
-    std::thread::current()
-        .name()
-        .map_or(true, move |name| name == "main")
-        .then_some(())
-        .ok_or(CoreError::NotMain)?;
-
-    THREAD_KIND.set(ThreadKind::Main);
-
-    if EVENT_TX.read().is_none() {
-        return Err(CoreError::Uninitialised);
-    }
-
-    info!("Starting main loop");
-    RUNNING.store(true, Ordering::SeqCst);
-
-    let core_rt = Builder::new_multi_thread()
-        .thread_name("core")
-        .on_thread_start(|| THREAD_KIND.set(ThreadKind::Core))
-        .worker_threads(1)
-        .enable_all()
-        .build()?;
-    let core_thread = core_rt.spawn(core_run());
-
-    while RUNNING.load(Ordering::SeqCst) {
-        unsafe { hardcore_sys::poll_events() }
-    }
-
-    core_rt.block_on(core_thread)??;
-
-    Ok(())
 }
 
 /// Loop for application and rendering logic.
-async fn core_run() -> Result<(), CoreError> {
+fn core_run(initialize: fn(context: &mut Context)) -> Result<(), CoreError> {
     info!("Starting application and rendering logic loop");
-    let mut layers = Vec::<Box<dyn Layer>>::new();
-
-    let mut layer_rx = {
-        let mut layer_lock = LAYER_RX.lock();
-        layer_lock.take().ok_or(CoreError::Uninitialised)?
-    };
 
     let mut event_rx = {
         let mut event_lock = EVENT_RX.lock();
         event_lock.take().ok_or(CoreError::Uninitialised)?
     };
+
+    let mut context = Context::create(Device::count());
+    let mut layers: Vec<Box<dyn Layer>> = vec![];
+
+    initialize(&mut context);
 
     let worker_count: AtomicUsize = AtomicUsize::new(0);
     let worker_rt = Builder::new_multi_thread()
@@ -290,54 +301,49 @@ async fn core_run() -> Result<(), CoreError> {
         .worker_threads(10) // TODO
         .enable_all()
         .build()?;
+
+    context.running = true;
     let mut last_frame = Instant::now();
-    let mut context = Context::new(worker_rt.handle().clone());
-    context.devices = (0..Device::count()).map(Device::new).collect();
-    while RUNNING.load(Ordering::SeqCst) {
-        let span = info_span!("Frame", frame = context.frame);
+    while context.running {
+        let _span = info_span!("Frame", frame = context.frame).entered();
 
-        let current_frame = Instant::now();
-        let duration = current_frame - last_frame;
-        context.delta_time = duration.as_secs_f64();
-        last_frame = current_frame;
+        {
+            let current_frame = Instant::now();
+            let duration = current_frame - last_frame;
+            context.delta_time = duration.as_secs_f64();
+            last_frame = current_frame;
+        }
 
-        async {
-            layers.truncate(layers.len() - POP_LAYER_COUNT.swap(0, Ordering::SeqCst));
+        layers.truncate(layers.len() - context.layer_pop_count);
+        context.layer_pop_count = 0;
 
-            while let Ok(layer) = layer_rx.try_recv() {
-                layers.push(layer);
-            }
+        layers.extend(context.pushed_layers.drain(..));
 
-            while let Ok(event) = event_rx.try_recv() {
-                for layer in layers.iter_mut().rev() {
-                    if layer.handle_event(&event).await {
-                        break;
-                    }
+        context.layer_count = layers.len();
+
+        while let Ok(event) = event_rx.try_recv() {
+            for layer in layers.iter_mut().rev() {
+                if layer.handle_event(&mut context, &event) {
+                    break;
                 }
             }
-
-            context.layer_count = layers.len();
-            context.current_layer_idx = 0;
-
-            for layer in &mut layers {
-                layer.tick(&context).await;
-                context.current_layer_idx += 1;
-            }
-
-            let res: i32 = unsafe { hardcore_sys::render_tick() };
-
-            if res < 0 {
-                RUNNING.store(false, Ordering::SeqCst);
-                Err(CoreError::System { code: res })
-            } else {
-                Ok(())
-            }
         }
-        .instrument(span)
-        .await?;
+
+        context.current_layer_idx = 0;
+        for layer in layers.iter_mut() {
+            layer.tick(&mut context);
+            context.current_layer_idx += 1;
+        }
+
+        let res: i32 = unsafe { hardcore_sys::render_tick() };
+
+        if res < 0 {
+            context.running = false;
+            return Err(CoreError::System { code: res });
+        }
 
         if layers.is_empty() {
-            RUNNING.store(false, Ordering::SeqCst);
+            context.running = false;
         }
 
         context.frame += 1;
@@ -352,54 +358,12 @@ async fn core_run() -> Result<(), CoreError> {
 
     worker_rt.shutdown_background();
 
-    let mut layer_lock = LAYER_RX.lock();
-    let _ = layer_lock.insert(layer_rx);
-
     let mut event_lock = EVENT_RX.lock();
     let _ = event_lock.insert(event_rx);
 
+    info!("Core thread exiting");
+
     Ok(())
-}
-
-/// If the engine is running, stop it and exit out of the main loop ([`run`]).
-pub fn stop() {
-    RUNNING.store(false, Ordering::SeqCst);
-}
-
-/// Submit a new layer to be pushed into the layer stack in the next frame.
-///
-/// # Parameters
-/// * `layer` - The layer to be pushed.
-pub fn push_layer(layer: impl Layer + 'static) -> Result<(), CoreError> {
-    let guard = LAYER_TX.read();
-    if let Some(tx) = guard.as_ref() {
-        tx.send(Box::new(layer)).map_err(|e| {
-            error!("Failed to send on layer channel ({e})");
-            CoreError::Uninitialised
-        })?;
-        Ok(())
-    } else {
-        Err(CoreError::Uninitialised)
-    }
-}
-
-// TODO change pop layer functionality to keep users from popping beyond the current layer
-
-/// Increment the number of layers to be popped in the next frame by 1.
-pub fn pop_layer() {
-    if RUNNING.load(Ordering::SeqCst) {
-        POP_LAYER_COUNT.fetch_add(1, Ordering::SeqCst);
-    }
-}
-
-/// Increase the number of layers to be popped in the next frame by an arbitrary amount.
-///
-/// # Parameters
-/// * `count` - The additional number of layers to be popped.
-pub fn pop_layers(count: usize) {
-    if RUNNING.load(Ordering::SeqCst) {
-        POP_LAYER_COUNT.fetch_add(count, Ordering::SeqCst);
-    }
 }
 
 /// Send a new event to the event queue.

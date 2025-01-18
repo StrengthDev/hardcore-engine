@@ -2,23 +2,29 @@
 
 // TODO add example
 
-use crate::context_token::{ContextDependent, ContextToken, ContextTokenError};
+use crate::GLFW_CALL_TX;
 use hardcore_sys::{
-	destroy_window, new_window, set_window_char_callback, set_window_char_mods_callback,
-	set_window_close_callback, set_window_cursor_enter_callback,
-	set_window_cursor_position_callback, set_window_drop_callback, set_window_focus_callback,
-	set_window_framebuffer_callback, set_window_key_callback, set_window_maximize_callback,
-	set_window_minimize_callback, set_window_mouse_button_callback, set_window_position_callback,
-	set_window_refresh_callback, set_window_scale_callback, set_window_scroll_callback,
-	set_window_size_callback,
+    destroy_window, new_window, set_window_char_callback, set_window_char_mods_callback,
+    set_window_close_callback, set_window_cursor_enter_callback,
+    set_window_cursor_position_callback, set_window_drop_callback, set_window_focus_callback,
+    set_window_framebuffer_callback, set_window_key_callback, set_window_maximize_callback,
+    set_window_minimize_callback, set_window_mouse_button_callback, set_window_position_callback,
+    set_window_refresh_callback, set_window_scale_callback, set_window_scroll_callback,
+    set_window_size_callback,
 };
 use std::ffi::{c_int, CString, NulError};
+use std::marker::PhantomData;
 use std::ptr::addr_of_mut;
 use thiserror::Error;
+use tracing::error;
 
 /// An error related to a [`Window`].
 #[derive(Error, Debug)]
 pub enum WindowError {
+    /// An error has occurred while forwarding a call to GLFW
+    #[error(transparent)]
+    GLFWCall(#[from] GLFWCallError),
+
     /// Failed to initialise window, this may indicate that the context has not been initialised yet.
     #[error("failed to create a new window")]
     Initialisation,
@@ -26,21 +32,91 @@ pub enum WindowError {
     /// Could turn provided string slice into a valid [`CString`].
     #[error("could turn provided string slice into a valid C string")]
     InvalidName(#[from] NulError),
-
-    /// Context not initialised.
-    #[error(transparent)]
-    ContextToken(#[from] ContextTokenError),
 }
+
+#[derive(Error, Debug)]
+pub enum GLFWCallError {
+    /// The engine context has not been initialised yet.
+    #[error("the engine context has not been initialised yet")]
+    Context,
+
+    /// Failed to send call data to main thread.
+    #[error("failed to send call data to main thread")]
+    SendToMain,
+
+    /// Failed to receive call results from main thread.
+    #[error("failed to receive call results from main thread")]
+    ReceiveFromMain,
+
+    /// Failed to send call results to the thread that submitted the call.
+    #[error("failed to send call results to the thread that submitted the call")]
+    SendToCaller,
+}
+
+pub(super) struct WindowParams {
+    device: u32,
+    width: u32,
+    height: u32,
+    pos_x: Option<i32>,
+    pos_y: Option<i32>,
+    name: String,
+}
+
+pub(super) enum GLFWCall {
+    CreateWindow {
+        result_channel: tokio::sync::oneshot::Sender<Result<hardcore_sys::Window, WindowError>>,
+        params: WindowParams,
+    },
+    DestroyWindow {
+        result_channel: tokio::sync::oneshot::Sender<Result<(), WindowError>>,
+        window: hardcore_sys::Window,
+    },
+}
+
+impl GLFWCall {
+    fn submit(self) -> Result<(), GLFWCallError> {
+        let guard = GLFW_CALL_TX.read();
+        let Some(call_channel) = guard.as_ref() else {
+            return Err(GLFWCallError::Context);
+        };
+        call_channel
+            .send(self)
+            .map_err(move |_| GLFWCallError::SendToMain)
+    }
+
+    pub(super) fn execute(self) -> Result<(), GLFWCallError> {
+        match self {
+            GLFWCall::CreateWindow {
+                result_channel,
+                params,
+            } => result_channel
+                .send(Window::create_inner(params))
+                .map_err(move |_| GLFWCallError::SendToCaller)?,
+            GLFWCall::DestroyWindow {
+                result_channel,
+                window,
+            } => {
+                Window::destroy(window);
+                result_channel
+                    .send(Ok(()))
+                    .map_err(move |_| GLFWCallError::SendToCaller)?
+            }
+        };
+
+        Ok(())
+    }
+}
+
+unsafe impl Send for GLFWCall {}
 
 /// A high-level abstraction over an *OS* window.
-pub struct Window {
-    context_token: ContextToken,
+pub struct Window<'c> {
     handle: hardcore_sys::Window,
+    lifetime: PhantomData<&'c hardcore_sys::Window>,
 }
 
-impl Window {
-    /// Instantiate a new window.
-    pub fn new(
+impl<'c> Window<'c> {
+    pub(super) fn create(
         device: u32,
         width: u32,
         height: u32,
@@ -48,8 +124,41 @@ impl Window {
         pos_y: Option<i32>,
         name: &str,
     ) -> Result<Self, WindowError> {
-        let token = ContextToken::new()?;
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let call = GLFWCall::CreateWindow {
+            result_channel: tx,
+            params: WindowParams {
+                device,
+                width,
+                height,
+                pos_x,
+                pos_y,
+                name: name.to_string(),
+            },
+        };
 
+        GLFWCall::submit(call)?;
+
+        let inner = rx
+            .blocking_recv()
+            .map_err(move |_| GLFWCallError::ReceiveFromMain)??;
+
+        Ok(Window {
+            handle: inner,
+            lifetime: PhantomData,
+        })
+    }
+
+    pub(super) fn create_inner(
+        WindowParams {
+            device,
+            width,
+            height,
+            pos_x,
+            pos_y,
+            name,
+        }: WindowParams,
+    ) -> Result<hardcore_sys::Window, WindowError> {
         let c_name = CString::new(name)?;
 
         let params = hardcore_sys::WindowParams {
@@ -90,10 +199,13 @@ impl Window {
             handle
         };
 
-        Ok(Self {
-            context_token: token,
-            handle,
-        })
+        Ok(handle)
+    }
+
+    fn destroy(mut handle: hardcore_sys::Window) {
+        unsafe {
+            destroy_window(addr_of_mut!(handle));
+        }
     }
 
     /// Return this window's id.
@@ -104,33 +216,33 @@ impl Window {
     }
 }
 
-impl Drop for Window {
+impl<'c> Drop for Window<'c> {
     fn drop(&mut self) {
-        if self.context_token.valid() {
-            unsafe {
-                destroy_window(addr_of_mut!(self.handle));
-            }
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let call = GLFWCall::DestroyWindow {
+            result_channel: tx,
+            window: self.handle,
+        };
+
+        if let Err(err) = GLFWCall::submit(call) {
+            error!("Failed to submit window destruction call: {err:?}")
+        }
+
+        if let Err(err) = rx.blocking_recv() {
+            error!("Failed to receive call result from main thread: {err:?}")
         }
     }
 }
 
-unsafe impl Send for Window {}
-
-impl ContextDependent for Window {
-    fn valid(&self) -> bool {
-        self.context_token.valid()
-    }
-}
-
 mod callback {
-	use crate::emit_event;
-	use crate::event::{Event, WindowEvent};
-	use crate::input::{ButtonAction, KeyboardKey, Modifiers, MouseButton};
-	use std::ffi::{c_char, c_int, c_uint, CStr};
-	use std::path::PathBuf;
-	use tracing::error;
+    use crate::emit_event;
+    use crate::event::{Event, WindowEvent};
+    use crate::input::{ButtonAction, KeyboardKey, Modifiers, MouseButton};
+    use std::ffi::{c_char, c_int, c_uint, CStr};
+    use std::path::PathBuf;
+    use tracing::error;
 
-	pub(super) unsafe extern "C" fn position(id: usize, x: c_int, y: c_int) {
+    pub(super) unsafe extern "C" fn position(id: usize, x: c_int, y: c_int) {
         if let Err(e) = emit_event(Event::Window {
             id,
             event: WindowEvent::Position { x, y },
