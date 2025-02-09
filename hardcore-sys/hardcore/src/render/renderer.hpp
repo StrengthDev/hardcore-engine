@@ -1,16 +1,10 @@
 #pragma once
 
-#include <vector>
-
-#define GLFW_INCLUDE_NONE
-
-#include <GLFW/glfw3.h>
+#include "device.hpp"
 
 #include <core/core.h>
 #include <util/number.hpp>
 #include <render/renderer.h>
-
-#include "device.hpp"
 
 namespace hc::render {
 	enum class InstanceResult : u32 {

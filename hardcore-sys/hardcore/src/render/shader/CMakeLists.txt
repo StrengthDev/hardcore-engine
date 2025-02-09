@@ -1,5 +1,6 @@
 list(APPEND SOURCES
-		${CMAKE_CURRENT_SOURCE_DIR}/shader.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/shader.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/util.cpp
 )
 
 set(SOURCES ${SOURCES} PARENT_SCOPE)

@@ -1,12 +1,8 @@
 #pragma once
 
+#include <core/glfw.hpp>
+
 #include <variant>
-
-#include <volk.h>
-
-#define GLFW_INCLUDE_NONE
-
-#include <GLFW/glfw3.h>
 
 namespace hc::render::device {
 	struct WindowDestructionMark {

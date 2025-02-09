@@ -1,8 +1,5 @@
 #pragma once
 
-#include <util/flow.hpp>
-
-#include <spirv_reflect.h>
 #include <vulkan/vulkan.h>
 
 namespace hc::render {
@@ -12,108 +9,7 @@ namespace hc::render {
     * @param result The `VKResult` for which the string is returned.
     * @return A C string representation of the `VKResult`.
     */
-    inline const char* to_str(VkResult result) {
-        switch (result) {
-        case VK_SUCCESS:
-            return "VK_SUCCESS";
-        case VK_NOT_READY:
-            return "VK_NOT_READY";
-        case VK_TIMEOUT:
-            return "VK_TIMEOUT";
-        case VK_EVENT_SET:
-            return "VK_EVENT_SET";
-        case VK_EVENT_RESET:
-            return "VK_EVENT_RESET";
-        case VK_INCOMPLETE:
-            return "VK_INCOMPLETE";
-        case VK_ERROR_OUT_OF_HOST_MEMORY:
-            return "VK_ERROR_OUT_OF_HOST_MEMORY";
-        case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-            return "VK_ERROR_OUT_OF_DEVICE_MEMORY";
-        case VK_ERROR_INITIALIZATION_FAILED:
-            return "VK_ERROR_INITIALIZATION_FAILED";
-        case VK_ERROR_DEVICE_LOST:
-            return "VK_ERROR_DEVICE_LOST";
-        case VK_ERROR_MEMORY_MAP_FAILED:
-            return "VK_ERROR_MEMORY_MAP_FAILED";
-        case VK_ERROR_LAYER_NOT_PRESENT:
-            return "VK_ERROR_LAYER_NOT_PRESENT";
-        case VK_ERROR_EXTENSION_NOT_PRESENT:
-            return "VK_ERROR_EXTENSION_NOT_PRESENT";
-        case VK_ERROR_FEATURE_NOT_PRESENT:
-            return "VK_ERROR_FEATURE_NOT_PRESENT";
-        case VK_ERROR_INCOMPATIBLE_DRIVER:
-            return "VK_ERROR_INCOMPATIBLE_DRIVER";
-        case VK_ERROR_TOO_MANY_OBJECTS:
-            return "VK_ERROR_TOO_MANY_OBJECTS";
-        case VK_ERROR_FORMAT_NOT_SUPPORTED:
-            return "VK_ERROR_FORMAT_NOT_SUPPORTED";
-        case VK_ERROR_FRAGMENTED_POOL:
-            return "VK_ERROR_FRAGMENTED_POOL";
-        case VK_ERROR_UNKNOWN:
-            return "VK_ERROR_UNKNOWN";
-        case VK_ERROR_OUT_OF_POOL_MEMORY:
-            return "VK_ERROR_OUT_OF_POOL_MEMORY";
-        case VK_ERROR_INVALID_EXTERNAL_HANDLE:
-            return "VK_ERROR_INVALID_EXTERNAL_HANDLE";
-        case VK_ERROR_FRAGMENTATION:
-            return "VK_ERROR_FRAGMENTATION";
-        case VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS:
-            return "VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS";
-        case VK_PIPELINE_COMPILE_REQUIRED:
-            return "VK_PIPELINE_COMPILE_REQUIRED";
-        case VK_ERROR_SURFACE_LOST_KHR:
-            return "VK_ERROR_SURFACE_LOST_KHR";
-        case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR:
-            return "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR";
-        case VK_SUBOPTIMAL_KHR:
-            return "VK_SUBOPTIMAL_KHR";
-        case VK_ERROR_OUT_OF_DATE_KHR:
-            return "VK_ERROR_OUT_OF_DATE_KHR";
-        case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR:
-            return "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR";
-        case VK_ERROR_VALIDATION_FAILED_EXT:
-            return "VK_ERROR_VALIDATION_FAILED_EXT";
-        case VK_ERROR_INVALID_SHADER_NV:
-            return "VK_ERROR_INVALID_SHADER_NV";
-        case VK_ERROR_IMAGE_USAGE_NOT_SUPPORTED_KHR:
-            return "VK_ERROR_IMAGE_USAGE_NOT_SUPPORTED_KHR";
-        case VK_ERROR_VIDEO_PICTURE_LAYOUT_NOT_SUPPORTED_KHR:
-            return "VK_ERROR_VIDEO_PICTURE_LAYOUT_NOT_SUPPORTED_KHR";
-        case VK_ERROR_VIDEO_PROFILE_OPERATION_NOT_SUPPORTED_KHR:
-            return "VK_ERROR_VIDEO_PROFILE_OPERATION_NOT_SUPPORTED_KHR";
-        case VK_ERROR_VIDEO_PROFILE_FORMAT_NOT_SUPPORTED_KHR:
-            return "VK_ERROR_VIDEO_PROFILE_FORMAT_NOT_SUPPORTED_KHR";
-        case VK_ERROR_VIDEO_PROFILE_CODEC_NOT_SUPPORTED_KHR:
-            return "VK_ERROR_VIDEO_PROFILE_CODEC_NOT_SUPPORTED_KHR";
-        case VK_ERROR_VIDEO_STD_VERSION_NOT_SUPPORTED_KHR:
-            return "VK_ERROR_VIDEO_STD_VERSION_NOT_SUPPORTED_KHR";
-        case VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT:
-            return "VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT";
-        case VK_ERROR_NOT_PERMITTED_KHR:
-            return "VK_ERROR_NOT_PERMITTED_KHR";
-        case VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT:
-            return "VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT";
-        case VK_THREAD_IDLE_KHR:
-            return "VK_THREAD_IDLE_KHR";
-        case VK_THREAD_DONE_KHR:
-            return "VK_THREAD_DONE_KHR";
-        case VK_OPERATION_DEFERRED_KHR:
-            return "VK_OPERATION_DEFERRED_KHR";
-        case VK_OPERATION_NOT_DEFERRED_KHR:
-            return "VK_OPERATION_NOT_DEFERRED_KHR";
-        case VK_ERROR_INVALID_VIDEO_STD_PARAMETERS_KHR:
-            return "VK_ERROR_INVALID_VIDEO_STD_PARAMETERS_KHR";
-        case VK_ERROR_COMPRESSION_EXHAUSTED_EXT:
-            return "VK_ERROR_COMPRESSION_EXHAUSTED_EXT";
-        case VK_INCOMPATIBLE_SHADER_BINARY_EXT:
-            return "VK_INCOMPATIBLE_SHADER_BINARY_EXT";
-        case VK_RESULT_MAX_ENUM:
-            return "VK_RESULT_MAX_ENUM";
-        default:
-            HC_UNREACHABLE("All result values must be implemented");
-        }
-    }
+    const char* to_str(VkResult result);
 
     /**
     * @brief Returns a string representation of the provided `VkExtent2D`.
@@ -121,66 +17,5 @@ namespace hc::render {
     * @param extent The `VkExtent2D` for which the string is returned.
     * @return A string representation of the `VkExtent2D`.
     */
-    inline std::string to_str(const VkExtent2D& extent) {
-        std::stringstream stream;
-        stream << '(' << extent.width << ", " << extent.height << ')';
-        return stream.str();
-    }
-
-    /**
-    * @brief Returns a C string representation of the provided `SpvReflectResult`.
-    *
-    * @param result The `SpvReflectResult` for which the string is returned.
-    * @return A C string representation of the `SpvReflectResult`.
-    */
-    inline const char* to_str(SpvReflectResult result) {
-        switch (result) {
-        case SPV_REFLECT_RESULT_SUCCESS:
-            return "SPV_REFLECT_RESULT_SUCCESS";
-        case SPV_REFLECT_RESULT_NOT_READY:
-            return "SPV_REFLECT_RESULT_NOT_READY";
-        case SPV_REFLECT_RESULT_ERROR_PARSE_FAILED:
-            return "SPV_REFLECT_RESULT_ERROR_PARSE_FAILED";
-        case SPV_REFLECT_RESULT_ERROR_ALLOC_FAILED:
-            return "SPV_REFLECT_RESULT_ERROR_ALLOC_FAILED";
-        case SPV_REFLECT_RESULT_ERROR_RANGE_EXCEEDED:
-            return "SPV_REFLECT_RESULT_ERROR_RANGE_EXCEEDED";
-        case SPV_REFLECT_RESULT_ERROR_NULL_POINTER:
-            return "SPV_REFLECT_RESULT_ERROR_NULL_POINTER";
-        case SPV_REFLECT_RESULT_ERROR_INTERNAL_ERROR:
-            return "SPV_REFLECT_RESULT_ERROR_INTERNAL_ERROR";
-        case SPV_REFLECT_RESULT_ERROR_COUNT_MISMATCH:
-            return "SPV_REFLECT_RESULT_ERROR_COUNT_MISMATCH";
-        case SPV_REFLECT_RESULT_ERROR_ELEMENT_NOT_FOUND:
-            return "SPV_REFLECT_RESULT_ERROR_ELEMENT_NOT_FOUND";
-        case SPV_REFLECT_RESULT_ERROR_SPIRV_INVALID_CODE_SIZE:
-            return "SPV_REFLECT_RESULT_ERROR_SPIRV_INVALID_CODE_SIZE";
-        case SPV_REFLECT_RESULT_ERROR_SPIRV_INVALID_MAGIC_NUMBER:
-            return "SPV_REFLECT_RESULT_ERROR_SPIRV_INVALID_MAGIC_NUMBER";
-        case SPV_REFLECT_RESULT_ERROR_SPIRV_UNEXPECTED_EOF:
-            return "SPV_REFLECT_RESULT_ERROR_SPIRV_UNEXPECTED_EOF";
-        case SPV_REFLECT_RESULT_ERROR_SPIRV_INVALID_ID_REFERENCE:
-            return "SPV_REFLECT_RESULT_ERROR_SPIRV_INVALID_ID_REFERENCE";
-        case SPV_REFLECT_RESULT_ERROR_SPIRV_SET_NUMBER_OVERFLOW:
-            return "SPV_REFLECT_RESULT_ERROR_SPIRV_SET_NUMBER_OVERFLOW";
-        case SPV_REFLECT_RESULT_ERROR_SPIRV_INVALID_STORAGE_CLASS:
-            return "SPV_REFLECT_RESULT_ERROR_SPIRV_INVALID_STORAGE_CLASS";
-        case SPV_REFLECT_RESULT_ERROR_SPIRV_RECURSION:
-            return "SPV_REFLECT_RESULT_ERROR_SPIRV_RECURSION";
-        case SPV_REFLECT_RESULT_ERROR_SPIRV_INVALID_INSTRUCTION:
-            return "SPV_REFLECT_RESULT_ERROR_SPIRV_INVALID_INSTRUCTION";
-        case SPV_REFLECT_RESULT_ERROR_SPIRV_UNEXPECTED_BLOCK_DATA:
-            return "SPV_REFLECT_RESULT_ERROR_SPIRV_UNEXPECTED_BLOCK_DATA";
-        case SPV_REFLECT_RESULT_ERROR_SPIRV_INVALID_BLOCK_MEMBER_REFERENCE:
-            return "SPV_REFLECT_RESULT_ERROR_SPIRV_INVALID_BLOCK_MEMBER_REFERENCE";
-        case SPV_REFLECT_RESULT_ERROR_SPIRV_INVALID_ENTRY_POINT:
-            return "SPV_REFLECT_RESULT_ERROR_SPIRV_INVALID_ENTRY_POINT";
-        case SPV_REFLECT_RESULT_ERROR_SPIRV_INVALID_EXECUTION_MODE:
-            return "SPV_REFLECT_RESULT_ERROR_SPIRV_INVALID_EXECUTION_MODE";
-        case SPV_REFLECT_RESULT_ERROR_SPIRV_MAX_RECURSIVE_EXCEEDED:
-            return "SPV_REFLECT_RESULT_ERROR_SPIRV_MAX_RECURSIVE_EXCEEDED";
-        default:
-            HC_UNREACHABLE("All result values must be implemented");
-        }
-    }
+    std::string to_str(const VkExtent2D& extent);
 }

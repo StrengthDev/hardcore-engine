@@ -1,119 +1,142 @@
 #pragma once
 
-#include <memory>
+#include "heap_manager.hpp"
+#include "allocation_pool.hpp"
 
-#define GLFW_INCLUDE_NONE
-
-#include <GLFW/glfw3.h>
+#include <core/glfw.hpp>
 
 #include <util/result.hpp>
 #include <util/uncopyable.hpp>
 
-#include "heap_manager.hpp"
-#include "allocation_pool.hpp"
+#include <memory>
 
 namespace hc::render::device::memory {
-	enum class PoolResult : u8 {
-		Success = 0,
-		OutOfHostMemory,
-		OutOfDeviceMemory,
-		UnsupportedHeap,
-		MapFailure,
-	};
+    enum class PoolResult : u8 {
+        Success = 0,
+        OutOfHostMemory,
+        OutOfDeviceMemory,
+        UnsupportedHeap,
+        MapFailure,
+    };
 
-	class BufferPool : public AllocationPool<NullSlot> {
-	public:
-		BufferPool() = default;
+    class BufferPool : public AllocationPool {
+    public:
+        BufferPool() = default;
 
-		[[nodiscard]]
-		static Result<BufferPool, PoolResult> create(const VolkDeviceTable &fn_table, VkDevice device,
-													HeapManager &heap_manager, VkDeviceSize size,
-													VkBufferUsageFlags usage);
+        [[nodiscard]] static Result<BufferPool, PoolResult> create(
+            const VolkDeviceTable& fn_table,
+            VkDevice device,
+            HeapManager& heap_manager,
+            VkDeviceSize size,
+            VkBufferUsageFlags usage
+        );
 
-		void free(const VolkDeviceTable &fn_table, VkDevice device, HeapManager &heap_manager) noexcept;
+        void free(const VolkDeviceTable& fn_table, VkDevice device, HeapManager& heap_manager) noexcept;
 
-		inline VkBuffer &handle() noexcept { return this->buffer; }
+        inline VkBuffer& handle() noexcept { return this->buffer; }
 
-	protected:
-		BufferPool(VkDeviceMemory memory, VkDeviceSize size, bool per_frame_allocation) : AllocationPool<NullSlot>(
-			memory, size, per_frame_allocation) {
-		}
+    protected:
+        BufferPool(VkDeviceMemory memory, VkDeviceSize size)
+            : AllocationPool(memory, size) {
+        }
 
-		ExternalHandle<VkBuffer, VK_NULL_HANDLE> buffer;
-	};
+        void insert(u32 index);
+        void rotate_right(u32 begin, u32 n, u32 end);
 
-	class DynamicBufferPool : public BufferPool {
-	public:
-		DynamicBufferPool() = default;
+        ExternalHandle<VkBuffer, VK_NULL_HANDLE> buffer;
 
-		[[nodiscard]]
-		static Result<DynamicBufferPool, PoolResult> create(const VolkDeviceTable &fn_table, VkDevice device,
-															HeapManager &heap_manager, VkDeviceSize size,
-															VkBufferUsageFlags usage);
+        friend class AllocationPool;
+    };
 
-		~DynamicBufferPool();
+    class DynamicBufferPool : public BufferPool {
+    public:
+        DynamicBufferPool() = default;
 
-		DynamicBufferPool(DynamicBufferPool &&) noexcept = default;
+        [[nodiscard]] static Result<DynamicBufferPool, PoolResult> create(
+            const VolkDeviceTable& fn_table,
+            VkDevice device,
+            HeapManager& heap_manager,
+            VkDeviceSize size,
+            VkBufferUsageFlags usage
+        );
 
-		DynamicBufferPool &operator=(DynamicBufferPool &&) = default;
+        ~DynamicBufferPool();
 
-		[[nodiscard]] PoolResult map(const VolkDeviceTable &fn_table, VkDevice device, u8 frame_mod);
+        DynamicBufferPool(DynamicBufferPool&&) noexcept = default;
 
-		void unmap(const VolkDeviceTable &fn_table, VkDevice device);
+        DynamicBufferPool& operator=(DynamicBufferPool&&) = default;
 
-		inline void **host_ptr() const noexcept { return this->mapped_host_ptr.get(); }
+        [[nodiscard]] PoolResult map(const VolkDeviceTable& fn_table, VkDevice device, u8 frame_mod);
 
-		inline VkMappedMemoryRange mapped_range(u8 frame_mod) const noexcept {
-			return {
-				.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
-				.pNext = nullptr,
-				.memory = this->memory,
-				.offset = this->total_capacity * frame_mod,
-				.size = this->total_capacity
-			};
-		}
+        void unmap(const VolkDeviceTable& fn_table, VkDevice device);
 
-	private:
-		DynamicBufferPool(VkDeviceMemory memory, VkDeviceSize size) : BufferPool(memory, size, true) {
-		}
+        inline void** host_ptr() const noexcept { return this->mapped_host_ptr.get(); }
 
-		// Use unique pointer so that the location never changes, even if the pool is moved. Resource handles will have
-		// a pointer to this pointer.
-		// Unique pointers cannot be copied, so there is no need to wrap this in an `Uncopyable`.
-		std::unique_ptr<void *> mapped_host_ptr;
-	};
+        inline VkMappedMemoryRange mapped_range(u8 frame_mod) const noexcept {
+            return {
+                .sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,
+                .pNext = nullptr,
+                .memory = this->memory,
+                .offset = this->total_capacity * frame_mod,
+                .size = this->total_capacity
+            };
+        }
 
-	/*
-		struct texture_slot {
-			VkImage image;
-			VkImageView view;
+    private:
+        DynamicBufferPool(VkDeviceMemory memory, VkDeviceSize size)
+            : BufferPool(memory, size) {
+        }
 
-			VkDeviceSize size;
-			VkExtent3D dims;
-			VkImageLayout layout; // Layout of the image at the start of the frame
-		};
+        // Use unique pointer so that the location never changes, even if the pool is moved. Resource handles will have
+        // a pointer to this pointer.
+        // Unique pointers cannot be copied, so there is no need to wrap this in an `Uncopyable`.
+        std::unique_ptr<void*> mapped_host_ptr;
+    };
 
-		texture_slot
-		create_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements &out_memory_requirements);
+    /*
 
-		class texture_pool : public AllocationPool<TextureSlot> {
-		public:
-			texture_pool() = default;
+    struct TextureSlot {
+        VkImage image;
+        VkImageView view;
 
-			texture_pool(VkDevice device, HeapManager &heap_manager, VkDeviceSize size,
-						u32 memory_type_bits, Heap preferred_heap);
+        VkDeviceSize size;
+        VkExtent3D dims;
+        VkImageLayout layout; // Layout of the image at the start of the frame
+    };
 
-			void free(const VolkDeviceTable &fn_table, VkDevice device, HeapManager &heap_manager) noexcept;
+        struct texture_slot {
+            VkImage image;
+            VkImageView view;
 
-			bool search(VkDeviceSize size, VkDeviceSize alignment, u32 memory_type_bits,
-						u32 &out_slot_idx, VkDeviceSize &out_size_needed, VkDeviceSize &out_offset) const;
+            VkDeviceSize size;
+            VkExtent3D dims;
+            VkImageLayout layout; // Layout of the image at the start of the frame
+        };
 
-			void fill_slot(VkDevice device, TextureSlot &&tex, u32 slot_idx, VkDeviceSize size, VkDeviceSize alignment);
+        texture_slot
+        create_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements &out_memory_requirements);
 
-			const TextureSlot &tex_at(u32 idx) const noexcept { return this->extra_slots[idx]; }
+        class texture_pool : public AllocationPool<TextureSlot> {
+        public:
+            texture_pool() = default;
 
-		private:
-			u32 m_memory_type_idx = std::numeric_limits<u32>::max();
-		};
-	*/
+            texture_pool(VkDevice device, HeapManager &heap_manager, VkDeviceSize size,
+                        u32 memory_type_bits, Heap preferred_heap);
+
+            void free(const VolkDeviceTable &fn_table, VkDevice device, HeapManager &heap_manager) noexcept;
+
+            bool search(VkDeviceSize size, VkDeviceSize alignment, u32 memory_type_bits,
+                        u32 &out_slot_idx, VkDeviceSize &out_size_needed, VkDeviceSize &out_offset) const;
+
+            void fill_slot(VkDevice device, TextureSlot &&tex, u32 slot_idx, VkDeviceSize size, VkDeviceSize alignment);
+
+            const TextureSlot &tex_at(u32 idx) const noexcept { return this->extra_slots[idx]; }
+
+        private:
+            void insert(u32 index);
+            void rotate_right(u32 begin, u32 n, u32 end);
+
+            u32 m_memory_type_idx = std::numeric_limits<u32>::max();
+        };
+    */
 }

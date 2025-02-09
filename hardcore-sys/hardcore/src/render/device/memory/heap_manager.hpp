@@ -1,10 +1,6 @@
 #pragma once
 
-#include <volk.h>
-
-#define GLFW_INCLUDE_NONE
-
-#include <GLFW/glfw3.h>
+#include <core/glfw.hpp>
 
 #include <util/number.hpp>
 #include <util/result.hpp>

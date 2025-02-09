@@ -1,14 +1,12 @@
 #include <pch.hpp>
 
-#ifndef HC_HEADLESS
-#define GLFW_INCLUDE_NONE
-
-#include <GLFW/glfw3.h>
-
-#endif // HC_HEADLESS
+#include "log.hpp"
 
 #include <core/core.h>
-#include "log.hpp"
+#ifndef HC_HEADLESS
+#include <core/glfw.hpp>
+#endif // HC_HEADLESS
+
 #include <render/renderer.hpp>
 
 #ifndef HC_HEADLESS

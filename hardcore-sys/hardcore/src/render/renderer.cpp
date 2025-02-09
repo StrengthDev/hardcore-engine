@@ -1,22 +1,18 @@
 #include <pch.hpp>
 
-#ifndef HC_HEADLESS
-#define GLFW_INCLUDE_NONE
-
-#include <GLFW/glfw3.h>
-
-#endif // HC_HEADLESS
+#include "util.hpp"
+#include "renderer.hpp"
+#include "vars.hpp"
+#include "device.hpp"
 
 #include <core/log.hpp>
 #include <util/flow.hpp>
 #include <render/renderer.h>
 #include <render/device.h>
 
-#include "util.hpp"
-
-#include "renderer.hpp"
-#include "vars.hpp"
-#include "device.hpp"
+#ifndef HC_HEADLESS
+#include <core/glfw.hpp>
+#endif // HC_HEADLESS
 
 #define VK_CHECK_RETURN(vk_fn_call)     \
 {                                       \
@@ -64,13 +60,17 @@ namespace hc::render {
         return VK_SUCCESS;
     }
 
-    VkResult extension_support(const char* layer_name, const std::vector<const char*>& extension_names,
-                               std::vector<bool>& out_found_extensions) {
+    VkResult extension_support(
+        const char* layer_name,
+        const std::vector<const char*>& extension_names,
+        std::vector<bool>& out_found_extensions
+    ) {
         u32 extension_count;
         VK_CHECK_RETURN(vkEnumerateInstanceExtensionProperties(layer_name, &extension_count, nullptr));
         std::vector<VkExtensionProperties> available_extensions(extension_count);
         VK_CHECK_RETURN(
-            vkEnumerateInstanceExtensionProperties(layer_name, &extension_count, available_extensions.data()));
+            vkEnumerateInstanceExtensionProperties(layer_name, &extension_count, available_extensions.data())
+        );
 
         for (auto& available_extension : available_extensions) {
             HC_DEBUG("Extension available: " << available_extension.extensionName);
@@ -97,7 +97,8 @@ namespace hc::render {
         VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
         VkDebugUtilsMessageTypeFlagsEXT message_type,
         const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
-        [[maybe_unused]] void* user_data) {
+        [[maybe_unused]] void* user_data
+    ) {
         char type[] = "[----]";
         if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) type[1] = 'G';
         if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) type[2] = 'V';
@@ -106,14 +107,11 @@ namespace hc::render {
 
         if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
             HC_ERROR("Vulkan " << type << ": " << callback_data->pMessage);
-        }
-        else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+        } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
             HC_WARN("Vulkan " << type << ": " << callback_data->pMessage);
-        }
-        else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
+        } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
             HC_INFO("Vulkan " << type << ": " << callback_data->pMessage);
-        }
-        else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
+        } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
             HC_TRACE("Vulkan " << type << ": " << callback_data->pMessage);
         }
 
@@ -124,28 +122,23 @@ namespace hc::render {
         VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
         VkDebugUtilsMessageTypeFlagsEXT message_type,
         const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
-        [[maybe_unused]] void* user_data) {
+        [[maybe_unused]] void* user_data
+    ) {
         int flags = 0;
-        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT)
-            flags |= HC_VK_GENERAL;
-        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT)
-            flags |= HC_VK_VALIDATION;
-        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
-            flags |= HC_VK_PERFORMANCE;
-        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT)
-            flags |= HC_VK_DEVICE_ADDRESS_BINDING;
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) flags |= HC_VK_GENERAL;
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) flags |= HC_VK_VALIDATION;
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) flags |= HC_VK_PERFORMANCE;
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT) flags |=
+            HC_VK_DEVICE_ADDRESS_BINDING;
 
         HCLogKind kind = HCLogKind::Error;
         if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
             kind = HCLogKind::Error;
-        }
-        else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+        } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
             kind = HCLogKind::Warn;
-        }
-        else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
+        } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
             kind = HCLogKind::Info;
-        }
-        else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
+        } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
             kind = HCLogKind::Debug;
         }
 
@@ -159,10 +152,8 @@ namespace hc::render {
             "Vulkan v" << HC_VULKAN_VERSION.major << '.' << HC_VULKAN_VERSION.minor << '.' << HC_VULKAN_VERSION.patch
         );
         HC_INFO(
-            "Vulkan application: " << app.name << " v"
-            << app.version.major << '.'
-            << app.version.minor << '.'
-            << app.version.patch
+            "Vulkan application: " << app.name << " v" << app.version.major << '.' << app.version.minor << '.' << app.
+            version.patch
         );
 
         VkApplicationInfo app_info = {};
@@ -174,7 +165,7 @@ namespace hc::render {
         app_info.apiVersion = VULKAN_API_VERSION;
 
         std::vector<bool> found_layers(layers.size());
-        std::fill(found_layers.begin(), found_layers.end(), false);
+        std::ranges::fill(found_layers, false);
         VK_CHECK_RETURN(layer_support(layers, found_layers));
         bool support_success = true;
         for (u32 i = 0; i < layers.size(); i++) {
@@ -285,18 +276,16 @@ namespace hc::render {
 #ifdef HC_LOGGING
         VkDebugUtilsMessengerCreateInfoEXT debug_info = {};
         debug_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-        debug_info.messageSeverity =
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-        debug_info.messageType =
-            VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        debug_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+            VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+            VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        debug_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+            VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 
         if (params.debug_callback) {
             user_debug_callback = params.debug_callback;
             debug_info.pfnUserCallback = custom_debug_callback;
-        }
-        else {
+        } else {
             debug_info.pfnUserCallback = default_debug_callback;
         }
 
@@ -391,11 +380,7 @@ struct VersionBitfield {
 
 constexpr HCVersion bitfield_to_version(u32 version_bitfield) {
     auto [patch, minor, major, variant] = std::bit_cast<VersionBitfield>(version_bitfield);
-    return {
-        .major = major,
-        .minor = minor,
-        .patch = patch,
-    };
+    return {.major = major, .minor = minor, .patch = patch,};
 }
 
 const HCVersion HC_VULKAN_VERSION = bitfield_to_version(hc::render::VULKAN_API_VERSION);
@@ -416,8 +401,7 @@ int hc_render_tick() {
 int hc_render_finish() {
     for (u8 i = 0; i < hc::render::max_frames_in_flight_count + 1; ++i) {
         int res = hc_render_tick();
-        if (res)
-            return res;
+        if (res) return res;
     }
 
     return 0;
@@ -429,8 +413,7 @@ u32 hc_device_count() {
 
 const char* hc_device_name(u32 device) {
     auto res = hc::render::device_at(device);
-    if (!res)
-        return nullptr;
+    if (!res) return nullptr;
     auto device_ptr = res.ok();
 
     return device_ptr->name();
