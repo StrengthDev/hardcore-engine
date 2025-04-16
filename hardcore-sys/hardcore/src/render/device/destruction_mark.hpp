@@ -2,6 +2,8 @@
 
 #include <core/glfw.hpp>
 
+#include <util/number.hpp>
+
 #include <variant>
 
 namespace hc::render::device {

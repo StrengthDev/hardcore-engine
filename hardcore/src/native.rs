@@ -1,8 +1,11 @@
+//! This module contains rust functions that get called from within C++ code.
+//! Mostly used for logging/tracing.
+
 use std::ffi::{c_char, c_int, c_void, CStr};
 
 use tracing::span::EnteredSpan;
 use tracing::{
-	debug, debug_span, error, error_span, info, info_span, trace, trace_span, warn, warn_span,
+    debug, debug_span, error, error_span, info, info_span, trace, trace_span, warn, warn_span,
 };
 
 use hardcore_sys::{LogKind, VK_DEVICE_ADDRESS_BINDING, VK_GENERAL, VK_PERFORMANCE, VK_VALIDATION};

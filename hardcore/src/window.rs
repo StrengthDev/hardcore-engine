@@ -53,6 +53,7 @@ pub enum GLFWCallError {
     SendToCaller,
 }
 
+// TODO add function parameter that is used to select the surface format
 pub(super) struct WindowParams {
     device: u32,
     width: u32,

@@ -92,7 +92,9 @@ namespace hc::render {
             &spv_reflect::ShaderModule::EnumerateDescriptorBindings,
             "descriptor binding"
         );
-        if (!bindings_res) return ShaderResult::FailedReflection;
+        if (!bindings_res) {
+            return ShaderResult::FailedReflection;
+        }
         for (const auto& binding : bindings_res.ok()) {
             shader.bindings.emplace(std::make_pair(binding->set, binding->binding), create_binding(*binding));
         }
@@ -108,21 +110,27 @@ namespace hc::render {
         shader.stage = stage;
 
         auto res = Shader::reflect(shader);
-        if (res != ShaderResult::Success) return Err(res);
+        if (res != ShaderResult::Success) {
+            return Err(res);
+        }
 
         return Ok(std::move(shader));
     }
 
     std::size_t Shader::LocationHash::operator()(const std::pair<u32, u32>& output) const noexcept {
-        return static_cast<std::size_t>(output.first << 32) | output.second;
+        return static_cast<std::size_t>(output.first) << 32 | output.second;
     }
 }
 
 HCShader hc_create_shader(const u32* bytecode, size_t size, HCShaderStage stage) {
-    if (!bytecode || !size) return {.inner = nullptr};
+    if (!bytecode || !size) {
+        return {.inner = nullptr};
+    }
 
     auto shader_res = hc::render::Shader::create(std::vector(bytecode, bytecode + size), stage);
-    if (!shader_res) return {.inner = nullptr};
+    if (!shader_res) {
+        return {.inner = nullptr};
+    }
 
     auto* shader_ptr = new hc::render::Shader;
     *shader_ptr = std::move(shader_res).ok();

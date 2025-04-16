@@ -7,20 +7,20 @@ extern "C" {
 #include <stdint.h>
 
 enum HCShaderStage {
-    VertexStage,
-    FragmentStage,
-    ComputeStage,
-    MeshStage,
-    TesselationControlStage,
-    TesselationEvaluationStage,
-    GeometryStage,
-    TaskStage,
-    RayGenerationStage,
-    RayIntersectionStage,
-    RayAnyHitStage,
-    RayClosestHitStage,
-    RayMissStage,
-    RayCallableStage,
+    HCShaderStage_Vertex,
+    HCShaderStage_Fragment,
+    HCShaderStage_Compute,
+    HCShaderStage_Mesh,
+    HCShaderStage_TesselationControl,
+    HCShaderStage_TesselationEvaluation,
+    HCShaderStage_Geometry,
+    HCShaderStage_Task,
+    HCShaderStage_RayGeneration,
+    HCShaderStage_RayIntersection,
+    HCShaderStage_RayAnyHit,
+    HCShaderStage_RayClosestHit,
+    HCShaderStage_RayMiss,
+    HCShaderStage_RayCallable,
 };
 
 /**

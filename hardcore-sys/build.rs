@@ -1,10 +1,17 @@
 use std::env;
 use std::path::PathBuf;
 
-use bindgen::callbacks::ParseCallbacks;
+use bindgen::callbacks::{EnumVariantCustomBehavior, EnumVariantValue, ParseCallbacks};
 use bindgen::EnumVariation;
 use cmake::Config;
 use regex::Regex;
+
+/// These are enum aliases which don't get properly parsed by bindgen (no doc comment)
+const ENUM_ALIASES: [&str; 3] = [
+    "HCMouseButton_Left",
+    "HCMouseButton_Right",
+    "HCMouseButton_Middle",
+];
 
 fn main() {
     let native_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/hardcore");
@@ -96,6 +103,36 @@ impl Default for StripPrefixCallback {
 }
 
 impl ParseCallbacks for StripPrefixCallback {
+    fn enum_variant_behavior(
+        &self,
+        _: Option<&str>,
+        original_variant_name: &str,
+        _: EnumVariantValue,
+    ) -> Option<EnumVariantCustomBehavior> {
+        for alias in ENUM_ALIASES {
+            if original_variant_name == alias {
+                return Some(EnumVariantCustomBehavior::Hide);
+            }
+        }
+
+        None
+    }
+
+    fn enum_variant_name(
+        &self,
+        enum_name: Option<&str>,
+        original_variant_name: &str,
+        _variant_value: EnumVariantValue,
+    ) -> Option<String> {
+        enum_name.and_then(|enum_name| {
+            // Why is "enum " included in the name?
+            let prefix = enum_name.strip_prefix("enum ").unwrap().to_string() + "_";
+            original_variant_name
+                .strip_prefix(&prefix)
+                .map(str::to_string)
+        })
+    }
+
     fn item_name(&self, original_item_name: &str) -> Option<String> {
         let prefixes = ["hc_", "HC_", "HC"];
         for prefix in prefixes {

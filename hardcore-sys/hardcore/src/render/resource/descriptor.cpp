@@ -1,60 +1,64 @@
 #include <pch.hpp>
 
-#include <core/log.hpp>
-#include <util/number.hpp>
-#include <render/descriptor.h>
-
 #include "descriptor.hpp"
+
+#include <core/log.hpp>
+#include <render/descriptor.h>
+#include <util/number.hpp>
 
 static Sz size_of(HCPrimitive primitive) {
     switch (primitive) {
-    case U8:
-    case I8:
+    case HCPrimitive_U8:
+    case HCPrimitive_I8:
         return 1;
-    case U16:
-    case I16:
+    case HCPrimitive_U16:
+    case HCPrimitive_I16:
         return 2;
-    case U32:
-    case I32:
-    case F32:
-    case B32:
+    case HCPrimitive_U32:
+    case HCPrimitive_I32:
+    case HCPrimitive_F32:
+    case HCPrimitive_B32:
         return 4;
-    case U64:
-    case I64:
-    case F64:
+    case HCPrimitive_U64:
+    case HCPrimitive_I64:
+    case HCPrimitive_F64:
         return 8;
     }
+
+    return 0;
 }
 
 static Sz count_of(HCComposition composition) {
     switch (composition) {
-    case Scalar:
+    case HCComposition_Scalar:
         return 1;
-    case Vec2:
+    case HCComposition_Vec2:
         return 2;
-    case Vec3:
+    case HCComposition_Vec3:
         return 3;
-    case Vec4:
+    case HCComposition_Vec4:
         return 4;
-    case Mat2x2:
+    case HCComposition_Mat2x2:
         return 4;
-    case Mat2x3:
+    case HCComposition_Mat2x3:
         return 6;
-    case Mat2x4:
+    case HCComposition_Mat2x4:
         return 8;
-    case Mat3x2:
+    case HCComposition_Mat3x2:
         return 6;
-    case Mat3x3:
+    case HCComposition_Mat3x3:
         return 9;
-    case Mat3x4:
+    case HCComposition_Mat3x4:
         return 12;
-    case Mat4x2:
+    case HCComposition_Mat4x2:
         return 8;
-    case Mat4x3:
+    case HCComposition_Mat4x3:
         return 12;
-    case Mat4x4:
+    case HCComposition_Mat4x4:
         return 16;
     }
+
+    return 0;
 }
 
 // TODO this may need to be revised based on the alignment https://www.khronos.org/opengl/wiki/Interface_Block_(GLSL)#Memory_layout
@@ -73,7 +77,7 @@ HCDescriptor hc_create_descriptor(Sz field_count) {
     }
 
     auto* fields = static_cast<HCField*>(std::malloc(sizeof(HCField) * field_count));
-    return {.fields = fields, .field_count = fields ? field_count : 0, .alignment = HCAlignment::Unknown};
+    return {.fields = fields, .field_count = fields ? field_count : 0, .alignment = HCAlignment::HCAlignment_Unknown};
 }
 
 void hc_destroy_descriptor(HCDescriptor* descriptor) {

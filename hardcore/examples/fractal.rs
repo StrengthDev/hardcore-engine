@@ -9,9 +9,11 @@ use hardcore::input::{ButtonAction, MouseButton};
 use hardcore::layer::Layer;
 use hardcore::render::vulkan_version;
 use hardcore::resource::VertexBuffer;
-use hardcore::shader::{Shader, ShaderStage};
+use hardcore::shader::Shader;
 use hardcore::window::Window;
 use hardcore::{ApplicationDescriptor, Instance, Version};
+
+use hardcore_sys::ShaderStage;
 
 struct FractalLayer<'c> {
     _window: Option<Window<'c>>,
@@ -31,13 +33,13 @@ impl<'c> FractalLayer<'c> {
             action_signal: false,
             vert_shader: Shader::try_from_source(
                 include_str!("resources/shaders/shader.vert"),
-                ShaderStage::Vertex,
+                ShaderStage::Vertex.into(),
                 Default::default(),
             )
             .expect("Failed to create shaders"),
             frag_shader: Shader::try_from_source(
                 include_str!("resources/shaders/shader.frag"),
-                ShaderStage::Fragment,
+                ShaderStage::Fragment.into(),
                 Default::default(),
             )
             .expect("Failed to create shader"),

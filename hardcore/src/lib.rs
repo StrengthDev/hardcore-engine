@@ -330,9 +330,13 @@ fn core_run(initialize: fn(context: &mut Context)) -> Result<(), CoreError> {
         }
 
         context.current_layer_idx = 0;
+        let layer_count = layers.len();
         for layer in layers.iter_mut() {
             layer.tick(&mut context);
             context.current_layer_idx += 1;
+            if layer_count <= context.current_layer_idx + context.layer_pop_count {
+                break;
+            }
         }
 
         let res: i32 = unsafe { hardcore_sys::render_tick() };

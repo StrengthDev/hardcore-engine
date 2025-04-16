@@ -17,23 +17,27 @@ extern "C" {
  * A window button input action.
  */
 enum HCButtonAction {
-	Release, //!< Stop pressing a button.
-	Press, //!< Begin pressing of a button.
-	Repeat, //!< The repeated input which happens when a button is being held down.
+    HCButtonAction_Release, //!< Stop pressing a button.
+    HCButtonAction_Press, //!< Begin pressing of a button.
+    HCButtonAction_Repeat, //!< The repeated input which happens when a button is being held down.
 };
 
 /**
  * The identifier of a mouse button.
  */
 enum HCMouseButton {
-	Button1, //!< Mouse button 1, also known as the left mouse button.
-	Button2, //!< Mouse button 2, also known as the right mouse button.
-	Button3, //!< Mouse button 3, also known as the middle mouse button.
-	Button4, //!< Mouse button 4.
-	Button5, //!< Mouse button 5.
-	Button6, //!< Mouse button 6.
-	Button7, //!< Mouse button 7.
-	Button8, //!< Mouse button 8.
+    HCMouseButton_Button1, //!< Mouse button 1, also known as the left mouse button.
+    HCMouseButton_Button2, //!< Mouse button 2, also known as the right mouse button.
+    HCMouseButton_Button3, //!< Mouse button 3, also known as the middle mouse button.
+    HCMouseButton_Button4, //!< Mouse button 4.
+    HCMouseButton_Button5, //!< Mouse button 5.
+    HCMouseButton_Button6, //!< Mouse button 6.
+    HCMouseButton_Button7, //!< Mouse button 7.
+    HCMouseButton_Button8, //!< Mouse button 8.
+
+    HCMouseButton_Left = HCMouseButton_Button1, //!< The left mouse button, an alias for mouse button 1.
+    HCMouseButton_Right = HCMouseButton_Button2, //!< The right mouse button, an alias for mouse button 2.
+    HCMouseButton_Middle = HCMouseButton_Button2, //!< The middle mouse button, an alias for mouse button 3.
 };
 
 /**
@@ -72,134 +76,134 @@ const int HC_MOD_NUM_LOCK = 0x0020;
  * The US keyboard layout is used.
  */
 enum HCKeyboardKey {
-	Space = 32, //!< Space key.
-	Apostrophe = 39, //!< Apostrophe key. (')
-	Comma = 44, //!< Comma key. (,)
-	Minus = 45, //!< Minus key. (-)
-	Period = 46, //!< Period key. (.)
-	Slash = 47, //!< Slash key. (/)
-	Num0 = 48, //!< Number 0 key.
-	Num1 = 49, //!< Number 1 key.
-	Num2 = 50, //!< Number 2 key.
-	Num3 = 51, //!< Number 3 key.
-	Num4 = 52, //!< Number 4 key.
-	Num5 = 53, //!< Number 5 key.
-	Num6 = 54, //!< Number 6 key.
-	Num7 = 55, //!< Number 7 key.
-	Num8 = 56, //!< Number 8 key.
-	Num9 = 57, //!< Number 9 key.
-	Semicolon = 59, //!< Semicolon key. (;)
-	Equal = 61, //!< Equal key. (=)
-	A = 65, //!< Letter A key.
-	B = 66, //!< Letter B key.
-	C = 67, //!< Letter C key.
-	D = 68, //!< Letter D key.
-	E = 69, //!< Letter E key.
-	F = 70, //!< Letter F key.
-	G = 71, //!< Letter G key.
-	H = 72, //!< Letter H key.
-	I = 73, //!< Letter I key.
-	J = 74, //!< Letter J key.
-	K = 75, //!< Letter K key.
-	L = 76, //!< Letter L key.
-	M = 77, //!< Letter M key.
-	N = 78, //!< Letter N key.
-	O = 79, //!< Letter O key.
-	P = 80, //!< Letter P key.
-	Q = 81, //!< Letter Q key.
-	R = 82, //!< Letter R key.
-	S = 83, //!< Letter S key.
-	T = 84, //!< Letter T key.
-	U = 85, //!< Letter U key.
-	V = 86, //!< Letter V key.
-	W = 87, //!< Letter W key.
-	X = 88, //!< Letter X key.
-	Y = 89, //!< Letter Y key.
-	Z = 90, //!< Letter Z key.
-	LeftBracket = 91, //!< Left bracket key. ([)
-	Backslash = 92, //!< Backslash key. (\)
-	RightBracket = 93, //!< Right bracket key. (])
-	GraveAccent = 96, //!< Grave accent key. (`)
-	World1 = 161, //!< World key 1. (not present in US keyboard layouts)
-	World2 = 162, //!< World key 2. (not present in US keyboard layouts)
-	Escape = 256, //!< Escape key.
-	Enter = 257, //!< Enter key.
-	Tab = 258, //!< Tab key.
-	Backspace = 259, //!< Backspace key.
-	Insert = 260, //!< Insert key.
-	Delete = 261, //!< Delete key.
-	Right = 262, //!< Right arrow key.
-	Left = 263, //!< Left arrow key.
-	Down = 264, //!< Down arrow key.
-	Up = 265, //!< Up arrow key.
-	PageUp = 266, //!< Page up key.
-	PageDown = 267, //!< Page down key.
-	Home = 268, //!< Home key.
-	End = 269, //!< End key.
-	CapsLock = 280, //!< Caps lock key.
-	ScrollLock = 281, //!< Scroll lock key.
-	NumLock = 282, //!< Num lock key.
-	PrintScreen = 283, //!< Print screen key.
-	Pause = 284, //!< Pause key.
-	F1 = 290, //!< Function 1 key. (F1)
-	F2 = 291, //!< Function 2 key. (F2)
-	F3 = 292, //!< Function 3 key. (F3)
-	F4 = 293, //!< Function 4 key. (F4)
-	F5 = 294, //!< Function 5 key. (F5)
-	F6 = 295, //!< Function 6 key. (F6)
-	F7 = 296, //!< Function 7 key. (F7)
-	F8 = 297, //!< Function 8 key. (F8)
-	F9 = 298, //!< Function 9 key. (F9)
-	F10 = 299, //!< Function 10 key. (F10)
-	F11 = 300, //!< Function 11 key. (F11)
-	F12 = 301, //!< Function 12 key. (F12)
-	F13 = 302, //!< Function 13 key. (F13)
-	F14 = 303, //!< Function 14 key. (F14)
-	F15 = 304, //!< Function 15 key. (F15)
-	F16 = 305, //!< Function 16 key. (F16)
-	F17 = 306, //!< Function 17 key. (F17)
-	F18 = 307, //!< Function 18 key. (F18)
-	F19 = 308, //!< Function 19 key. (F19)
-	F20 = 309, //!< Function 20 key. (F20)
-	F21 = 310, //!< Function 21 key. (F21)
-	F22 = 311, //!< Function 22 key. (F22)
-	F23 = 312, //!< Function 23 key. (F23)
-	F24 = 313, //!< Function 24 key. (F24)
-	F25 = 314, //!< Function 25 key. (F25)
-	Numpad0 = 320, //!< Numpad number 0 key.
-	Numpad1 = 321, //!< Numpad number 1 key.
-	Numpad2 = 322, //!< Numpad number 2 key.
-	Numpad3 = 323, //!< Numpad number 3 key.
-	Numpad4 = 324, //!< Numpad number 4 key.
-	Numpad5 = 325, //!< Numpad number 5 key.
-	Numpad6 = 326, //!< Numpad number 6 key.
-	Numpad7 = 327, //!< Numpad number 7 key.
-	Numpad8 = 328, //!< Numpad number 8 key.
-	Numpad9 = 329, //!< Numpad number 9 key.
-	NumpadDecimal = 330, //!< Numpad decimal key.
-	NumpadDivide = 331, //!< Numpad divide key.
-	NumpadMultiply = 332, //!< Numpad multiply key.
-	NumpadSubtract = 333, //!< Numpad subtract key.
-	NumpadAdd = 334, //!< Numpad add key.
-	NumpadEnter = 335, //!< Numpad enter key.
-	NumpadEqual = 336, //!< Numpad equal key.
-	LeftShift = 340, //!< Left shift key.
-	LeftControl = 341, //!< Left control key.
-	LeftAlt = 342, //!< Left alt key.
-	LeftSuper = 343, //!< Left super key.
-	RightShift = 344, //!< Right shift key.
-	RightControl = 345, //!< Right control key.
-	RightAlt = 346, //!< Right alt key.
-	RightSuper = 347, //!< Right super key.
-	Menu = 348, //!< Menu key.
+    HCKeyboardKey_Space = 32, //!< Space key.
+    HCKeyboardKey_Apostrophe = 39, //!< Apostrophe key. (')
+    HCKeyboardKey_Comma = 44, //!< Comma key. (,)
+    HCKeyboardKey_Minus = 45, //!< Minus key. (-)
+    HCKeyboardKey_Period = 46, //!< Period key. (.)
+    HCKeyboardKey_Slash = 47, //!< Slash key. (/)
+    HCKeyboardKey_Num0 = 48, //!< Number 0 key.
+    HCKeyboardKey_Num1 = 49, //!< Number 1 key.
+    HCKeyboardKey_Num2 = 50, //!< Number 2 key.
+    HCKeyboardKey_Num3 = 51, //!< Number 3 key.
+    HCKeyboardKey_Num4 = 52, //!< Number 4 key.
+    HCKeyboardKey_Num5 = 53, //!< Number 5 key.
+    HCKeyboardKey_Num6 = 54, //!< Number 6 key.
+    HCKeyboardKey_Num7 = 55, //!< Number 7 key.
+    HCKeyboardKey_Num8 = 56, //!< Number 8 key.
+    HCKeyboardKey_Num9 = 57, //!< Number 9 key.
+    HCKeyboardKey_Semicolon = 59, //!< Semicolon key. (;)
+    HCKeyboardKey_Equal = 61, //!< Equal key. (=)
+    HCKeyboardKey_A = 65, //!< Letter A key.
+    HCKeyboardKey_B = 66, //!< Letter B key.
+    HCKeyboardKey_C = 67, //!< Letter C key.
+    HCKeyboardKey_D = 68, //!< Letter D key.
+    HCKeyboardKey_E = 69, //!< Letter E key.
+    HCKeyboardKey_F = 70, //!< Letter F key.
+    HCKeyboardKey_G = 71, //!< Letter G key.
+    HCKeyboardKey_H = 72, //!< Letter H key.
+    HCKeyboardKey_I = 73, //!< Letter I key.
+    HCKeyboardKey_J = 74, //!< Letter J key.
+    HCKeyboardKey_K = 75, //!< Letter K key.
+    HCKeyboardKey_L = 76, //!< Letter L key.
+    HCKeyboardKey_M = 77, //!< Letter M key.
+    HCKeyboardKey_N = 78, //!< Letter N key.
+    HCKeyboardKey_O = 79, //!< Letter O key.
+    HCKeyboardKey_P = 80, //!< Letter P key.
+    HCKeyboardKey_Q = 81, //!< Letter Q key.
+    HCKeyboardKey_R = 82, //!< Letter R key.
+    HCKeyboardKey_S = 83, //!< Letter S key.
+    HCKeyboardKey_T = 84, //!< Letter T key.
+    HCKeyboardKey_U = 85, //!< Letter U key.
+    HCKeyboardKey_V = 86, //!< Letter V key.
+    HCKeyboardKey_W = 87, //!< Letter W key.
+    HCKeyboardKey_X = 88, //!< Letter X key.
+    HCKeyboardKey_Y = 89, //!< Letter Y key.
+    HCKeyboardKey_Z = 90, //!< Letter Z key.
+    HCKeyboardKey_LeftBracket = 91, //!< Left bracket key. ([)
+    HCKeyboardKey_Backslash = 92, //!< Backslash key. (\)
+    HCKeyboardKey_RightBracket = 93, //!< Right bracket key. (])
+    HCKeyboardKey_GraveAccent = 96, //!< Grave accent key. (`)
+    HCKeyboardKey_World1 = 161, //!< World key 1. (not present in US keyboard layouts)
+    HCKeyboardKey_World2 = 162, //!< World key 2. (not present in US keyboard layouts)
+    HCKeyboardKey_Escape = 256, //!< Escape key.
+    HCKeyboardKey_Enter = 257, //!< Enter key.
+    HCKeyboardKey_Tab = 258, //!< Tab key.
+    HCKeyboardKey_Backspace = 259, //!< Backspace key.
+    HCKeyboardKey_Insert = 260, //!< Insert key.
+    HCKeyboardKey_Delete = 261, //!< Delete key.
+    HCKeyboardKey_Right = 262, //!< Right arrow key.
+    HCKeyboardKey_Left = 263, //!< Left arrow key.
+    HCKeyboardKey_Down = 264, //!< Down arrow key.
+    HCKeyboardKey_Up = 265, //!< Up arrow key.
+    HCKeyboardKey_PageUp = 266, //!< Page up key.
+    HCKeyboardKey_PageDown = 267, //!< Page down key.
+    HCKeyboardKey_Home = 268, //!< Home key.
+    HCKeyboardKey_End = 269, //!< End key.
+    HCKeyboardKey_CapsLock = 280, //!< Caps lock key.
+    HCKeyboardKey_ScrollLock = 281, //!< Scroll lock key.
+    HCKeyboardKey_NumLock = 282, //!< Num lock key.
+    HCKeyboardKey_PrintScreen = 283, //!< Print screen key.
+    HCKeyboardKey_Pause = 284, //!< Pause key.
+    HCKeyboardKey_F1 = 290, //!< Function 1 key. (F1)
+    HCKeyboardKey_F2 = 291, //!< Function 2 key. (F2)
+    HCKeyboardKey_F3 = 292, //!< Function 3 key. (F3)
+    HCKeyboardKey_F4 = 293, //!< Function 4 key. (F4)
+    HCKeyboardKey_F5 = 294, //!< Function 5 key. (F5)
+    HCKeyboardKey_F6 = 295, //!< Function 6 key. (F6)
+    HCKeyboardKey_F7 = 296, //!< Function 7 key. (F7)
+    HCKeyboardKey_F8 = 297, //!< Function 8 key. (F8)
+    HCKeyboardKey_F9 = 298, //!< Function 9 key. (F9)
+    HCKeyboardKey_F10 = 299, //!< Function 10 key. (F10)
+    HCKeyboardKey_F11 = 300, //!< Function 11 key. (F11)
+    HCKeyboardKey_F12 = 301, //!< Function 12 key. (F12)
+    HCKeyboardKey_F13 = 302, //!< Function 13 key. (F13)
+    HCKeyboardKey_F14 = 303, //!< Function 14 key. (F14)
+    HCKeyboardKey_F15 = 304, //!< Function 15 key. (F15)
+    HCKeyboardKey_F16 = 305, //!< Function 16 key. (F16)
+    HCKeyboardKey_F17 = 306, //!< Function 17 key. (F17)
+    HCKeyboardKey_F18 = 307, //!< Function 18 key. (F18)
+    HCKeyboardKey_F19 = 308, //!< Function 19 key. (F19)
+    HCKeyboardKey_F20 = 309, //!< Function 20 key. (F20)
+    HCKeyboardKey_F21 = 310, //!< Function 21 key. (F21)
+    HCKeyboardKey_F22 = 311, //!< Function 22 key. (F22)
+    HCKeyboardKey_F23 = 312, //!< Function 23 key. (F23)
+    HCKeyboardKey_F24 = 313, //!< Function 24 key. (F24)
+    HCKeyboardKey_F25 = 314, //!< Function 25 key. (F25)
+    HCKeyboardKey_Numpad0 = 320, //!< Numpad number 0 key.
+    HCKeyboardKey_Numpad1 = 321, //!< Numpad number 1 key.
+    HCKeyboardKey_Numpad2 = 322, //!< Numpad number 2 key.
+    HCKeyboardKey_Numpad3 = 323, //!< Numpad number 3 key.
+    HCKeyboardKey_Numpad4 = 324, //!< Numpad number 4 key.
+    HCKeyboardKey_Numpad5 = 325, //!< Numpad number 5 key.
+    HCKeyboardKey_Numpad6 = 326, //!< Numpad number 6 key.
+    HCKeyboardKey_Numpad7 = 327, //!< Numpad number 7 key.
+    HCKeyboardKey_Numpad8 = 328, //!< Numpad number 8 key.
+    HCKeyboardKey_Numpad9 = 329, //!< Numpad number 9 key.
+    HCKeyboardKey_NumpadDecimal = 330, //!< Numpad decimal key.
+    HCKeyboardKey_NumpadDivide = 331, //!< Numpad divide key.
+    HCKeyboardKey_NumpadMultiply = 332, //!< Numpad multiply key.
+    HCKeyboardKey_NumpadSubtract = 333, //!< Numpad subtract key.
+    HCKeyboardKey_NumpadAdd = 334, //!< Numpad add key.
+    HCKeyboardKey_NumpadEnter = 335, //!< Numpad enter key.
+    HCKeyboardKey_NumpadEqual = 336, //!< Numpad equal key.
+    HCKeyboardKey_LeftShift = 340, //!< Left shift key.
+    HCKeyboardKey_LeftControl = 341, //!< Left control key.
+    HCKeyboardKey_LeftAlt = 342, //!< Left alt key.
+    HCKeyboardKey_LeftSuper = 343, //!< Left super key.
+    HCKeyboardKey_RightShift = 344, //!< Right shift key.
+    HCKeyboardKey_RightControl = 345, //!< Right control key.
+    HCKeyboardKey_RightAlt = 346, //!< Right alt key.
+    HCKeyboardKey_RightSuper = 347, //!< Right super key.
+    HCKeyboardKey_Menu = 348, //!< Menu key.
 };
 
 /**
  * Events related to devices external to the system.
  */
 enum HCDeviceEvent {
-	Connected, //!< A device as been connected to the system.
-	Disconnected, //!< A device has been disconnected from the system.
+    HCDeviceEvent_Connected, //!< A device as been connected to the system.
+    HCDeviceEvent_Disconnected, //!< A device has been disconnected from the system.
 };
 
 // Callback definitions
@@ -309,8 +313,12 @@ typedef void (*HCWindowScaleCallback)(size_t window, float x_scale, float y_scal
  * @param action - Either `HCButtonAction::Press` or `HCButtonAction::Release`. Future releases may add more actions.
  * @param mods - Bit field describing which modifiers are active.
  */
-typedef void (*HCWindowMouseButtonCallback)(size_t window, enum HCMouseButton button, enum HCButtonAction action,
-											int mods);
+typedef void (*HCWindowMouseButtonCallback)(
+    size_t window,
+    enum HCMouseButton button,
+    enum HCButtonAction action,
+    int mods
+);
 
 /**
  * @brief The type/signature of cursor position callback functions.
@@ -356,8 +364,13 @@ typedef void (*HCWindowScrollCallback)(size_t window, double x_offset, double y_
  * add more actions.
  * @param mods - Bit field describing which modifiers are active.
  */
-typedef void (*HCWindowKeyCallback)(size_t window, enum HCKeyboardKey key, int scan_code, enum HCButtonAction action,
-									int mods);
+typedef void (*HCWindowKeyCallback)(
+    size_t window,
+    enum HCKeyboardKey key,
+    int scan_code,
+    enum HCButtonAction action,
+    int mods
+);
 
 /**
  * @brief The type/signature of Unicode character callback functions.
@@ -393,7 +406,7 @@ typedef void (*HCWindowCharModsCallback)(size_t window, unsigned int code_point,
  * @param path_count - The number of dropped paths.
  * @param paths - The UTF-8 encoded file and/or directory path names.
  */
-typedef void (*HCWindowDropCallback)(size_t window, int path_count, const char *paths[]);
+typedef void (*HCWindowDropCallback)(size_t window, int path_count, const char* paths[]);
 
 /**
  * @brief The type/signature of monitor configuration callback functions.
@@ -424,20 +437,20 @@ typedef void (*HCWindowJoystickCallback)(size_t window, enum HCDeviceEvent event
  * `hc_destroy_window` used to destroy the instance.
  */
 struct HCWindow {
-	void *handle; //!< The internal handle of this window.
-	size_t id; //!< The global id of this window.
+    void* handle; //!< The internal handle of this window.
+    size_t id; //!< The global id of this window.
 };
 
 /**
  * @brief Initialisation parameters for a new window.
  */
 struct HCWindowParams {
-	uint32_t device; //!< The ID of the device in which this window's buffer will be allocated in.
-	uint32_t width; //!< The width of the window.
-	uint32_t height; //!< The height of the window.
-	int pos_x; //!< A hint for the initial position of the window, in the x-axis.
-	int pos_y; //!< A hint for the initial position of the window, in the y-axis.
-	const char *name; //!< The name of the window, UTF-8 encoded.
+    uint32_t device; //!< The ID of the device in which this window's buffer will be allocated in.
+    uint32_t width; //!< The width of the window.
+    uint32_t height; //!< The height of the window.
+    int pos_x; //!< A hint for the initial position of the window, in the x-axis.
+    int pos_y; //!< A hint for the initial position of the window, in the y-axis.
+    const char* name; //!< The name of the window, UTF-8 encoded.
 };
 
 /**
@@ -465,7 +478,7 @@ struct HCWindow hc_new_window(struct HCWindowParams params);
  *
  * @param window A pointer to the `HCWindow` to be destroyed.
  */
-void hc_destroy_window(struct HCWindow *window);
+void hc_destroy_window(struct HCWindow* window);
 
 /**
  * @brief Sets the window position callback.
@@ -475,7 +488,7 @@ void hc_destroy_window(struct HCWindow *window);
  * @param window A pointer to the `HCWindow` for which the callback is set.
  * @param callback A pointer to the new callback function.
  */
-void hc_set_window_position_callback(struct HCWindow *window, HCWindowPositionCallback callback);
+void hc_set_window_position_callback(struct HCWindow* window, HCWindowPositionCallback callback);
 
 /**
  * @brief Sets the window size callback.
@@ -485,7 +498,7 @@ void hc_set_window_position_callback(struct HCWindow *window, HCWindowPositionCa
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
  */
-void hc_set_window_size_callback(struct HCWindow *window, HCWindowSizeCallback callback);
+void hc_set_window_size_callback(struct HCWindow* window, HCWindowSizeCallback callback);
 
 /**
  * @brief Sets the window close callback.
@@ -495,7 +508,7 @@ void hc_set_window_size_callback(struct HCWindow *window, HCWindowSizeCallback c
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
  */
-void hc_set_window_close_callback(struct HCWindow *window, HCWindowCloseCallback callback);
+void hc_set_window_close_callback(struct HCWindow* window, HCWindowCloseCallback callback);
 
 /**
  * @brief Sets the window refresh callback.
@@ -505,7 +518,7 @@ void hc_set_window_close_callback(struct HCWindow *window, HCWindowCloseCallback
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
  */
-void hc_set_window_refresh_callback(struct HCWindow *window, HCWindowRefreshCallback callback);
+void hc_set_window_refresh_callback(struct HCWindow* window, HCWindowRefreshCallback callback);
 
 /**
  * @brief Sets the window focus callback.
@@ -515,7 +528,7 @@ void hc_set_window_refresh_callback(struct HCWindow *window, HCWindowRefreshCall
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
  */
-void hc_set_window_focus_callback(struct HCWindow *window, HCWindowFocusCallback callback);
+void hc_set_window_focus_callback(struct HCWindow* window, HCWindowFocusCallback callback);
 
 /**
  * @brief Sets the window minimize callback.
@@ -525,7 +538,7 @@ void hc_set_window_focus_callback(struct HCWindow *window, HCWindowFocusCallback
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
  */
-void hc_set_window_minimize_callback(struct HCWindow *window, HCWindowMinimizeCallback callback);
+void hc_set_window_minimize_callback(struct HCWindow* window, HCWindowMinimizeCallback callback);
 
 /**
  * @brief Sets the window maximize callback.
@@ -535,7 +548,7 @@ void hc_set_window_minimize_callback(struct HCWindow *window, HCWindowMinimizeCa
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
  */
-void hc_set_window_maximize_callback(struct HCWindow *window, HCWindowMaximizeCallback callback);
+void hc_set_window_maximize_callback(struct HCWindow* window, HCWindowMaximizeCallback callback);
 
 /**
  * @brief Sets the window framebuffer callback.
@@ -545,7 +558,7 @@ void hc_set_window_maximize_callback(struct HCWindow *window, HCWindowMaximizeCa
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
  */
-void hc_set_window_framebuffer_callback(struct HCWindow *window, HCWindowFramebufferCallback callback);
+void hc_set_window_framebuffer_callback(struct HCWindow* window, HCWindowFramebufferCallback callback);
 
 /**
  * @brief Sets the window scale callback.
@@ -555,7 +568,7 @@ void hc_set_window_framebuffer_callback(struct HCWindow *window, HCWindowFramebu
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
  */
-void hc_set_window_scale_callback(struct HCWindow *window, HCWindowScaleCallback callback);
+void hc_set_window_scale_callback(struct HCWindow* window, HCWindowScaleCallback callback);
 
 /**
  * @brief Sets the mouse button callback.
@@ -565,7 +578,7 @@ void hc_set_window_scale_callback(struct HCWindow *window, HCWindowScaleCallback
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
  */
-void hc_set_window_mouse_button_callback(struct HCWindow *window, HCWindowMouseButtonCallback callback);
+void hc_set_window_mouse_button_callback(struct HCWindow* window, HCWindowMouseButtonCallback callback);
 
 /**
  * @brief Sets the cursor position callback.
@@ -575,7 +588,7 @@ void hc_set_window_mouse_button_callback(struct HCWindow *window, HCWindowMouseB
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
  */
-void hc_set_window_cursor_position_callback(struct HCWindow *window, HCWindowCursorPositionCallback callback);
+void hc_set_window_cursor_position_callback(struct HCWindow* window, HCWindowCursorPositionCallback callback);
 
 /**
  * @brief Sets the cursor enter callback.
@@ -585,7 +598,7 @@ void hc_set_window_cursor_position_callback(struct HCWindow *window, HCWindowCur
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
  */
-void hc_set_window_cursor_enter_callback(struct HCWindow *window, HCWindowCursorEnterCallback callback);
+void hc_set_window_cursor_enter_callback(struct HCWindow* window, HCWindowCursorEnterCallback callback);
 
 /**
  * @brief Sets the scroll callback.
@@ -595,7 +608,7 @@ void hc_set_window_cursor_enter_callback(struct HCWindow *window, HCWindowCursor
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
  */
-void hc_set_window_scroll_callback(struct HCWindow *window, HCWindowScrollCallback callback);
+void hc_set_window_scroll_callback(struct HCWindow* window, HCWindowScrollCallback callback);
 
 /**
  * @brief Sets the key callback.
@@ -605,7 +618,7 @@ void hc_set_window_scroll_callback(struct HCWindow *window, HCWindowScrollCallba
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
  */
-void hc_set_window_key_callback(struct HCWindow *window, HCWindowKeyCallback callback);
+void hc_set_window_key_callback(struct HCWindow* window, HCWindowKeyCallback callback);
 
 /**
  * @brief Sets the character callback.
@@ -615,7 +628,7 @@ void hc_set_window_key_callback(struct HCWindow *window, HCWindowKeyCallback cal
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
  */
-void hc_set_window_char_callback(struct HCWindow *window, HCWindowCharCallback callback);
+void hc_set_window_char_callback(struct HCWindow* window, HCWindowCharCallback callback);
 
 /**
  * @brief Sets the character with modifiers callback.
@@ -625,7 +638,7 @@ void hc_set_window_char_callback(struct HCWindow *window, HCWindowCharCallback c
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
  */
-void hc_set_window_char_mods_callback(struct HCWindow *window, HCWindowCharModsCallback callback);
+void hc_set_window_char_mods_callback(struct HCWindow* window, HCWindowCharModsCallback callback);
 
 /**
  * @brief Sets the window drop callback.
@@ -635,7 +648,7 @@ void hc_set_window_char_mods_callback(struct HCWindow *window, HCWindowCharModsC
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
  */
-void hc_set_window_drop_callback(struct HCWindow *window, HCWindowDropCallback callback);
+void hc_set_window_drop_callback(struct HCWindow* window, HCWindowDropCallback callback);
 
 //void hc_set_window_monitor_callback(struct HCWindow *window, HCWindowMonitorCallback callback);
 //

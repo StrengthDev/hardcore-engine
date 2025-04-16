@@ -2,9 +2,9 @@
 
 #ifdef HC_LOGGING
 
-#include <sstream>
-
 #include <core/log.h>
+
+#include <sstream>
 
 namespace hc {
 	/**
@@ -59,20 +59,20 @@ namespace hc {
     hc::log(kind, str.c_str());    \
 }(0)
 
-#define HC_TRACE(message) LOG_WRAPPER(HCLogKind::Trace, message)
-#define HC_DEBUG(message) LOG_WRAPPER(HCLogKind::Debug, message)
-#define HC_INFO(message) LOG_WRAPPER(HCLogKind::Info, message)
-#define HC_WARN(message) LOG_WRAPPER(HCLogKind::Warn, message)
-#define HC_ERROR(message) LOG_WRAPPER(HCLogKind::Error, message)
+#define HC_TRACE(message) LOG_WRAPPER(HCLogKind::HCLogKind_Trace, message)
+#define HC_DEBUG(message) LOG_WRAPPER(HCLogKind::HCLogKind_Debug, message)
+#define HC_INFO(message) LOG_WRAPPER(HCLogKind::HCLogKind_Info, message)
+#define HC_WARN(message) LOG_WRAPPER(HCLogKind::HCLogKind_Warn, message)
+#define HC_ERROR(message) LOG_WRAPPER(HCLogKind::HCLogKind_Error, message)
 
 #define CONCAT2(x, y) x ## y
 #define HC_SPAN_NAME(line) CONCAT2(span, line)
 
-#define HC_TRACE_SPAN(name) hc::Span HC_SPAN_NAME(__LINE__) (HCLogKind::Trace, name)
-#define HC_DEBUG_SPAN(name) hc::Span HC_SPAN_NAME(__LINE__) (HCLogKind::Debug, name)
-#define HC_INFO_SPAN(name) hc::Span HC_SPAN_NAME(__LINE__) (HCLogKind::Info, name)
-#define HC_WARN_SPAN(name) hc::Span HC_SPAN_NAME(__LINE__) (HCLogKind::Warn, name)
-#define HC_ERROR_SPAN(name) hc::Span HC_SPAN_NAME(__LINE__) (HCLogKind::Error, name)
+#define HC_TRACE_SPAN(name) hc::Span HC_SPAN_NAME(__LINE__) (HCLogKind::HCLogKind_Trace, name)
+#define HC_DEBUG_SPAN(name) hc::Span HC_SPAN_NAME(__LINE__) (HCLogKind::HCLogKind_Debug, name)
+#define HC_INFO_SPAN(name) hc::Span HC_SPAN_NAME(__LINE__) (HCLogKind::HCLogKind_Info, name)
+#define HC_WARN_SPAN(name) hc::Span HC_SPAN_NAME(__LINE__) (HCLogKind::HCLogKind_Warn, name)
+#define HC_ERROR_SPAN(name) hc::Span HC_SPAN_NAME(__LINE__) (HCLogKind::HCLogKind_Error, name)
 
 #else
 

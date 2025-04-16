@@ -10,17 +10,17 @@ extern "C" {
  * @brief The basic data type of a descriptor's field.
  */
 enum HCPrimitive {
-    U8, //!< An unsigned 8-bit integer.
-    U16, //!< An unsigned 16-bit integer.
-    U32, //!< An unsigned 32-bit integer.
-    U64, //!< An unsigned 64-bit integer.
-    I8, //!< An 8-bit integer.
-    I16, //!< A 16-bit integer.
-    I32, //!< A 32-bit integer.
-    I64, //!< A 64-bit integer.
-    F32, //!< A 32-bit floating point number.
-    F64, //!< A 64-bit floating point number.
-    B32, //!< A 32-bit boolean value.
+    HCPrimitive_U8, //!< An unsigned 8-bit integer.
+    HCPrimitive_U16, //!< An unsigned 16-bit integer.
+    HCPrimitive_U32, //!< An unsigned 32-bit integer.
+    HCPrimitive_U64, //!< An unsigned 64-bit integer.
+    HCPrimitive_I8, //!< An 8-bit integer.
+    HCPrimitive_I16, //!< A 16-bit integer.
+    HCPrimitive_I32, //!< A 32-bit integer.
+    HCPrimitive_I64, //!< A 64-bit integer.
+    HCPrimitive_F32, //!< A 32-bit floating point number.
+    HCPrimitive_F64, //!< A 64-bit floating point number.
+    HCPrimitive_B32, //!< A 32-bit boolean value.
 };
 
 /**
@@ -29,22 +29,22 @@ enum HCPrimitive {
  * ### Note on matrices
  *
  * The matrix layout used here matches the one used in GLSL, that is, a MatNxM matrix has N columns and M rows,
- * which is backward from convention in mathematics.
+ * which is backwards from convention in mathematics.
  */
 enum HCComposition {
-    Scalar, //!< A singular value.
-    Vec2, //!< A 2 element vector/array of values.
-    Vec3, //!< A 3 element vector/array of values.
-    Vec4, //!< A 4 element vector/array of values.
-    Mat2x2, //!< A 2x2 matrix of values.
-    Mat2x3, //!< A 2x3 matrix of values.
-    Mat2x4, //!< A 2x4 matrix of values.
-    Mat3x2, //!< A 3x2 matrix of values.
-    Mat3x3, //!< A 3x3 matrix of values.
-    Mat3x4, //!< A 3x4 matrix of values.
-    Mat4x2, //!< A 4x2 matrix of values.
-    Mat4x3, //!< A 4x3 matrix of values.
-    Mat4x4, //!< A 4x4 matrix of values.
+    HCComposition_Scalar, //!< A singular value.
+    HCComposition_Vec2, //!< A 2 element vector/array of values.
+    HCComposition_Vec3, //!< A 3 element vector/array of values.
+    HCComposition_Vec4, //!< A 4 element vector/array of values.
+    HCComposition_Mat2x2, //!< A 2x2 matrix of values.
+    HCComposition_Mat2x3, //!< A 2x3 matrix of values.
+    HCComposition_Mat2x4, //!< A 2x4 matrix of values.
+    HCComposition_Mat3x2, //!< A 3x2 matrix of values.
+    HCComposition_Mat3x3, //!< A 3x3 matrix of values.
+    HCComposition_Mat3x4, //!< A 3x4 matrix of values.
+    HCComposition_Mat4x2, //!< A 4x2 matrix of values.
+    HCComposition_Mat4x3, //!< A 4x3 matrix of values.
+    HCComposition_Mat4x4, //!< A 4x4 matrix of values.
 };
 
 /**
@@ -59,9 +59,9 @@ struct HCField {
  * @brief TODO
  */
 enum HCAlignment {
-    Unknown,
-    Std140,
-    Std430,
+    HCAlignment_Unknown,
+    HCAlignment_Std140,
+    HCAlignment_Std430,
 };
 
 /**

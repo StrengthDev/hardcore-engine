@@ -5,29 +5,29 @@
 #include <core/window.h>
 #include <core/window.hpp>
 #include <core/log.hpp>
-#include <util/number.hpp>
 #include <render/renderer.hpp>
+#include <util/number.hpp>
 
 namespace hc {
     inline HCMouseButton from_glfw_button(int button) {
 #ifndef HC_UNSAFE_TYPE_CASTS
         switch (button) {
         case GLFW_MOUSE_BUTTON_1:
-            return HCMouseButton::Button1;
+            return HCMouseButton::HCMouseButton_Button1;
         case GLFW_MOUSE_BUTTON_2:
-            return HCMouseButton::Button2;
+            return HCMouseButton::HCMouseButton_Button2;
         case GLFW_MOUSE_BUTTON_3:
-            return HCMouseButton::Button3;
+            return HCMouseButton::HCMouseButton_Button3;
         case GLFW_MOUSE_BUTTON_4:
-            return HCMouseButton::Button4;
+            return HCMouseButton::HCMouseButton_Button4;
         case GLFW_MOUSE_BUTTON_5:
-            return HCMouseButton::Button5;
+            return HCMouseButton::HCMouseButton_Button5;
         case GLFW_MOUSE_BUTTON_6:
-            return HCMouseButton::Button6;
+            return HCMouseButton::HCMouseButton_Button6;
         case GLFW_MOUSE_BUTTON_7:
-            return HCMouseButton::Button7;
+            return HCMouseButton::HCMouseButton_Button7;
         case GLFW_MOUSE_BUTTON_8:
-            return HCMouseButton::Button8;
+            return HCMouseButton::HCMouseButton_Button8;
         default:
             return HCMouseButton{};
         }
@@ -40,11 +40,11 @@ namespace hc {
 #ifndef HC_UNSAFE_TYPE_CASTS
         switch (action) {
         case GLFW_RELEASE:
-            return HCButtonAction::Release;
+            return HCButtonAction::HCButtonAction_Release;
         case GLFW_PRESS:
-            return HCButtonAction::Press;
+            return HCButtonAction::HCButtonAction_Press;
         case GLFW_REPEAT:
-            return HCButtonAction::Repeat;
+            return HCButtonAction::HCButtonAction_Repeat;
         default:
             return HCButtonAction{};
         }
@@ -57,245 +57,245 @@ namespace hc {
 #ifndef HC_UNSAFE_TYPE_CASTS
         switch (key) {
         case GLFW_KEY_SPACE:
-            return HCKeyboardKey::Space;
+            return HCKeyboardKey::HCKeyboardKey_Space;
         case GLFW_KEY_APOSTROPHE:
-            return HCKeyboardKey::Apostrophe;
+            return HCKeyboardKey::HCKeyboardKey_Apostrophe;
         case GLFW_KEY_COMMA:
-            return HCKeyboardKey::Comma;
+            return HCKeyboardKey::HCKeyboardKey_Comma;
         case GLFW_KEY_MINUS:
-            return HCKeyboardKey::Minus;
+            return HCKeyboardKey::HCKeyboardKey_Minus;
         case GLFW_KEY_PERIOD:
-            return HCKeyboardKey::Period;
+            return HCKeyboardKey::HCKeyboardKey_Period;
         case GLFW_KEY_SLASH:
-            return HCKeyboardKey::Slash;
+            return HCKeyboardKey::HCKeyboardKey_Slash;
         case GLFW_KEY_0:
-            return HCKeyboardKey::Num0;
+            return HCKeyboardKey::HCKeyboardKey_Num0;
         case GLFW_KEY_1:
-            return HCKeyboardKey::Num1;
+            return HCKeyboardKey::HCKeyboardKey_Num1;
         case GLFW_KEY_2:
-            return HCKeyboardKey::Num2;
+            return HCKeyboardKey::HCKeyboardKey_Num2;
         case GLFW_KEY_3:
-            return HCKeyboardKey::Num3;
+            return HCKeyboardKey::HCKeyboardKey_Num3;
         case GLFW_KEY_4:
-            return HCKeyboardKey::Num4;
+            return HCKeyboardKey::HCKeyboardKey_Num4;
         case GLFW_KEY_5:
-            return HCKeyboardKey::Num5;
+            return HCKeyboardKey::HCKeyboardKey_Num5;
         case GLFW_KEY_6:
-            return HCKeyboardKey::Num6;
+            return HCKeyboardKey::HCKeyboardKey_Num6;
         case GLFW_KEY_7:
-            return HCKeyboardKey::Num7;
+            return HCKeyboardKey::HCKeyboardKey_Num7;
         case GLFW_KEY_8:
-            return HCKeyboardKey::Num8;
+            return HCKeyboardKey::HCKeyboardKey_Num8;
         case GLFW_KEY_9:
-            return HCKeyboardKey::Num9;
+            return HCKeyboardKey::HCKeyboardKey_Num9;
         case GLFW_KEY_SEMICOLON:
-            return HCKeyboardKey::Semicolon;
+            return HCKeyboardKey::HCKeyboardKey_Semicolon;
         case GLFW_KEY_EQUAL:
-            return HCKeyboardKey::Equal;
+            return HCKeyboardKey::HCKeyboardKey_Equal;
         case GLFW_KEY_A:
-            return HCKeyboardKey::A;
+            return HCKeyboardKey::HCKeyboardKey_A;
         case GLFW_KEY_B:
-            return HCKeyboardKey::B;
+            return HCKeyboardKey::HCKeyboardKey_B;
         case GLFW_KEY_C:
-            return HCKeyboardKey::C;
+            return HCKeyboardKey::HCKeyboardKey_C;
         case GLFW_KEY_D:
-            return HCKeyboardKey::D;
+            return HCKeyboardKey::HCKeyboardKey_D;
         case GLFW_KEY_E:
-            return HCKeyboardKey::E;
+            return HCKeyboardKey::HCKeyboardKey_E;
         case GLFW_KEY_F:
-            return HCKeyboardKey::F;
+            return HCKeyboardKey::HCKeyboardKey_F;
         case GLFW_KEY_G:
-            return HCKeyboardKey::G;
+            return HCKeyboardKey::HCKeyboardKey_G;
         case GLFW_KEY_H:
-            return HCKeyboardKey::H;
+            return HCKeyboardKey::HCKeyboardKey_H;
         case GLFW_KEY_I:
-            return HCKeyboardKey::I;
+            return HCKeyboardKey::HCKeyboardKey_I;
         case GLFW_KEY_J:
-            return HCKeyboardKey::J;
+            return HCKeyboardKey::HCKeyboardKey_J;
         case GLFW_KEY_K:
-            return HCKeyboardKey::K;
+            return HCKeyboardKey::HCKeyboardKey_K;
         case GLFW_KEY_L:
-            return HCKeyboardKey::L;
+            return HCKeyboardKey::HCKeyboardKey_L;
         case GLFW_KEY_M:
-            return HCKeyboardKey::M;
+            return HCKeyboardKey::HCKeyboardKey_M;
         case GLFW_KEY_N:
-            return HCKeyboardKey::N;
+            return HCKeyboardKey::HCKeyboardKey_N;
         case GLFW_KEY_O:
-            return HCKeyboardKey::O;
+            return HCKeyboardKey::HCKeyboardKey_O;
         case GLFW_KEY_P:
-            return HCKeyboardKey::P;
+            return HCKeyboardKey::HCKeyboardKey_P;
         case GLFW_KEY_Q:
-            return HCKeyboardKey::Q;
+            return HCKeyboardKey::HCKeyboardKey_Q;
         case GLFW_KEY_R:
-            return HCKeyboardKey::R;
+            return HCKeyboardKey::HCKeyboardKey_R;
         case GLFW_KEY_S:
-            return HCKeyboardKey::S;
+            return HCKeyboardKey::HCKeyboardKey_S;
         case GLFW_KEY_T:
-            return HCKeyboardKey::T;
+            return HCKeyboardKey::HCKeyboardKey_T;
         case GLFW_KEY_U:
-            return HCKeyboardKey::U;
+            return HCKeyboardKey::HCKeyboardKey_U;
         case GLFW_KEY_V:
-            return HCKeyboardKey::V;
+            return HCKeyboardKey::HCKeyboardKey_V;
         case GLFW_KEY_W:
-            return HCKeyboardKey::W;
+            return HCKeyboardKey::HCKeyboardKey_W;
         case GLFW_KEY_X:
-            return HCKeyboardKey::X;
+            return HCKeyboardKey::HCKeyboardKey_X;
         case GLFW_KEY_Y:
-            return HCKeyboardKey::Y;
+            return HCKeyboardKey::HCKeyboardKey_Y;
         case GLFW_KEY_Z:
-            return HCKeyboardKey::Z;
+            return HCKeyboardKey::HCKeyboardKey_Z;
         case GLFW_KEY_LEFT_BRACKET:
-            return HCKeyboardKey::LeftBracket;
+            return HCKeyboardKey::HCKeyboardKey_LeftBracket;
         case GLFW_KEY_BACKSLASH:
-            return HCKeyboardKey::Backslash;
+            return HCKeyboardKey::HCKeyboardKey_Backslash;
         case GLFW_KEY_RIGHT_BRACKET:
-            return HCKeyboardKey::RightBracket;
+            return HCKeyboardKey::HCKeyboardKey_RightBracket;
         case GLFW_KEY_GRAVE_ACCENT:
-            return HCKeyboardKey::GraveAccent;
+            return HCKeyboardKey::HCKeyboardKey_GraveAccent;
         case GLFW_KEY_WORLD_1:
-            return HCKeyboardKey::World1;
+            return HCKeyboardKey::HCKeyboardKey_World1;
         case GLFW_KEY_WORLD_2:
-            return HCKeyboardKey::World2;
+            return HCKeyboardKey::HCKeyboardKey_World2;
         case GLFW_KEY_ESCAPE:
-            return HCKeyboardKey::Escape;
+            return HCKeyboardKey::HCKeyboardKey_Escape;
         case GLFW_KEY_ENTER:
-            return HCKeyboardKey::Enter;
+            return HCKeyboardKey::HCKeyboardKey_Enter;
         case GLFW_KEY_TAB:
-            return HCKeyboardKey::Tab;
+            return HCKeyboardKey::HCKeyboardKey_Tab;
         case GLFW_KEY_BACKSPACE:
-            return HCKeyboardKey::Backspace;
+            return HCKeyboardKey::HCKeyboardKey_Backspace;
         case GLFW_KEY_INSERT:
-            return HCKeyboardKey::Insert;
+            return HCKeyboardKey::HCKeyboardKey_Insert;
         case GLFW_KEY_DELETE:
-            return HCKeyboardKey::Delete;
+            return HCKeyboardKey::HCKeyboardKey_Delete;
         case GLFW_KEY_RIGHT:
-            return HCKeyboardKey::Right;
+            return HCKeyboardKey::HCKeyboardKey_Right;
         case GLFW_KEY_LEFT:
-            return HCKeyboardKey::Left;
+            return HCKeyboardKey::HCKeyboardKey_Left;
         case GLFW_KEY_DOWN:
-            return HCKeyboardKey::Down;
+            return HCKeyboardKey::HCKeyboardKey_Down;
         case GLFW_KEY_UP:
-            return HCKeyboardKey::Up;
+            return HCKeyboardKey::HCKeyboardKey_Up;
         case GLFW_KEY_PAGE_UP:
-            return HCKeyboardKey::PageUp;
+            return HCKeyboardKey::HCKeyboardKey_PageUp;
         case GLFW_KEY_PAGE_DOWN:
-            return HCKeyboardKey::PageDown;
+            return HCKeyboardKey::HCKeyboardKey_PageDown;
         case GLFW_KEY_HOME:
-            return HCKeyboardKey::Home;
+            return HCKeyboardKey::HCKeyboardKey_Home;
         case GLFW_KEY_END:
-            return HCKeyboardKey::End;
+            return HCKeyboardKey::HCKeyboardKey_End;
         case GLFW_KEY_CAPS_LOCK:
-            return HCKeyboardKey::CapsLock;
+            return HCKeyboardKey::HCKeyboardKey_CapsLock;
         case GLFW_KEY_SCROLL_LOCK:
-            return HCKeyboardKey::ScrollLock;
+            return HCKeyboardKey::HCKeyboardKey_ScrollLock;
         case GLFW_KEY_NUM_LOCK:
-            return HCKeyboardKey::NumLock;
+            return HCKeyboardKey::HCKeyboardKey_NumLock;
         case GLFW_KEY_PRINT_SCREEN:
-            return HCKeyboardKey::PrintScreen;
+            return HCKeyboardKey::HCKeyboardKey_PrintScreen;
         case GLFW_KEY_PAUSE:
-            return HCKeyboardKey::Pause;
+            return HCKeyboardKey::HCKeyboardKey_Pause;
         case GLFW_KEY_F1:
-            return HCKeyboardKey::F1;
+            return HCKeyboardKey::HCKeyboardKey_F1;
         case GLFW_KEY_F2:
-            return HCKeyboardKey::F2;
+            return HCKeyboardKey::HCKeyboardKey_F2;
         case GLFW_KEY_F3:
-            return HCKeyboardKey::F3;
+            return HCKeyboardKey::HCKeyboardKey_F3;
         case GLFW_KEY_F4:
-            return HCKeyboardKey::F4;
+            return HCKeyboardKey::HCKeyboardKey_F4;
         case GLFW_KEY_F5:
-            return HCKeyboardKey::F5;
+            return HCKeyboardKey::HCKeyboardKey_F5;
         case GLFW_KEY_F6:
-            return HCKeyboardKey::F6;
+            return HCKeyboardKey::HCKeyboardKey_F6;
         case GLFW_KEY_F7:
-            return HCKeyboardKey::F7;
+            return HCKeyboardKey::HCKeyboardKey_F7;
         case GLFW_KEY_F8:
-            return HCKeyboardKey::F8;
+            return HCKeyboardKey::HCKeyboardKey_F8;
         case GLFW_KEY_F9:
-            return HCKeyboardKey::F9;
+            return HCKeyboardKey::HCKeyboardKey_F9;
         case GLFW_KEY_F10:
-            return HCKeyboardKey::F10;
+            return HCKeyboardKey::HCKeyboardKey_F10;
         case GLFW_KEY_F11:
-            return HCKeyboardKey::F11;
+            return HCKeyboardKey::HCKeyboardKey_F11;
         case GLFW_KEY_F12:
-            return HCKeyboardKey::F12;
+            return HCKeyboardKey::HCKeyboardKey_F12;
         case GLFW_KEY_F13:
-            return HCKeyboardKey::F13;
+            return HCKeyboardKey::HCKeyboardKey_F13;
         case GLFW_KEY_F14:
-            return HCKeyboardKey::F14;
+            return HCKeyboardKey::HCKeyboardKey_F14;
         case GLFW_KEY_F15:
-            return HCKeyboardKey::F15;
+            return HCKeyboardKey::HCKeyboardKey_F15;
         case GLFW_KEY_F16:
-            return HCKeyboardKey::F16;
+            return HCKeyboardKey::HCKeyboardKey_F16;
         case GLFW_KEY_F17:
-            return HCKeyboardKey::F17;
+            return HCKeyboardKey::HCKeyboardKey_F17;
         case GLFW_KEY_F18:
-            return HCKeyboardKey::F18;
+            return HCKeyboardKey::HCKeyboardKey_F18;
         case GLFW_KEY_F19:
-            return HCKeyboardKey::F19;
+            return HCKeyboardKey::HCKeyboardKey_F19;
         case GLFW_KEY_F20:
-            return HCKeyboardKey::F20;
+            return HCKeyboardKey::HCKeyboardKey_F20;
         case GLFW_KEY_F21:
-            return HCKeyboardKey::F21;
+            return HCKeyboardKey::HCKeyboardKey_F21;
         case GLFW_KEY_F22:
-            return HCKeyboardKey::F22;
+            return HCKeyboardKey::HCKeyboardKey_F22;
         case GLFW_KEY_F23:
-            return HCKeyboardKey::F23;
+            return HCKeyboardKey::HCKeyboardKey_F23;
         case GLFW_KEY_F24:
-            return HCKeyboardKey::F24;
+            return HCKeyboardKey::HCKeyboardKey_F24;
         case GLFW_KEY_F25:
-            return HCKeyboardKey::F25;
+            return HCKeyboardKey::HCKeyboardKey_F25;
         case GLFW_KEY_KP_0:
-            return HCKeyboardKey::Numpad0;
+            return HCKeyboardKey::HCKeyboardKey_Numpad0;
         case GLFW_KEY_KP_1:
-            return HCKeyboardKey::Numpad1;
+            return HCKeyboardKey::HCKeyboardKey_Numpad1;
         case GLFW_KEY_KP_2:
-            return HCKeyboardKey::Numpad2;
+            return HCKeyboardKey::HCKeyboardKey_Numpad2;
         case GLFW_KEY_KP_3:
-            return HCKeyboardKey::Numpad3;
+            return HCKeyboardKey::HCKeyboardKey_Numpad3;
         case GLFW_KEY_KP_4:
-            return HCKeyboardKey::Numpad4;
+            return HCKeyboardKey::HCKeyboardKey_Numpad4;
         case GLFW_KEY_KP_5:
-            return HCKeyboardKey::Numpad5;
+            return HCKeyboardKey::HCKeyboardKey_Numpad5;
         case GLFW_KEY_KP_6:
-            return HCKeyboardKey::Numpad6;
+            return HCKeyboardKey::HCKeyboardKey_Numpad6;
         case GLFW_KEY_KP_7:
-            return HCKeyboardKey::Numpad7;
+            return HCKeyboardKey::HCKeyboardKey_Numpad7;
         case GLFW_KEY_KP_8:
-            return HCKeyboardKey::Numpad8;
+            return HCKeyboardKey::HCKeyboardKey_Numpad8;
         case GLFW_KEY_KP_9:
-            return HCKeyboardKey::Numpad9;
+            return HCKeyboardKey::HCKeyboardKey_Numpad9;
         case GLFW_KEY_KP_DECIMAL:
-            return HCKeyboardKey::NumpadDecimal;
+            return HCKeyboardKey::HCKeyboardKey_NumpadDecimal;
         case GLFW_KEY_KP_DIVIDE:
-            return HCKeyboardKey::NumpadDivide;
+            return HCKeyboardKey::HCKeyboardKey_NumpadDivide;
         case GLFW_KEY_KP_MULTIPLY:
-            return HCKeyboardKey::NumpadMultiply;
+            return HCKeyboardKey::HCKeyboardKey_NumpadMultiply;
         case GLFW_KEY_KP_SUBTRACT:
-            return HCKeyboardKey::NumpadSubtract;
+            return HCKeyboardKey::HCKeyboardKey_NumpadSubtract;
         case GLFW_KEY_KP_ADD:
-            return HCKeyboardKey::NumpadAdd;
+            return HCKeyboardKey::HCKeyboardKey_NumpadAdd;
         case GLFW_KEY_KP_ENTER:
-            return HCKeyboardKey::NumpadEnter;
+            return HCKeyboardKey::HCKeyboardKey_NumpadEnter;
         case GLFW_KEY_KP_EQUAL:
-            return HCKeyboardKey::NumpadEqual;
+            return HCKeyboardKey::HCKeyboardKey_NumpadEqual;
         case GLFW_KEY_LEFT_SHIFT:
-            return HCKeyboardKey::LeftShift;
+            return HCKeyboardKey::HCKeyboardKey_LeftShift;
         case GLFW_KEY_LEFT_CONTROL:
-            return HCKeyboardKey::LeftControl;
+            return HCKeyboardKey::HCKeyboardKey_LeftControl;
         case GLFW_KEY_LEFT_ALT:
-            return HCKeyboardKey::LeftAlt;
+            return HCKeyboardKey::HCKeyboardKey_LeftAlt;
         case GLFW_KEY_LEFT_SUPER:
-            return HCKeyboardKey::LeftSuper;
+            return HCKeyboardKey::HCKeyboardKey_LeftSuper;
         case GLFW_KEY_RIGHT_SHIFT:
-            return HCKeyboardKey::RightShift;
+            return HCKeyboardKey::HCKeyboardKey_RightShift;
         case GLFW_KEY_RIGHT_CONTROL:
-            return HCKeyboardKey::RightControl;
+            return HCKeyboardKey::HCKeyboardKey_RightControl;
         case GLFW_KEY_RIGHT_ALT:
-            return HCKeyboardKey::RightAlt;
+            return HCKeyboardKey::HCKeyboardKey_RightAlt;
         case GLFW_KEY_RIGHT_SUPER:
-            return HCKeyboardKey::RightSuper;
+            return HCKeyboardKey::HCKeyboardKey_RightSuper;
         case GLFW_KEY_MENU:
-            return HCKeyboardKey::Menu;
+            return HCKeyboardKey::HCKeyboardKey_Menu;
         default:
             return HCKeyboardKey{};
         }
@@ -308,9 +308,9 @@ namespace hc {
 #ifndef HC_UNSAFE_TYPE_CASTS
         switch (event) {
         case GLFW_CONNECTED:
-            return HCDeviceEvent::Connected;
+            return HCDeviceEvent::HCDeviceEvent_Connected;
         case GLFW_DISCONNECTED:
-            return HCDeviceEvent::Disconnected;
+            return HCDeviceEvent::HCDeviceEvent_Disconnected;
         default:
             return HCDeviceEvent{};
         }
@@ -386,7 +386,9 @@ HCWindow hc_new_window(HCWindowParams params) {
     }
 
     auto device_res = hc::render::device_at(params.device);
-    if (!device_res) return INVALID_WINDOW;
+    if (!device_res) {
+        return INVALID_WINDOW;
+    }
     auto device_ptr = device_res.ok();
 
     GLFWwindow* window = glfwCreateWindow(
@@ -419,8 +421,11 @@ HCWindow hc_new_window(HCWindowParams params) {
     std::ranges::sort(ids);
     Sz id = 0;
     for (auto item : ids) {
-        if (id == item) id++;
-        else break;
+        if (id == item) {
+            id++;
+        } else {
+            break;
+        }
     }
 
     StaticWindow static_window;
@@ -434,7 +439,9 @@ HCWindow hc_new_window(HCWindowParams params) {
 }
 
 void hc_destroy_window(HCWindow* window) {
-    if (!window || !window->handle) return;
+    if (!window || !window->handle) {
+        return;
+    }
 
     HC_INFO("Window " << window->id << " marked for destruction (handle: " << window->handle << ')');
     auto* handle = static_cast<GLFWwindow*>(window->handle);

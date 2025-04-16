@@ -1,6 +1,7 @@
 use crate::context::Context;
-use crate::resource::descriptor::{CDescriptorError, Descriptor, Primitive};
+use crate::resource::descriptor::{CDescriptorError, Descriptor, PrimitiveExt};
 use hardcore_sys;
+use hardcore_sys::Primitive;
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
 use std::ops::{Deref, DerefMut};
