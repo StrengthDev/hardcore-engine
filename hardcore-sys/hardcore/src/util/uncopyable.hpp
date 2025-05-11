@@ -1,8 +1,8 @@
 #pragma once
 
-#include <utility>
-
 #include "flow.hpp"
+
+#include <utility>
 
 // TODO rename to Unique
 
@@ -15,37 +15,38 @@
  * @tparam T The type of the inner value.
  * @tparam DEFAULT The default value assigned by the default constructor, move constructor and move assignment.
  */
-template<typename T, T DEFAULT>
+template <typename T, T DEFAULT>
 class Uncopyable {
 public:
-	Uncopyable() = default;
+    Uncopyable() = default;
 
-	/**
-	* @brief Implicit value constructor.
-	*
-	* @param value The value to assign to this uncopyable variable.
-	*/
+    /**
+    * @brief Implicit value constructor.
+    *
+    * @param value The value to assign to this uncopyable variable.
+    */
 
-	Uncopyable(const T &value) : value(value) { ; } // NOLINT(*-explicit-constructor) intentionally implicit
+    Uncopyable(const T& value) : value(value) { ; } // NOLINT(*-explicit-constructor) intentionally implicit
 
-	Uncopyable(const Uncopyable &) = delete;
+    Uncopyable(const Uncopyable&) = delete;
 
-	Uncopyable &operator=(const Uncopyable &) = delete;
+    Uncopyable& operator=(const Uncopyable&) = delete;
 
-	Uncopyable(Uncopyable &&other) noexcept: value(std::exchange(other.value, DEFAULT)) {
-	}
+    Uncopyable(Uncopyable&& other) noexcept
+        : value(std::exchange(other.value, DEFAULT)) {
+    }
 
-	Uncopyable &operator=(Uncopyable &&other) noexcept {
-		this->value = std::exchange(other.value, DEFAULT);
-		return *this;
-	}
+    Uncopyable& operator=(Uncopyable&& other) noexcept {
+        this->value = std::exchange(other.value, DEFAULT);
+        return *this;
+    }
 
-	operator T() const { return value; } // NOLINT(*-explicit-constructor) intentionally implicit
+    operator T() const { return value; } // NOLINT(*-explicit-constructor) intentionally implicit
 
-	operator T &() { return value; } // NOLINT(*-explicit-constructor) intentionally implicit
+    operator T&() { return value; } // NOLINT(*-explicit-constructor) intentionally implicit
 
 private:
-	T value = DEFAULT;
+    T value = DEFAULT;
 };
 
 /**
@@ -56,51 +57,54 @@ private:
  * When a move occurs, the object that got moved from is assigned the specified default value.
  *
  * Unlike an `Uncopyable` when moving into a value that has already been assigned, the program SHOULD crash. "Should"
- * because this type is only used internally, any related errors should be easily caught in debug builds.
+ * because this type is only used internally, any related errors should be easily caught in debug builds. Additionally,
+ * objects of this type must be manually "destroyed" before expiring, as they are used to hold manually managed
+ * resources, such as Vulkan handles.
  *
  * @tparam T The type of the inner value.
  * @tparam DEFAULT The default value assigned by the default constructor, move constructor and move assignment.
  */
-template<typename T, T DEFAULT>
+template <typename T, T DEFAULT>
 class ExternalHandle {
 public:
-	ExternalHandle() = default;
+    ExternalHandle() = default;
 
-	/**
-	* @brief Implicit value constructor.
-	*
-	* @param value The value to assign to this external handle.
-	*/
-	ExternalHandle(const T &value) : value(value) { ; } // NOLINT(*-explicit-constructor) intentionally implicit
+    /**
+    * @brief Implicit value constructor.
+    *
+    * @param value The value to assign to this external handle.
+    */
+    ExternalHandle(const T& value) : value(value) { ; } // NOLINT(*-explicit-constructor) intentionally implicit
 
-	~ExternalHandle() {
-		HC_ASSERT(this->value == DEFAULT, "Inner value must be externally cleaned up");
-	}
+    ~ExternalHandle() {
+        HC_ASSERT(this->value == DEFAULT, "Inner value must be externally cleaned up");
+    }
 
-	ExternalHandle(const ExternalHandle &) = delete;
+    ExternalHandle(const ExternalHandle&) = delete;
 
-	ExternalHandle &operator=(const ExternalHandle &) = delete;
+    ExternalHandle& operator=(const ExternalHandle&) = delete;
 
-	ExternalHandle(ExternalHandle &&other) noexcept: value(std::exchange(other.value, DEFAULT)) {
-	}
+    ExternalHandle(ExternalHandle&& other) noexcept
+        : value(std::exchange(other.value, DEFAULT)) {
+    }
 
-	ExternalHandle &operator=(ExternalHandle &&other) noexcept {
-		HC_ASSERT(this->value == DEFAULT, "Inner value cannot be overwritten if already assigned");
-		this->value = std::exchange(other.value, DEFAULT);
-		return *this;
-	}
+    ExternalHandle& operator=(ExternalHandle&& other) noexcept {
+        HC_ASSERT(this->value == DEFAULT, "Inner value cannot be overwritten if already assigned");
+        this->value = std::exchange(other.value, DEFAULT);
+        return *this;
+    }
 
-	operator T() const { return value; } // NOLINT(*-explicit-constructor) intentionally implicit
+    operator T() const { return value; } // NOLINT(*-explicit-constructor) intentionally implicit
 
-	operator T &() { return value; } // NOLINT(*-explicit-constructor) intentionally implicit
+    operator T&() { return value; } // NOLINT(*-explicit-constructor) intentionally implicit
 
-	/**
-	* @brief "Destroy" this handle by setting it to the default value.
-	*/
-	void destroy() {
-		this->value = DEFAULT;
-	}
+    /**
+    * @brief "Destroy" this handle by setting it to the default value.
+    */
+    void destroy() {
+        this->value = DEFAULT;
+    }
 
 private:
-	T value = DEFAULT;
+    T value = DEFAULT;
 };

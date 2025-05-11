@@ -71,7 +71,7 @@ void hc_destroy_buffer(struct HCBuffer* buffer);
  *
  * Unlike regular buffers, dynamic buffers may be written to directly by the host.
  *
- * Just like is the case with `HCRDataBuffer`, every field of this struct MUST be treated as const, and thus, not
+ * Just like is the case with `HCBuffer`, every field of this struct MUST be treated as const, and thus, not
  * altered throughout its lifetime.
  *
  * This struct should never be created directly. Instead, `hc_new_dynamic_buffer` or `hc_new_dynamic_index_buffer`

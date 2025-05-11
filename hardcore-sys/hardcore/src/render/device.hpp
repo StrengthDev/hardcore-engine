@@ -7,6 +7,7 @@
 #include "device/swapchain.hpp"
 #include "resource/descriptor.hpp"
 #include "resource/buffer.hpp"
+#include "resource/texture.hpp"
 
 #include <core/glfw.hpp>
 
@@ -21,6 +22,7 @@ namespace hc::render {
         SurfaceFailure,
         SwapchainFailure,
         AllocFailure,
+        TextureFailure,
     };
 
     class Device {
@@ -75,8 +77,15 @@ namespace hc::render {
 
         void destroy_buffer(u64 id);
 
+        [[nodiscard]] std::expected<texture::Params, DeviceResult> create_texture(VkImageCreateInfo const& image_info);
+
+        void destroy_texture(u64 id);
+
     private:
         Device() = default;
+
+        void cleanup(u8 frame_mod);
+        void present(u8 frame_mod);
 
         ExternalHandle<VkPhysicalDevice, VK_NULL_HANDLE> physical_handle;
         VkPhysicalDeviceProperties properties = {};

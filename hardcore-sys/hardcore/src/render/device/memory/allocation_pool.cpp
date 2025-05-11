@@ -16,7 +16,9 @@ namespace hc::render::device::memory {
             .slot_idx = invalid_idx,
         };
 
-        if (this->total_capacity < size) return invalid_spec;
+        if (this->total_capacity < size) {
+            return invalid_spec;
+        }
 
         if (this->slots.size() - 1 < this->largest_free_slot || this->slots[this->largest_free_slot].in_use) {
             // Largest free slot is unknown, must check everything, look for smallest possible fit
@@ -28,22 +30,26 @@ namespace hc::render::device::memory {
             u32 min_idx = invalid_idx;
 
             for (u32 i = 0; i < this->slots.size(); i++) {
-                if (this->slots[i].in_use) continue;
+                if (this->slots[i].in_use) {
+                    continue;
+                }
 
                 if (max_size < this->slots[i].size) {
                     max_size = this->slots[i].size;
                     max_idx = i;
                 }
 
-                if (min_size > this->slots[i].size && size + alignment_pad(this->slots[i].offset, alignment) <= this->
-                    slots[i].size) {
+                if (min_size > this->slots[i].size
+                    && size + alignment_pad(this->slots[i].offset, alignment) <= this->slots[i].size) {
                     min_size = this->slots[i].size;
                     min_idx = i;
                 }
             }
 
             if (min_idx != invalid_idx) {
-                if (max_idx != invalid_idx && max_idx != min_idx) this->largest_free_slot = max_idx;
+                if (max_idx != invalid_idx && max_idx != min_idx) {
+                    this->largest_free_slot = max_idx;
+                }
 
                 return {
                     .range = {
@@ -54,7 +60,9 @@ namespace hc::render::device::memory {
                     .slot_idx = min_idx,
                 };
             } else {
-                if (max_idx != invalid_idx) this->largest_free_slot = max_idx;
+                if (max_idx != invalid_idx) {
+                    this->largest_free_slot = max_idx;
+                }
 
                 return invalid_spec;
             }
@@ -62,7 +70,9 @@ namespace hc::render::device::memory {
             // Largest free slot is known, so if it is large enough, assign a slot in this pool,
             // otherwise move on to next pool
 
-            if (this->slots[this->largest_free_slot].size < size) return invalid_spec;
+            if (this->slots[this->largest_free_slot].size < size) {
+                return invalid_spec;
+            }
 
             VkDeviceSize min_size = std::numeric_limits<VkDeviceSize>::max();
             u32 min_idx = invalid_idx;
@@ -88,6 +98,49 @@ namespace hc::render::device::memory {
         }
     }
 
+    std::optional<PoolRange> AllocationPool::allocate(VkDeviceSize size, VkDeviceSize alignment) {
+        auto const [range, slot_idx] = this->search(size, alignment);
+
+        if (!range.size) {
+            return std::nullopt;
+        }
+
+        size += range.padding;
+
+        HC_ASSERT(slot_idx < this->slots.size(), "Slot index out of bounds");
+        HC_ASSERT(!this->slots[slot_idx].in_use, "Slot must not already be in use");
+        HC_ASSERT(size <= this->slots[slot_idx].size, "Allocation size greater than slot size");
+        HC_ASSERT(slot_idx == 0 || this->slots[slot_idx - 1].in_use, "Slot before a selected slot must be in use");
+
+        if (size < this->slots[slot_idx].size) {
+            if (slot_idx + 1 < this->slots.size()) {
+                // Check if the next slot is already an empty slot we can use
+                if (this->slots[slot_idx + 1].size != 0) {
+                    // Check if we need to insert a new empty slot, or have one already at the end that we can use
+                    if (this->slots.back().size == 0) {
+                        auto begin_it = this->slots.rbegin() + (this->slots.size() - slot_idx - 2);
+                        auto middle_it = begin_it + 1;
+                        auto end_it = this->slots.rbegin() + 1;
+
+                        std::rotate(begin_it, middle_it, end_it);
+                    } else {
+                        this->slots.emplace(this->slots.begin() + slot_idx + 1);
+                    }
+                }
+            } else {
+                this->slots.emplace(this->slots.begin() + (slot_idx + 1));
+            }
+
+            this->slots[slot_idx + 1].offset = this->slots[slot_idx].offset + size;
+            this->slots[slot_idx + 1].size = this->slots[slot_idx].size - size;
+            this->slots[slot_idx].size = size;
+        }
+
+        this->slots[slot_idx].in_use = true;
+
+        return range;
+    }
+
     void AllocationPool::free_allocation(VkDeviceSize offset) {
         auto slot_opt = find_slot(offset);
         HC_ASSERT(slot_opt, "A slot with the given offset should exist");
@@ -102,37 +155,41 @@ namespace hc::render::device::memory {
         }
 
         // If there is free space before the slot, take the space from the freed slot and put it there
-        if (slot_idx != 0) {
+        if (0 < slot_idx) {
             u32 left_free = slot_idx;
-            while (0 < left_free && !this->slots[left_free - 1].in_use) left_free--;
+            while (0 < left_free && !this->slots[left_free - 1].in_use) {
+                left_free--;
+            }
 
             if (left_free != slot_idx) {
                 this->slots[left_free].size += this->slots[slot_idx].size;
                 this->slots[slot_idx].size = 0;
+
+                if (0 < left_free) {
+                    this->slots[left_free].offset = this->slots[left_free - 1].offset + this->slots[left_free - 1].size;
+                }
             }
         }
     }
 
     std::optional<u32> AllocationPool::find_slot(VkDeviceSize offset) const noexcept {
-        u32 slot_idx = 0;
-
+        HC_ASSERT(
+            this->slots.size() <= std::numeric_limits<u32>::max(),
+            "Number of slots should never go over the u32 max"
+        );
         // TODO this is probably an inefficient way to look for the slot
-        for (const Slot& slot : this->slots) {
-            if (offset <= slot.offset) {
-                if (slot.offset == offset) {
-                    if (slot.in_use) break;
-                    else return std::nullopt;
-                }
 
-                slot_idx = this->slots.size();
-                break;
+        for (u32 i = 0; i < this->slots.size(); ++i) {
+            if (offset == this->slots[i].offset) {
+                return i;
             }
 
-            slot_idx++;
+            if (offset < this->slots[i].offset) {
+                break;
+            }
         }
 
-        if (slot_idx == this->slots.size()) return std::nullopt;
-        else return slot_idx;
+        return std::nullopt;
     }
 
     AllocationPool::AllocationPool(VkDeviceMemory memory, VkDeviceSize size)
@@ -157,6 +214,7 @@ namespace hc::render::device::memory {
         if (this->memory != VK_NULL_HANDLE) {
             heap_manager.free(fn_table, device, this->memory);
             this->slots.clear();
+            this->memory.destroy();
         }
     }
 }

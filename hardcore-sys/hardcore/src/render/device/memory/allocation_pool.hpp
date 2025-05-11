@@ -35,20 +35,20 @@ namespace hc::render::device::memory {
     }
 
     struct PoolRange {
-        VkDeviceSize size;
-        VkDeviceSize offset;
-        VkDeviceSize padding;
+        VkDeviceSize size; //!< The size of the range, in bytes, without the padding.
+        VkDeviceSize offset; //!< The absolute byte offset of the range.
+        VkDeviceSize padding; //!< The number of padding bytes before the range's contents.
     };
 
     struct PoolSearchResult {
         PoolRange range;
-        u32 slot_idx;
+        u64 slot_idx;
     };
 
     struct Slot {
-        VkDeviceSize offset; // Relative to previous slot
-        VkDeviceSize size;
-        bool in_use;
+        VkDeviceSize offset; //!< The absolute byte offset of the slot.
+        VkDeviceSize size; //!< The total volume this slot occupies, in bytes.
+        bool in_use; //!< Indicates if the slot is occupied.
     };
 
     class AllocationPool {
@@ -65,40 +65,7 @@ namespace hc::render::device::memory {
         *
         * @return An optional that will hold the allocation range, if it was successful.
         */
-        template <typename Self>
-        std::optional<PoolRange> allocate(this Self&& self, VkDeviceSize size, VkDeviceSize alignment) {
-            auto const [range, slot_idx] = self.search(size, alignment);
-
-            if (!range.size) return std::nullopt;
-
-            size += range.padding;
-
-            HC_ASSERT(slot_idx < self.slots.size(), "Slot index out of bounds");
-            HC_ASSERT(!self.slots[slot_idx].in_use, "Slot must not already be in use");
-            HC_ASSERT(size <= self.slots[slot_idx].size, "Allocation size greater than slot size");
-            HC_ASSERT(slot_idx == 0 || self.slots[slot_idx - 1].in_use, "Slot before a selected slot must be in use");
-
-            if (size < self.slots[slot_idx].size) {
-                if (slot_idx + 1 < self.slots.size()) {
-                    // Check if the next slot is already an empty slot we can use
-                    if (self.slots[slot_idx + 1].size != 0) {
-                        // Check if we need to insert a new empty slot, or have one already at the end that we can use
-                        if (self.slots.back().size == 0) self.rotate_right(slot_idx + 1, 1, self.slots.size() - 1);
-                        else self.insert(slot_idx + 1);
-                    }
-                } else {
-                    self.insert(slot_idx + 1);
-                }
-
-                self.slots[slot_idx + 1].offset = self.slots[slot_idx].offset + size;
-                self.slots[slot_idx + 1].size = self.slots[slot_idx].size - size;
-                self.slots[slot_idx].size = size;
-            }
-
-            self.slots[slot_idx].in_use = true;
-
-            return range;
-        }
+        [[nodiscard]] std::optional<PoolRange> allocate(VkDeviceSize size, VkDeviceSize alignment);
 
         /**
          * @brief Free an allocation in this pool.

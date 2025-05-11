@@ -3,11 +3,10 @@
 #include "heap_manager.hpp"
 #include "allocation_pool.hpp"
 
-#include <core/glfw.hpp>
-
 #include <util/result.hpp>
 #include <util/uncopyable.hpp>
 
+#include <expected>
 #include <memory>
 
 namespace hc::render::device::memory {
@@ -17,6 +16,7 @@ namespace hc::render::device::memory {
         OutOfDeviceMemory,
         UnsupportedHeap,
         MapFailure,
+        NotEnoughSpace,
     };
 
     class BufferPool : public AllocationPool {
@@ -40,12 +40,7 @@ namespace hc::render::device::memory {
             : AllocationPool(memory, size) {
         }
 
-        void insert(u32 index);
-        void rotate_right(u32 begin, u32 n, u32 end);
-
         ExternalHandle<VkBuffer, VK_NULL_HANDLE> buffer;
-
-        friend class AllocationPool;
     };
 
     class DynamicBufferPool : public BufferPool {
@@ -93,50 +88,30 @@ namespace hc::render::device::memory {
         std::unique_ptr<void*> mapped_host_ptr;
     };
 
-    /*
+    class TexturePool : public AllocationPool {
+    public:
+        TexturePool() = default;
 
-    struct TextureSlot {
-        VkImage image;
-        VkImageView view;
+        [[nodiscard]] static std::expected<TexturePool, PoolResult> create(
+            const VolkDeviceTable& fn_table,
+            VkDevice device,
+            HeapManager& heap_manager,
+            VkDeviceSize size,
+            u32 memory_type_bits
+        );
+        void free(const VolkDeviceTable& fn_table, VkDevice device, HeapManager& heap_manager) noexcept;
 
-        VkDeviceSize size;
-        VkExtent3D dims;
-        VkImageLayout layout; // Layout of the image at the start of the frame
+        std::expected<PoolRange, PoolResult> allocate(
+            const VolkDeviceTable& fn_table,
+            VkDevice device,
+            VkImage image,
+            VkDeviceSize size,
+            VkDeviceSize alignment
+        );
+
+    private:
+        TexturePool(VkDeviceMemory memory, VkDeviceSize size)
+            : AllocationPool(memory, size) {
+        }
     };
-
-        struct texture_slot {
-            VkImage image;
-            VkImageView view;
-
-            VkDeviceSize size;
-            VkExtent3D dims;
-            VkImageLayout layout; // Layout of the image at the start of the frame
-        };
-
-        texture_slot
-        create_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements &out_memory_requirements);
-
-        class texture_pool : public AllocationPool<TextureSlot> {
-        public:
-            texture_pool() = default;
-
-            texture_pool(VkDevice device, HeapManager &heap_manager, VkDeviceSize size,
-                        u32 memory_type_bits, Heap preferred_heap);
-
-            void free(const VolkDeviceTable &fn_table, VkDevice device, HeapManager &heap_manager) noexcept;
-
-            bool search(VkDeviceSize size, VkDeviceSize alignment, u32 memory_type_bits,
-                        u32 &out_slot_idx, VkDeviceSize &out_size_needed, VkDeviceSize &out_offset) const;
-
-            void fill_slot(VkDevice device, TextureSlot &&tex, u32 slot_idx, VkDeviceSize size, VkDeviceSize alignment);
-
-            const TextureSlot &tex_at(u32 idx) const noexcept { return this->extra_slots[idx]; }
-
-        private:
-            void insert(u32 index);
-            void rotate_right(u32 begin, u32 n, u32 end);
-
-            u32 m_memory_type_idx = std::numeric_limits<u32>::max();
-        };
-    */
 }

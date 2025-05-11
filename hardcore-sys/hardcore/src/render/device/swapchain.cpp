@@ -86,10 +86,10 @@ namespace hc::render::device {
         SwapchainParams&& params
     ) {
         VkSurfaceCapabilities2KHR& surface_capabilities = surface_info.capabilities;
-        if (params.extent.width < surface_capabilities.surfaceCapabilities.minImageExtent.width || params.extent.height
-            < surface_capabilities.surfaceCapabilities.minImageExtent.height || surface_capabilities.surfaceCapabilities
-            .maxImageExtent.width < params.extent.width || surface_capabilities.surfaceCapabilities.maxImageExtent.
-            height < params.extent.height) {
+        if (params.extent.width < surface_capabilities.surfaceCapabilities.minImageExtent.width
+            || params.extent.height < surface_capabilities.surfaceCapabilities.minImageExtent.height
+            || surface_capabilities.surfaceCapabilities.maxImageExtent.width < params.extent.width
+            || surface_capabilities.surfaceCapabilities.maxImageExtent.height < params.extent.height) {
             HC_ERROR(
                 "Unsupported surface extent " << to_str(params.extent) << ", minimum is " << to_str(surface_capabilities
                     .surfaceCapabilities.minImageExtent) << " and maximum is " << to_str(surface_capabilities.
@@ -105,10 +105,12 @@ namespace hc::render::device {
             static_cast<u32>(max_frames_in_flight())
         );
         // Maximum images may be 0, indicating there is no limit
-        if (surface_capabilities.surfaceCapabilities.maxImageCount > 0) image_count = std::min(
-            surface_capabilities.surfaceCapabilities.maxImageCount,
-            image_count
-        );
+        if (surface_capabilities.surfaceCapabilities.maxImageCount > 0) {
+            image_count = std::min(
+                surface_capabilities.surfaceCapabilities.maxImageCount,
+                image_count
+            );
+        }
 
         VkSwapchainCreateInfoKHR create_info = {};
         create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -144,7 +146,8 @@ namespace hc::render::device {
         create_info.oldSwapchain = VK_NULL_HANDLE; //used when it's needed to create a new target
 
         auto inner_res = create_inner_swapchain(fn_table, device, create_info);
-        if (!inner_res) return Err(std::move(inner_res).err());
+        if (!inner_res)
+            return Err(std::move(inner_res).err());
 
         Swapchain swapchain;
         swapchain.inner = std::move(inner_res).ok();
@@ -173,7 +176,8 @@ namespace hc::render::device {
             old_swapchains.pop();
         }
 
-        if (this->inner.handle != VK_NULL_HANDLE) destroy_inner_swapchain(fn_table, device, this->inner);
+        if (this->inner.handle != VK_NULL_HANDLE)
+            destroy_inner_swapchain(fn_table, device, this->inner);
 
         vkDestroySurfaceKHR(instance, this->surface, nullptr);
         this->surface.destroy();
@@ -210,7 +214,9 @@ namespace hc::render::device {
         if (res == VK_ERROR_OUT_OF_DATE_KHR && !window::is_resizing(window)) {
             HC_DEBUG("Swapchain out of date, recreating");
             SwapchainResult swapchain_result = this->recreate(fn_table, device, window);
-            if (swapchain_result != SwapchainResult::Success) return Err(std::move(swapchain_result));
+            if (swapchain_result != SwapchainResult::Success) {
+                return Err(std::move(swapchain_result));
+            }
 
             return Err(SwapchainResult::SkipFrame);
         } else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR) {
@@ -260,7 +266,10 @@ namespace hc::render::device {
         create_info.oldSwapchain = this->inner.handle;
 
         auto inner_res = create_inner_swapchain(fn_table, device, create_info);
-        if (!inner_res) return SwapchainResult::CreationFailure;
+        if (!inner_res) {
+            HC_ERROR("Failed to recreate swapchain");
+            return SwapchainResult::CreationFailure;
+        }
 
         this->old_swapchains.push(std::exchange(this->inner, std::move(inner_res).ok()));
 

@@ -47,19 +47,6 @@ namespace hc::render::device::memory {
         }
     }
 
-    void BufferPool::insert(u32 index) {
-        this->slots.insert(this->slots.begin() + index, {});
-    }
-
-    void BufferPool::rotate_right(u32 begin, u32 n, u32 end) {
-        const u32 size = this->slots.size();
-
-        auto begin_it = this->slots.rbegin() + (size - 1 - end);
-        auto middle_it = begin_it + n;
-        auto end_it = this->slots.rbegin() + (size - begin);
-        std::rotate(begin_it, middle_it, end_it);
-    }
-
     Result<DynamicBufferPool, PoolResult> DynamicBufferPool::create(
         const VolkDeviceTable& fn_table,
         VkDevice device,
@@ -138,189 +125,68 @@ namespace hc::render::device::memory {
         this->mapped_host_ptr = nullptr;
     }
 
-    /*
-        texture_slot
-        create_texture(VkDevice device, VkImageCreateInfo image_info, VkMemoryRequirements &out_memory_requirements) {
-            VkImage image;
-            VK_CRASH_CHECK(vkCreateImage(device, &image_info, nullptr, &image), "Failed to create image");
+    std::expected<TexturePool, PoolResult> TexturePool::create(
+        const VolkDeviceTable& fn_table,
+        VkDevice device,
+        HeapManager& heap_manager,
+        VkDeviceSize size,
+        u32 memory_type_bits
+    ) {
+        VkDeviceMemory memory = VK_NULL_HANDLE;
 
-            vkGetImageMemoryRequirements(device, image, &out_memory_requirements);
-
-            VkImageView image_view;
-
-            VkImageViewCreateInfo view_info = {};
-            view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-            view_info.flags = 0;
-            view_info.image = image;
-            view_info.format = image_info.format;
-
-            // Setting all components to identity so no swizzling occurs
-            view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-            view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-            view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-            view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-            view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            view_info.subresourceRange.baseMipLevel = 0;
-            view_info.subresourceRange.levelCount = image_info.mipLevels;
-            view_info.subresourceRange.baseArrayLayer = 0;
-            view_info.subresourceRange.layerCount = image_info.arrayLayers;
-
-            const bool is_cube = image_info.flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-            HC_ASSERT(!is_cube || (is_cube && image_info.imageType == VK_IMAGE_TYPE_2D),
-                    "Image type must be 2D if image is a cube");
-            HC_ASSERT(!is_cube || (is_cube && image_info.arrayLayers % 6 == 0),
-                    "Number of image layers must be a multiple of 6 if image is a cube");
-
-            const bool is_array = is_cube ? 1 < image_info.arrayLayers / 6 : 1 < image_info.arrayLayers;
-            HC_ASSERT(!is_array || (is_array && image_info.imageType != VK_IMAGE_TYPE_3D),
-                    "3D image arrays are invalid");
-
-            switch (image_info.imageType) {
-                case VK_IMAGE_TYPE_1D:
-                    view_info.viewType = is_array ? VK_IMAGE_VIEW_TYPE_1D_ARRAY : VK_IMAGE_VIEW_TYPE_1D;
-                    break;
-                case VK_IMAGE_TYPE_2D:
-                    if (is_cube) view_info.viewType = is_array ? VK_IMAGE_VIEW_TYPE_CUBE_ARRAY : VK_IMAGE_VIEW_TYPE_CUBE;
-                    else view_info.viewType = is_array ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
-                    break;
-                case VK_IMAGE_TYPE_3D:
-                    view_info.viewType = VK_IMAGE_VIEW_TYPE_3D;
-                    break;
-                default:
-                HC_ASSERT(false, "Invalid image type");
-                    break;
+        auto res = heap_manager.alloc_texture_memory(fn_table, device, memory, size, Heap::Main, memory_type_bits);
+        if (!res) {
+            switch (res.error()) {
+            case HeapResult::Success:
+                // Nothing, keep going
+                break;
+            case HeapResult::OutOfHostMemory:
+                return std::unexpected(PoolResult::OutOfHostMemory);
+            case HeapResult::OutOfDeviceMemory:
+                return std::unexpected(PoolResult::OutOfDeviceMemory);
+            case HeapResult::UnsupportedHeap:
+                return std::unexpected(PoolResult::UnsupportedHeap);
+            // These are both ignored because a specific address is never requested, and no external handle is used
+            // case HeapResult::InvalidCapture:
+            // case HeapResult::InvalidHandle:
+            default: HC_UNREACHABLE("alloc_texture_memory should not return any other values here");
             }
-
-            //VK_CRASH_CHECK(vkCreateImageView(device, &view_info, nullptr, &image_view), "Failed to create image view");
-
-            return {
-                    .image = image,
-                    .view = VK_NULL_HANDLE,// image_view,
-                    .size = out_memory_requirements.size,
-                    .dims = image_info.extent,
-                    .layout = image_info.initialLayout
-            };
         }
 
-        texture_pool::texture_pool(VkDevice device, HeapManager &heap_manager, VkDeviceSize size,
-                                    u32 memory_type_bits, Heap preferred_heap) :
-                AllocationPool<TextureSlot>(size) {
-            this->m_memory_type_idx = heap_manager.alloc_texture_memory(device, this->memory, size, preferred_heap,
-                                                                        memory_type_bits);
-        }
-
-        void texture_pool::free(const VolkDeviceTable &fn_table, VkDevice device, HeapManager &heap_manager) noexcept {
-            this->free_memory(fn_table, device, heap_manager);
-            this->extra_slots.clear();
-        }
-
-        void texture_pool::insert(u32 index) {
-            this->slots.insert(this->slots.begin() + index, {});
-            this->extra_slots.insert(this->extra_slots.begin() + index, {});
-        }
-
-        void texture_pool::rotate_right(u32 begin, u32 n, u32 end) {
-            const u32 size = this->slots.size();
-
-            auto begin_it = this->slots.rbegin() + (size - 1 - end);
-            auto middle_it = begin_it + n;
-            auto end_it = this->slots.rbegin() + (size - begin);
-            std::rotate(begin_it, middle_it, end_it);
-
-            auto e_begin_it = this->extra_slots.rbegin() + (size - 1 - end);
-            auto e_middle_it = e_begin_it + n;
-            auto e_end_it = this->extra_slots.rbegin() + (size - begin);
-            std::rotate(e_begin_it, e_middle_it, e_end_it);
-        }
-
-        bool texture_pool::search(VkDeviceSize size, VkDeviceSize alignment, u32 memory_type_bits,
-                                u32 &out_slot_idx, VkDeviceSize &out_size_needed, VkDeviceSize &out_offset) const {
-            if (memory_type_bits & (1ULL << this->m_memory_type_idx))
-                return AllocationPool<TextureSlot>::search(size, alignment, out_slot_idx, out_size_needed, out_offset);
-
-            return false;
-        }
-
-        void texture_pool::fill_slot(VkDevice device, TextureSlot &&tex, u32 slot_idx, VkDeviceSize size,
-                                    VkDeviceSize alignment) {
-            AllocationPool<TextureSlot>::fill_slot(slot_idx, size);
-
-            // resource_pool::fill_slot should perform any reallocation if necessary, so the slot should always exist
-
-            this->extra_slots[slot_idx] = std::move(tex);
-
-            VK_CRASH_CHECK(vkBindImageMemory(device, this->extra_slots[slot_idx].image, this->memory,
-                                            aligned_offset(this->slots[slot_idx].offset, alignment)),
-                            "Failed to bind image to memory");
-        }
-    */
-#ifdef TODO
-
-    struct dynamic_texture {
-        VkImage image;
-        VkImageLayout layout;
-        std::array<VkImageView, max_frames_in_flight> views;
-    };
-
-    dynamic_texture create_dynamic_texture(VkDevice device, VkImageCreateInfo image_info,
-                                           VkMemoryRequirements &out_memory_requirements) {
-        dynamic_texture res = {};
-        u8 max_frames_in_flight = hc::render::max_frames_in_flight();
-
-        VK_CRASH_CHECK(vkCreateImage(device, &image_info, nullptr, &res.image), "Failed to create image");
-
-        vkGetImageMemoryRequirements(device, res.image, &out_memory_requirements);
-
-        VkImageViewCreateInfo view_info = {};
-        view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        view_info.flags = 0;
-        view_info.image = res.image;
-        view_info.format = image_info.format;
-
-        // Setting all components to identity so no swizzling occurs
-        view_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        view_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        view_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        view_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-        HC_ASSERT(image_info.arrayLayers % max_frames_in_flight == 0,
-                        "Number of layers indivisible by number of frames in flight");
-        const u32 frame_layers = image_info.arrayLayers / max_frames_in_flight;
-
-        view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        view_info.subresourceRange.baseMipLevel = 0;
-        view_info.subresourceRange.levelCount = image_info.mipLevels;
-        view_info.subresourceRange.baseArrayLayer = 0;
-        view_info.subresourceRange.layerCount = frame_layers;
-
-        const bool is_cube = image_info.flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-        HC_ASSERT(!is_cube || image_info.imageType == VK_IMAGE_TYPE_2D,
-                        "Image type must be 2D if image is a cube");
-        HC_ASSERT(!is_cube || frame_layers % 6 == 0,
-                        "Number of image layers must be a multiple of 6 if image is a cube");
-
-        const bool is_array = is_cube ? 1 < frame_layers / 6 : 1 < frame_layers;
-
-        switch (image_info.imageType) {
-            case VK_IMAGE_TYPE_1D:
-                view_info.viewType = is_array ? VK_IMAGE_VIEW_TYPE_1D_ARRAY : VK_IMAGE_VIEW_TYPE_1D;
-                break;
-            case VK_IMAGE_TYPE_2D:
-                if (is_cube) view_info.viewType = is_array ? VK_IMAGE_VIEW_TYPE_CUBE_ARRAY : VK_IMAGE_VIEW_TYPE_CUBE;
-                else view_info.viewType = is_array ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
-                break;
-            default:
-                HC_ASSERT(false, "Invalid image type");
-                break;
-        }
-
-        for (u8 i = 0; i < max_frames_in_flight; i++)
-            VK_CRASH_CHECK(vkCreateImageView(device, &view_info, nullptr, &res.views[i]),
-                           "Failed to create image view");
-
-        return res;
+        return TexturePool(memory, size);
     }
 
-#endif // TODO
+    void TexturePool::free(const VolkDeviceTable& fn_table, VkDevice device, HeapManager& heap_manager) noexcept {
+        if (this->memory != VK_NULL_HANDLE) {
+            this->free_memory(fn_table, device, heap_manager);
+        }
+    }
+
+    std::expected<PoolRange, PoolResult> TexturePool::allocate(
+        const VolkDeviceTable& fn_table,
+        VkDevice device,
+        VkImage image,
+        VkDeviceSize size,
+        VkDeviceSize alignment
+    ) {
+        auto range_res = AllocationPool::allocate(size, alignment);
+        if (!range_res) {
+            return std::unexpected(PoolResult::NotEnoughSpace);
+        }
+        PoolRange range = *range_res;
+
+        VkResult res = fn_table.vkBindImageMemory(device, image, this->memory, range.offset + range.padding);
+        if (res != VK_SUCCESS) {
+            this->free_allocation(range.offset);
+            switch (res) {
+            case VK_ERROR_OUT_OF_HOST_MEMORY:
+                return std::unexpected(PoolResult::OutOfHostMemory);
+            case VK_ERROR_OUT_OF_DEVICE_MEMORY:
+                return std::unexpected(PoolResult::OutOfDeviceMemory);
+            default: HC_UNREACHABLE("vkBindImageMemory should not return any other values here");
+            }
+        }
+
+        return range;
+    }
 }

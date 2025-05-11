@@ -1,6 +1,8 @@
-use hardcore_sys::{Composition, Field, Primitive};
+use hardcore_sys::Field;
 use std::ptr;
 use thiserror::Error;
+
+pub use hardcore_sys::{Composition, Primitive};
 
 #[forbid(missing_docs)]
 mod seal {

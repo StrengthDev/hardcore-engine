@@ -100,10 +100,14 @@ namespace hc::render {
         [[maybe_unused]] void* user_data
     ) {
         char type[] = "[----]";
-        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) type[1] = 'G';
-        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) type[2] = 'V';
-        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) type[3] = 'P';
-        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT) type[4] = 'B';
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT)
+            type[1] = 'G';
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT)
+            type[2] = 'V';
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
+            type[3] = 'P';
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT)
+            type[4] = 'B';
 
         if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
             HC_ERROR("Vulkan " << type << ": " << callback_data->pMessage);
@@ -125,21 +129,28 @@ namespace hc::render {
         [[maybe_unused]] void* user_data
     ) {
         int flags = 0;
-        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) flags |= HC_VK_GENERAL;
-        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) flags |= HC_VK_VALIDATION;
-        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) flags |= HC_VK_PERFORMANCE;
-        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT) flags |=
-            HC_VK_DEVICE_ADDRESS_BINDING;
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) {
+            flags |= HC_VK_GENERAL;
+        }
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) {
+            flags |= HC_VK_VALIDATION;
+        }
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) {
+            flags |= HC_VK_PERFORMANCE;
+        }
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT) {
+            flags |= HC_VK_DEVICE_ADDRESS_BINDING;
+        }
 
-        HCLogKind kind = HCLogKind::Error;
+        HCLogKind kind = HCLogKind::HCLogKind_Error;
         if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-            kind = HCLogKind::Error;
+            kind = HCLogKind::HCLogKind_Error;
         } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-            kind = HCLogKind::Warn;
+            kind = HCLogKind::HCLogKind_Warn;
         } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
-            kind = HCLogKind::Info;
+            kind = HCLogKind::HCLogKind_Info;
         } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
-            kind = HCLogKind::Debug;
+            kind = HCLogKind::HCLogKind_Debug;
         }
 
         user_debug_callback(kind, flags, callback_data->pMessage);
@@ -378,7 +389,7 @@ struct VersionBitfield {
     u32 variant : 3;
 };
 
-constexpr HCVersion bitfield_to_version(u32 version_bitfield) {
+static constexpr HCVersion bitfield_to_version(u32 version_bitfield) {
     auto [patch, minor, major, variant] = std::bit_cast<VersionBitfield>(version_bitfield);
     return {.major = major, .minor = minor, .patch = patch,};
 }
@@ -401,7 +412,8 @@ int hc_render_tick() {
 int hc_render_finish() {
     for (u8 i = 0; i < hc::render::max_frames_in_flight_count + 1; ++i) {
         int res = hc_render_tick();
-        if (res) return res;
+        if (res)
+            return res;
     }
 
     return 0;
@@ -413,7 +425,8 @@ u32 hc_device_count() {
 
 const char* hc_device_name(u32 device) {
     auto res = hc::render::device_at(device);
-    if (!res) return nullptr;
+    if (!res)
+        return nullptr;
     auto device_ptr = res.ok();
 
     return device_ptr->name();

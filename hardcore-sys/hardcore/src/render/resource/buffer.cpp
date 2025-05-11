@@ -25,7 +25,7 @@ static constexpr HCDynamicBuffer INVALID_DYNAMIC_BUFFER = {
 };
 
 HCBuffer hc_new_buffer(u32 device, HCBufferKind kind, const HCDescriptor* descriptor, u64 count, bool writable) {
-    if (kind == HCBufferKind::HCBufferKind_Index) {
+    if (kind == HCBufferKind_Index) {
         HC_ERROR("Invalid buffer kind (call `hc_new_index_buffer` instead)");
         return INVALID_BUFFER;
     }
@@ -62,8 +62,7 @@ HCBuffer hc_new_buffer(u32 device, HCBufferKind kind, const HCDescriptor* descri
 }
 
 HCBuffer hc_new_index_buffer(u32 device, HCPrimitive index_type, u64 count, bool writable) {
-    if (index_type != HCPrimitive::HCPrimitive_U8 && index_type != HCPrimitive::HCPrimitive_U16 && index_type !=
-        HCPrimitive::HCPrimitive_U32) {
+    if (index_type != HCPrimitive_U8 && index_type != HCPrimitive_U16 && index_type != HCPrimitive_U32) {
         HC_ERROR("Invalid index type");
         return INVALID_BUFFER;
     }
@@ -92,8 +91,9 @@ HCBuffer hc_new_index_buffer(u32 device, HCPrimitive index_type, u64 count, bool
 }
 
 void hc_destroy_buffer(HCBuffer* buffer) {
-    if (!buffer)
+    if (!buffer) {
         return;
+    }
 
     if (!buffer->size) {
         HC_WARN("Attempted to destroy invalid buffer");
@@ -118,7 +118,7 @@ HCDynamicBuffer hc_new_dynamic_buffer(
     u64 count,
     bool writable
 ) {
-    if (kind == HCBufferKind::HCBufferKind_Index) {
+    if (kind == HCBufferKind_Index) {
         HC_ERROR("Invalid buffer kind (call `hc_new_dynamic_index_buffer` instead)");
         return INVALID_DYNAMIC_BUFFER;
     }
@@ -164,8 +164,7 @@ HCDynamicBuffer hc_new_dynamic_buffer(
 }
 
 HCDynamicBuffer hc_new_dynamic_index_buffer(u32 device, HCPrimitive index_type, u64 count, bool writable) {
-    if (index_type != HCPrimitive::HCPrimitive_U8 && index_type != HCPrimitive::HCPrimitive_U16 && index_type !=
-        HCPrimitive::HCPrimitive_U32) {
+    if (index_type != HCPrimitive_U8 && index_type != HCPrimitive_U16 && index_type != HCPrimitive_U32) {
         HC_ERROR("Invalid index type");
         return INVALID_DYNAMIC_BUFFER;
     }
@@ -197,8 +196,9 @@ HCDynamicBuffer hc_new_dynamic_index_buffer(u32 device, HCPrimitive index_type, 
 }
 
 void hc_destroy_dynamic_buffer(HCDynamicBuffer* buffer) {
-    if (!buffer)
+    if (!buffer) {
         return;
+    }
 
     if (!buffer->size) {
         HC_WARN("Attempted to destroy invalid buffer");

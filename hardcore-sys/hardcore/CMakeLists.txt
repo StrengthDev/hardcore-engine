@@ -63,7 +63,7 @@ add_subdirectory(src)
 # Setup library target
 add_library(${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME} PUBLIC "include" PRIVATE ${PRIVATE_INCLUDES})
-# Instead of calling target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBRARIES}), the library compiled objects are
+# Instead of calling target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBRARIES}), the compiled library objects are
 # linked directly so that everything is included in hardcore's library
 target_sources(${PROJECT_NAME} PUBLIC ${SOURCES} PRIVATE ${LIB_OBJECTS})
 target_precompile_headers(${PROJECT_NAME} PRIVATE "src/pch.hpp")
