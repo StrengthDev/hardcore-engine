@@ -175,7 +175,7 @@ impl Drop for Shader {
 
 #[cfg(feature = "shader-compilation")]
 mod shader_compilation {
-    use crate::render::vulkan_version;
+    use crate::render::vulkan_api_version;
     use crate::shader::{Shader, ShaderError, ShaderStage};
     use crate::Version;
     use std::path::Path;
@@ -293,7 +293,7 @@ mod shader_compilation {
             };
 
             let compiler = Compiler::acquire().ok_or(ShaderError::NoCompiler)?;
-            let vulkan = match vulkan_version() {
+            let vulkan = match vulkan_api_version() {
                 Version {
                     major: 1,
                     minor,

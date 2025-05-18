@@ -760,8 +760,9 @@ namespace hc::render::device::memory {
         for (auto& pools : this->dynamic_buffer_pools | std::views::values) {
             for (auto& pool : pools | std::views::values) {
                 PoolResult res = pool.map(fn_table, device, frame_mod);
-                if (res != PoolResult::Success)
+                if (res != PoolResult::Success) {
                     return MemoryResult::MapError;
+                }
                 // TODO might want to clean up already mapped ranges
             }
         }
@@ -781,8 +782,8 @@ namespace hc::render::device::memory {
         std::vector<VkMappedMemoryRange> ranges;
 
         if (!this->heap_manager.host_coherent_dynamic_heap()) {
-            for (auto& [flags, pools] : this->dynamic_buffer_pools) {
-                for (auto& [id, pool] : pools) {
+            for (auto& pools : this->dynamic_buffer_pools | std::views::values) {
+                for (auto& pool : pools | std::views::values) {
                     ranges.push_back(pool.mapped_range(frame_mod));
                 }
             }
@@ -810,8 +811,9 @@ namespace hc::render::device::memory {
     }
 
     inline VkDeviceSize increase_to_fit(VkDeviceSize base, VkDeviceSize target) {
-        if (target <= base)
+        if (target <= base) {
             return base;
+        }
 
         // Mathematical equivalent to a loop doubling base until target is smaller
         double exp = std::ceil(std::log2(static_cast<double>(target) / static_cast<double>(base)));
@@ -824,8 +826,9 @@ namespace hc::render::device::memory {
         VkBufferUsageFlags flags,
         VkDeviceSize size
     ) {
-        if (!this->buffer_pools.contains(flags))
+        if (!this->buffer_pools.contains(flags)) {
             this->buffer_pools.insert({flags, {}});
+        }
 
         VkDeviceSize alignment = this->alignment_of(flags);
         auto& pools = this->buffer_pools[flags];
@@ -888,8 +891,9 @@ namespace hc::render::device::memory {
         VkDeviceSize size,
         u8 frame_mod
     ) {
-        if (!this->dynamic_buffer_pools.contains(flags))
+        if (!this->dynamic_buffer_pools.contains(flags)) {
             this->dynamic_buffer_pools.insert({flags, {}});
+        }
 
         VkDeviceSize alignment = this->alignment_of(flags);
         auto& pools = this->dynamic_buffer_pools[flags];
@@ -1064,11 +1068,13 @@ namespace hc::render::device::memory {
     }
 
     VkDeviceSize Memory::alignment_of(VkBufferUsageFlags flags) const noexcept {
-        if (flags & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+        if (flags & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) {
             return this->limits.minStorageBufferOffsetAlignment;
+        }
 
-        if (flags & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+        if (flags & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) {
             return this->limits.minUniformBufferOffsetAlignment;
+        }
 
         // Using 64 as the default should prevent any unspecified alignment issues (vertexes/indexes) and may even help
         // with cache usage

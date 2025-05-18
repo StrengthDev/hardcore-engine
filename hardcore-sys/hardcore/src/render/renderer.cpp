@@ -160,7 +160,7 @@ namespace hc::render {
 
     VkResult create_instance(const HCApplicationDescriptor& app, const std::vector<const char*>& layers) {
         HC_INFO(
-            "Vulkan v" << HC_VULKAN_VERSION.major << '.' << HC_VULKAN_VERSION.minor << '.' << HC_VULKAN_VERSION.patch
+            "Using Vulkan v" << HC_VULKAN_API_VERSION.major << '.' << HC_VULKAN_API_VERSION.minor << '.' << HC_VULKAN_API_VERSION.patch << " API"
         );
         HC_INFO(
             "Vulkan application: " << app.name << " v" << app.version.major << '.' << app.version.minor << '.' << app.
@@ -270,6 +270,11 @@ namespace hc::render {
             HC_ERROR("Failed to initialize Volk: " << to_str(res));
             return InstanceResult::VolkError;
         }
+
+        HC_INFO(
+            "Vulkan header v" << HC_VULKAN_HEADER_VERSION.major << '.' << HC_VULKAN_HEADER_VERSION.minor << '.' << HC_VULKAN_HEADER_VERSION.patch
+        );
+        HC_INFO("Volk header v" << HC_VOLK_HEADER_VERSION);
 
         std::vector<const char*> layers;
 
@@ -394,7 +399,9 @@ static constexpr HCVersion bitfield_to_version(u32 version_bitfield) {
     return {.major = major, .minor = minor, .patch = patch,};
 }
 
-const HCVersion HC_VULKAN_VERSION = bitfield_to_version(hc::render::VULKAN_API_VERSION);
+const HCVersion HC_VULKAN_API_VERSION = bitfield_to_version(hc::render::VULKAN_API_VERSION);
+const HCVersion HC_VULKAN_HEADER_VERSION = bitfield_to_version(VK_HEADER_VERSION_COMPLETE);
+const u32 HC_VOLK_HEADER_VERSION = VOLK_HEADER_VERSION;
 
 int hc_render_tick() {
     u8 next_mod = hc::render::frame_mod + 1;

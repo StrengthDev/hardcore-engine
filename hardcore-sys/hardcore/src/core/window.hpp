@@ -5,9 +5,13 @@
 #include <core/glfw.hpp>
 
 namespace hc::window {
-	void destroy(GLFWwindow *window);
+    bool init_context();
 
-	bool is_resizing(GLFWwindow *window);
+    void terminate_context();
+
+    void destroy(GLFWwindow* window);
+
+    bool is_resizing(GLFWwindow* window);
 }
 
 #endif // HC_HEADLESS

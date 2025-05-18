@@ -548,8 +548,9 @@ namespace hc::render::device {
 
         for (auto& [window, swapchain] : this->swapchains) {
             auto res = swapchain.acquire_image(this->fn_table, this->handle, window, frame_mod);
-            if (!res)
+            if (!res) {
                 continue;
+            }
 
             u32 image_index = res.ok();
             swapchain_handles.push_back(swapchain.handle());

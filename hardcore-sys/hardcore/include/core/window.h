@@ -14,6 +14,23 @@ extern "C" {
 // (https://github.com/glfw/glfw) 3.4 release.
 
 /**
+ * Mouse cursor modes.
+ */
+enum HCCursorMode {
+    HCCursorMode_Normal, //!< Cursor is visible and its motion is not limited by anything.
+    HCCursorMode_Hidden, //!< Cursor becomes invisible while over the window, but its motion is not limited by anything.
+    HCCursorMode_Captured, //!< Cursor is visible, but it will be confined to the window's area while it is in focus.
+    /**
+     * @brief When the window is in focus, the cursor is hidden and locked to the window's area.
+     *
+     * This mode should be ideal for things such as controlling a camera via mouse motion.
+     *
+     * On systems that support it, this mode will enable raw mouse motion input.
+     */
+    HCCursorMode_Disabled,
+};
+
+/**
  * A window button input action.
  */
 enum HCButtonAction {
@@ -213,9 +230,9 @@ enum HCDeviceEvent {
  *
  * This kind of function is typically called when a window is moved.
  *
- * @param window - The window identifier.
- * @param x - The new x-coordinate, in screen coordinates, of the upper-left corner of the content area of the window.
- * @param y - The new y-coordinate, in screen coordinates, of the upper-left corner of the content area of the window.
+ * @param window The window identifier.
+ * @param x The new x-coordinate, in screen coordinates, of the upper-left corner of the content area of the window.
+ * @param y The new y-coordinate, in screen coordinates, of the upper-left corner of the content area of the window.
  */
 typedef void (*HCWindowPositionCallback)(size_t window, int x, int y);
 
@@ -224,9 +241,9 @@ typedef void (*HCWindowPositionCallback)(size_t window, int x, int y);
  *
  * This kind of function is typically called when a window is resized.
  *
- * @param window - The window identifier.
- * @param width - The new width, in screen coordinates, of the window.
- * @param height - The new height, in screen coordinates, of the window.
+ * @param window The window identifier.
+ * @param width The new width, in screen coordinates, of the window.
+ * @param height The new height, in screen coordinates, of the window.
  */
 typedef void (*HCWindowSizeCallback)(size_t window, int width, int height);
 
@@ -235,7 +252,7 @@ typedef void (*HCWindowSizeCallback)(size_t window, int width, int height);
  *
  * This kind of function is typically called, for example, when a user clicks the window's close button.
  *
- * @param window - The window identifier.
+ * @param window The window identifier.
  */
 typedef void (*HCWindowCloseCallback)(size_t window);
 
@@ -244,7 +261,7 @@ typedef void (*HCWindowCloseCallback)(size_t window);
  *
  * This kind of function is typically called when the contents of the window need to be refreshed after getting damaged.
  *
- * @param window - The window identifier.
+ * @param window The window identifier.
  */
 typedef void (*HCWindowRefreshCallback)(size_t window);
 
@@ -253,8 +270,8 @@ typedef void (*HCWindowRefreshCallback)(size_t window);
  *
  * This kind of function is typically called when the window comes into or out of focus.
  *
- * @param window - The window identifier.
- * @param focused - `true` if the window was given input focus, or `false` if it lost it.
+ * @param window The window identifier.
+ * @param focused `true` if the window was given input focus, or `false` if it lost it.
  */
 typedef void (*HCWindowFocusCallback)(size_t window, bool focused);
 
@@ -263,8 +280,8 @@ typedef void (*HCWindowFocusCallback)(size_t window, bool focused);
  *
  * This kind of function is typically called when the window is minimized/iconified or restored.
  *
- * @param window - The window identifier.
- * @param minimized -  `true` if the window was minimized, or `false` if it was restored.
+ * @param window The window identifier.
+ * @param minimized  `true` if the window was minimized, or `false` if it was restored.
  */
 typedef void (*HCWindowMinimizeCallback)(size_t window, bool minimized);
 
@@ -273,8 +290,8 @@ typedef void (*HCWindowMinimizeCallback)(size_t window, bool minimized);
  *
  * This kind of function is typically called when the window is maximized or restored.
  *
- * @param window - The window identifier.
- * @param maximized -  `true` if the window was maximized, or `false` if it was restored.
+ * @param window The window identifier.
+ * @param maximized  `true` if the window was maximized, or `false` if it was restored.
  */
 typedef void (*HCWindowMaximizeCallback)(size_t window, bool maximized);
 
@@ -286,9 +303,9 @@ typedef void (*HCWindowMaximizeCallback)(size_t window, bool maximized);
  * This differs from `HCWindowSizeCallback` in some systems where something like DPI scaling is used, and always gives
  * appropriate dimensions for rendering.
  *
- * @param window - The window identifier.
- * @param width - The new width, in pixels, of the framebuffer.
- * @param height - The new height, in pixels, of the framebuffer.
+ * @param window The window identifier.
+ * @param width The new width, in pixels, of the framebuffer.
+ * @param height The new height, in pixels, of the framebuffer.
  */
 typedef void (*HCWindowFramebufferCallback)(size_t window, int width, int height);
 
@@ -297,9 +314,9 @@ typedef void (*HCWindowFramebufferCallback)(size_t window, int width, int height
  *
  * This kind of function is typically called when a window is rescaled.
  *
- * @param window - The window identifier.
- * @param x_scale - The new x-axis content scale of the window.
- * @param y_scale - The new y-axis content scale of the window.
+ * @param window The window identifier.
+ * @param x_scale The new x-axis content scale of the window.
+ * @param y_scale The new y-axis content scale of the window.
  */
 typedef void (*HCWindowScaleCallback)(size_t window, float x_scale, float y_scale);
 
@@ -308,10 +325,10 @@ typedef void (*HCWindowScaleCallback)(size_t window, float x_scale, float y_scal
  *
  * This kind of function is typically called when a mouse button is pressed or released.
  *
- * @param window - The window identifier.
- * @param button - The mouse button that was pressed or released.
- * @param action - Either `HCButtonAction::Press` or `HCButtonAction::Release`. Future releases may add more actions.
- * @param mods - Bit field describing which modifiers are active.
+ * @param window The window identifier.
+ * @param button The mouse button that was pressed or released.
+ * @param action Either `HCButtonAction::Press` or `HCButtonAction::Release`. Future releases may add more actions.
+ * @param mods Bit field describing which modifiers are active.
  */
 typedef void (*HCWindowMouseButtonCallback)(
     size_t window,
@@ -325,9 +342,9 @@ typedef void (*HCWindowMouseButtonCallback)(
  *
  * This kind of function is typically called when the mouse cursor is moved.
  *
- * @param window - The window identifier.
- * @param x - The new cursor x-coordinate, relative to the left edge of the content area.
- * @param y - The new cursor y-coordinate, relative to the top edge of the content area.
+ * @param window The window identifier.
+ * @param x The new cursor x-coordinate, relative to the left edge of the content area.
+ * @param y The new cursor y-coordinate, relative to the top edge of the content area.
  */
 typedef void (*HCWindowCursorPositionCallback)(size_t window, double x, double y);
 
@@ -336,8 +353,8 @@ typedef void (*HCWindowCursorPositionCallback)(size_t window, double x, double y
  *
  * This kind of function is typically called when the mouse cursor enters or leaves the content area.
  *
- * @param window - The window identifier.
- * @param entered -  `true` if the cursor entered the window's content area, or `false` if it left it.
+ * @param window The window identifier.
+ * @param entered  `true` if the cursor entered the window's content area, or `false` if it left it.
  */
 typedef void (*HCWindowCursorEnterCallback)(size_t window, bool entered);
 
@@ -346,9 +363,9 @@ typedef void (*HCWindowCursorEnterCallback)(size_t window, bool entered);
  *
  * This kind of function is typically called when a user, for example, uses the scroll wheel.
  *
- * @param window - The window identifier.
- * @param x_offset - The scroll offset along the x-axis.
- * @param y_offset - The scroll offset along the y-axis.
+ * @param window The window identifier.
+ * @param x_offset The scroll offset along the x-axis.
+ * @param y_offset The scroll offset along the y-axis.
  */
 typedef void (*HCWindowScrollCallback)(size_t window, double x_offset, double y_offset);
 
@@ -357,12 +374,12 @@ typedef void (*HCWindowScrollCallback)(size_t window, double x_offset, double y_
  *
  * This kind of function is typically called when a keyboard key is pressed, released or held (repeated).
  *
- * @param window - The window identifier.
- * @param key - The keyboard key that was pressed or released.
- * @param scan_code - The platform-specific scancode of the key.
- * @param action - `HCButtonAction::Press`, `HCButtonAction::Release` or `HCButtonAction::Repeat`. Future releases may
+ * @param window The window identifier.
+ * @param key The keyboard key that was pressed or released.
+ * @param scan_code The platform-specific scancode of the key.
+ * @param action `HCButtonAction::Press`, `HCButtonAction::Release` or `HCButtonAction::Repeat`. Future releases may
  * add more actions.
- * @param mods - Bit field describing which modifiers are active.
+ * @param mods Bit field describing which modifiers are active.
  */
 typedef void (*HCWindowKeyCallback)(
     size_t window,
@@ -378,8 +395,8 @@ typedef void (*HCWindowKeyCallback)(
  * This kind of function is typically called when a character key is pressed, released or held (repeated), essentially,
  * when something is typed.
  *
- * @param window - The window identifier.
- * @param code_point - The Unicode code point of the character.
+ * @param window The window identifier.
+ * @param code_point The Unicode code point of the character.
  */
 typedef void (*HCWindowCharCallback)(size_t window, unsigned int code_point);
 
@@ -391,9 +408,9 @@ typedef void (*HCWindowCharCallback)(size_t window, unsigned int code_point);
  *
  * This is called for each input character, regardless of what modifier keys are held down.
  *
- * @param window - The window identifier.
- * @param code_point - The Unicode code point of the character.
- * @param mods - Bit field describing which modifiers are active.
+ * @param window The window identifier.
+ * @param code_point The Unicode code point of the character.
+ * @param mods Bit field describing which modifiers are active.
  */
 typedef void (*HCWindowCharModsCallback)(size_t window, unsigned int code_point, int mods);
 
@@ -402,9 +419,9 @@ typedef void (*HCWindowCharModsCallback)(size_t window, unsigned int code_point,
  *
  * This kind of function is typically called when a selection is dropped inside the content area.
  *
- * @param window - The window identifier.
- * @param path_count - The number of dropped paths.
- * @param paths - The UTF-8 encoded file and/or directory path names.
+ * @param window The window identifier.
+ * @param path_count The number of dropped paths.
+ * @param paths The UTF-8 encoded file and/or directory path names.
  */
 typedef void (*HCWindowDropCallback)(size_t window, int path_count, const char* paths[]);
 
@@ -413,8 +430,8 @@ typedef void (*HCWindowDropCallback)(size_t window, int path_count, const char* 
  *
  * This kind of function is typically called when a monitor is connected or disconnected
  *
- * @param window - The window identifier.
- * @param event - One of `HCDeviceEvent::Connected` or `HCDeviceEvent::Disconnected`. Future releases may add more events.
+ * @param window The window identifier.
+ * @param event One of `HCDeviceEvent::Connected` or `HCDeviceEvent::Disconnected`. Future releases may add more events.
  */
 typedef void (*HCWindowMonitorCallback)(size_t window, enum HCDeviceEvent event);
 
@@ -423,8 +440,8 @@ typedef void (*HCWindowMonitorCallback)(size_t window, enum HCDeviceEvent event)
  *
  * This kind of function is typically called when a joystick is connected or disconnected
  *
- * @param window - The window identifier.
- * @param event - One of `HCDeviceEvent::Connected` or `HCDeviceEvent::Disconnected`. Future releases may add more events.
+ * @param window The window identifier.
+ * @param event One of `HCDeviceEvent::Connected` or `HCDeviceEvent::Disconnected`. Future releases may add more events.
  */
 typedef void (*HCWindowJoystickCallback)(size_t window, enum HCDeviceEvent event);
 
@@ -479,6 +496,15 @@ struct HCWindow hc_new_window(struct HCWindowParams params);
  * @param window A pointer to the `HCWindow` to be destroyed.
  */
 void hc_destroy_window(struct HCWindow* window);
+
+
+/**
+ * @brief Set the cursor mode of a window.
+ *
+ * @param window A pointer to the `HCWindow` for which the cursor mode is set.
+ * @param cursor_mode The cursor mode to change into.
+ */
+void hc_set_window_cursor_mode(struct HCWindow* window, enum HCCursorMode cursor_mode);
 
 /**
  * @brief Sets the window position callback.

@@ -77,7 +77,7 @@ HCDescriptor hc_create_descriptor(Sz field_count) {
     }
 
     auto* fields = static_cast<HCField*>(std::malloc(sizeof(HCField) * field_count));
-    return {.fields = fields, .field_count = fields ? field_count : 0, .alignment = HCAlignment::HCAlignment_Unknown};
+    return {.fields = fields, .field_count = fields ? field_count : 0, .alignment = HCAlignment_Unknown};
 }
 
 void hc_destroy_descriptor(HCDescriptor* descriptor) {

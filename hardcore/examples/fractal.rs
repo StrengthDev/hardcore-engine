@@ -7,10 +7,10 @@ use hardcore::context::Context;
 use hardcore::event::{Event, WindowEvent};
 use hardcore::input::{ButtonAction, MouseButton};
 use hardcore::layer::Layer;
-use hardcore::render::vulkan_version;
+use hardcore::render::vulkan_api_version;
 use hardcore::resource::VertexBuffer;
 use hardcore::shader::Shader;
-use hardcore::window::Window;
+use hardcore::window::{CursorMode, Window};
 use hardcore::{ApplicationDescriptor, Instance, Version};
 
 use hardcore_sys::ShaderStage;
@@ -22,6 +22,7 @@ struct FractalLayer<'c> {
     action_signal: bool,
     vert_shader: Shader,
     frag_shader: Shader,
+    cursor_mode: bool,
 }
 
 impl<'c> FractalLayer<'c> {
@@ -43,6 +44,7 @@ impl<'c> FractalLayer<'c> {
                 Default::default(),
             )
             .expect("Failed to create shader"),
+            cursor_mode: false,
         };
 
         s._window = Some(
@@ -59,7 +61,7 @@ impl<'c> Layer<'c> for FractalLayer<'c> {
     fn tick(&mut self, context: &mut Context<'c>) {
         if self.print_signal {
             self.print_signal = false;
-            debug!("Vulkan {}", vulkan_version());
+            debug!("Vulkan {}", vulkan_api_version());
             for (i, device) in context.devices.iter().enumerate() {
                 debug!("Device {i} name: {}", device.name())
             }
@@ -109,6 +111,26 @@ impl<'c> Layer<'c> for FractalLayer<'c> {
                     },
                 ..
             } => self.print_signal = true,
+            Event::Window {
+                event:
+                    WindowEvent::MouseButton {
+                        button: MouseButton::Button4,
+                        action: ButtonAction::Release,
+                        ..
+                    },
+                ..
+            } => {
+                self.cursor_mode = !self.cursor_mode;
+                let cursor_mode = if self.cursor_mode {
+                    CursorMode::Disabled
+                } else {
+                    CursorMode::Normal
+                };
+
+                if let Some(window) = &mut self._window {
+                    window.set_cursor_mode(cursor_mode)
+                }
+            }
             Event::Window {
                 event: WindowEvent::Close,
                 ..

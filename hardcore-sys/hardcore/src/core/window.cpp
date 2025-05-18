@@ -8,364 +8,398 @@
 #include <render/renderer.hpp>
 #include <util/number.hpp>
 
-namespace hc {
-    inline HCMouseButton from_glfw_button(int button) {
-#ifndef HC_UNSAFE_TYPE_CASTS
+namespace hc::window {
+    /**
+     * @brief Static window callback function pointers.
+     */
+    struct StaticWindow {
+        Sz id = std::numeric_limits<Sz>::max();
+        u32 owning_device = std::numeric_limits<u32>::max();
+        bool resizing = false;
+        HCWindowPositionCallback position_callback = nullptr;
+        HCWindowSizeCallback size_callback = nullptr;
+        HCWindowCloseCallback close_callback = nullptr;
+        HCWindowRefreshCallback refresh_callback = nullptr;
+        HCWindowFocusCallback focus_callback = nullptr;
+        HCWindowMinimizeCallback minimize_callback = nullptr;
+        HCWindowMaximizeCallback maximize_callback = nullptr;
+        HCWindowFramebufferCallback framebuffer_callback = nullptr;
+        HCWindowScaleCallback scale_callback = nullptr;
+        HCWindowMouseButtonCallback mouse_button_callback = nullptr;
+        HCWindowCursorPositionCallback cursor_position_callback = nullptr;
+        HCWindowCursorEnterCallback cursor_enter_callback = nullptr;
+        HCWindowScrollCallback scroll_callback = nullptr;
+        HCWindowKeyCallback key_callback = nullptr;
+        HCWindowCharCallback char_callback = nullptr;
+        HCWindowCharModsCallback char_mod_callback = nullptr;
+        HCWindowDropCallback drop_callback = nullptr;
+    };
+
+    /**
+     * @brief The mutex used to lock access to `window_map`.
+     */
+    static std::shared_mutex window_mutex;
+
+    /**
+     * @brief A map that takes a GLFWwindow pointer as a key, and stores the respective window callbacks.
+     *
+     * This is needed because GLFW window callbacks do not accept user data and only provide the GLFWwindow pointer within
+     * the callback, so this is used to access each window's individual callbacks.
+     */
+    static std::unordered_map<void*, StaticWindow> window_map;
+
+    static bool raw_mouse_input_available = false;
+
+    static void glfw_error_callback(int error_code, const char* description) {
+        HC_ERROR("GLFW: " << description << "(code " << error_code << ')');
+    }
+
+    bool init_context() {
+        if (!glfwInit()) {
+            const char* description;
+            glfwGetError(&description);
+            HC_ERROR("Error initialising GLFW's context: " << description);
+            return false;
+        }
+
+        int major, minor, rev;
+        glfwGetVersion(&major, &minor, &rev);
+        HC_INFO("GLFW v" << major << '.' << minor << '.' << rev);
+
+        glfwSetErrorCallback(glfw_error_callback);
+
+        raw_mouse_input_available = glfwRawMouseMotionSupported();
+        if (raw_mouse_input_available) {
+            HC_INFO("Raw mouse input available");
+        } else {
+            HC_INFO("Raw mouse input unavailable");
+        }
+
+        return true;
+    }
+
+    void terminate_context() {
+        glfwTerminate();
+    }
+
+    void destroy(GLFWwindow* window) {
+        if (window) {
+            const char* name = glfwGetWindowTitle(window);
+            if (name) {
+                HC_INFO("Destroying window (handle: " << window << ')');
+                std::unique_lock lock(window_mutex);
+                window_map.erase(window);
+                glfwDestroyWindow(window);
+            } else {
+                HC_WARN("Invalid window or GLFW context");
+            }
+        }
+    }
+
+    bool is_resizing(GLFWwindow* window) {
+        std::shared_lock lock(window_mutex);
+        StaticWindow& static_window = window_map.at(window);
+        return static_window.resizing;
+    }
+
+    static inline HCMouseButton from_glfw_button(int button) {
         switch (button) {
         case GLFW_MOUSE_BUTTON_1:
-            return HCMouseButton::HCMouseButton_Button1;
+            return HCMouseButton_Button1;
         case GLFW_MOUSE_BUTTON_2:
-            return HCMouseButton::HCMouseButton_Button2;
+            return HCMouseButton_Button2;
         case GLFW_MOUSE_BUTTON_3:
-            return HCMouseButton::HCMouseButton_Button3;
+            return HCMouseButton_Button3;
         case GLFW_MOUSE_BUTTON_4:
-            return HCMouseButton::HCMouseButton_Button4;
+            return HCMouseButton_Button4;
         case GLFW_MOUSE_BUTTON_5:
-            return HCMouseButton::HCMouseButton_Button5;
+            return HCMouseButton_Button5;
         case GLFW_MOUSE_BUTTON_6:
-            return HCMouseButton::HCMouseButton_Button6;
+            return HCMouseButton_Button6;
         case GLFW_MOUSE_BUTTON_7:
-            return HCMouseButton::HCMouseButton_Button7;
+            return HCMouseButton_Button7;
         case GLFW_MOUSE_BUTTON_8:
-            return HCMouseButton::HCMouseButton_Button8;
-        default:
-            return HCMouseButton{};
+            return HCMouseButton_Button8;
+        default: HC_UNREACHABLE("All possible values must be handled");
         }
-#else
-        return static_cast<HCMouseButton>(button);
-#endif // HC_UNSAFE_TYPE_CASTS
     }
 
-    inline HCButtonAction from_glfw_action(int action) {
-#ifndef HC_UNSAFE_TYPE_CASTS
+    static inline HCButtonAction from_glfw_action(int action) {
         switch (action) {
         case GLFW_RELEASE:
-            return HCButtonAction::HCButtonAction_Release;
+            return HCButtonAction_Release;
         case GLFW_PRESS:
-            return HCButtonAction::HCButtonAction_Press;
+            return HCButtonAction_Press;
         case GLFW_REPEAT:
-            return HCButtonAction::HCButtonAction_Repeat;
-        default:
-            return HCButtonAction{};
+            return HCButtonAction_Repeat;
+        default: HC_UNREACHABLE("All possible values must be handled");
         }
-#else
-        return static_cast<HCButtonAction>(action);
-#endif // HC_UNSAFE_TYPE_CASTS
     }
 
-    inline HCKeyboardKey from_glfw_key(int key) {
-#ifndef HC_UNSAFE_TYPE_CASTS
+    static inline HCKeyboardKey from_glfw_key(int key) {
         switch (key) {
         case GLFW_KEY_SPACE:
-            return HCKeyboardKey::HCKeyboardKey_Space;
+            return HCKeyboardKey_Space;
         case GLFW_KEY_APOSTROPHE:
-            return HCKeyboardKey::HCKeyboardKey_Apostrophe;
+            return HCKeyboardKey_Apostrophe;
         case GLFW_KEY_COMMA:
-            return HCKeyboardKey::HCKeyboardKey_Comma;
+            return HCKeyboardKey_Comma;
         case GLFW_KEY_MINUS:
-            return HCKeyboardKey::HCKeyboardKey_Minus;
+            return HCKeyboardKey_Minus;
         case GLFW_KEY_PERIOD:
-            return HCKeyboardKey::HCKeyboardKey_Period;
+            return HCKeyboardKey_Period;
         case GLFW_KEY_SLASH:
-            return HCKeyboardKey::HCKeyboardKey_Slash;
+            return HCKeyboardKey_Slash;
         case GLFW_KEY_0:
-            return HCKeyboardKey::HCKeyboardKey_Num0;
+            return HCKeyboardKey_Num0;
         case GLFW_KEY_1:
-            return HCKeyboardKey::HCKeyboardKey_Num1;
+            return HCKeyboardKey_Num1;
         case GLFW_KEY_2:
-            return HCKeyboardKey::HCKeyboardKey_Num2;
+            return HCKeyboardKey_Num2;
         case GLFW_KEY_3:
-            return HCKeyboardKey::HCKeyboardKey_Num3;
+            return HCKeyboardKey_Num3;
         case GLFW_KEY_4:
-            return HCKeyboardKey::HCKeyboardKey_Num4;
+            return HCKeyboardKey_Num4;
         case GLFW_KEY_5:
-            return HCKeyboardKey::HCKeyboardKey_Num5;
+            return HCKeyboardKey_Num5;
         case GLFW_KEY_6:
-            return HCKeyboardKey::HCKeyboardKey_Num6;
+            return HCKeyboardKey_Num6;
         case GLFW_KEY_7:
-            return HCKeyboardKey::HCKeyboardKey_Num7;
+            return HCKeyboardKey_Num7;
         case GLFW_KEY_8:
-            return HCKeyboardKey::HCKeyboardKey_Num8;
+            return HCKeyboardKey_Num8;
         case GLFW_KEY_9:
-            return HCKeyboardKey::HCKeyboardKey_Num9;
+            return HCKeyboardKey_Num9;
         case GLFW_KEY_SEMICOLON:
-            return HCKeyboardKey::HCKeyboardKey_Semicolon;
+            return HCKeyboardKey_Semicolon;
         case GLFW_KEY_EQUAL:
-            return HCKeyboardKey::HCKeyboardKey_Equal;
+            return HCKeyboardKey_Equal;
         case GLFW_KEY_A:
-            return HCKeyboardKey::HCKeyboardKey_A;
+            return HCKeyboardKey_A;
         case GLFW_KEY_B:
-            return HCKeyboardKey::HCKeyboardKey_B;
+            return HCKeyboardKey_B;
         case GLFW_KEY_C:
-            return HCKeyboardKey::HCKeyboardKey_C;
+            return HCKeyboardKey_C;
         case GLFW_KEY_D:
-            return HCKeyboardKey::HCKeyboardKey_D;
+            return HCKeyboardKey_D;
         case GLFW_KEY_E:
-            return HCKeyboardKey::HCKeyboardKey_E;
+            return HCKeyboardKey_E;
         case GLFW_KEY_F:
-            return HCKeyboardKey::HCKeyboardKey_F;
+            return HCKeyboardKey_F;
         case GLFW_KEY_G:
-            return HCKeyboardKey::HCKeyboardKey_G;
+            return HCKeyboardKey_G;
         case GLFW_KEY_H:
-            return HCKeyboardKey::HCKeyboardKey_H;
+            return HCKeyboardKey_H;
         case GLFW_KEY_I:
-            return HCKeyboardKey::HCKeyboardKey_I;
+            return HCKeyboardKey_I;
         case GLFW_KEY_J:
-            return HCKeyboardKey::HCKeyboardKey_J;
+            return HCKeyboardKey_J;
         case GLFW_KEY_K:
-            return HCKeyboardKey::HCKeyboardKey_K;
+            return HCKeyboardKey_K;
         case GLFW_KEY_L:
-            return HCKeyboardKey::HCKeyboardKey_L;
+            return HCKeyboardKey_L;
         case GLFW_KEY_M:
-            return HCKeyboardKey::HCKeyboardKey_M;
+            return HCKeyboardKey_M;
         case GLFW_KEY_N:
-            return HCKeyboardKey::HCKeyboardKey_N;
+            return HCKeyboardKey_N;
         case GLFW_KEY_O:
-            return HCKeyboardKey::HCKeyboardKey_O;
+            return HCKeyboardKey_O;
         case GLFW_KEY_P:
-            return HCKeyboardKey::HCKeyboardKey_P;
+            return HCKeyboardKey_P;
         case GLFW_KEY_Q:
-            return HCKeyboardKey::HCKeyboardKey_Q;
+            return HCKeyboardKey_Q;
         case GLFW_KEY_R:
-            return HCKeyboardKey::HCKeyboardKey_R;
+            return HCKeyboardKey_R;
         case GLFW_KEY_S:
-            return HCKeyboardKey::HCKeyboardKey_S;
+            return HCKeyboardKey_S;
         case GLFW_KEY_T:
-            return HCKeyboardKey::HCKeyboardKey_T;
+            return HCKeyboardKey_T;
         case GLFW_KEY_U:
-            return HCKeyboardKey::HCKeyboardKey_U;
+            return HCKeyboardKey_U;
         case GLFW_KEY_V:
-            return HCKeyboardKey::HCKeyboardKey_V;
+            return HCKeyboardKey_V;
         case GLFW_KEY_W:
-            return HCKeyboardKey::HCKeyboardKey_W;
+            return HCKeyboardKey_W;
         case GLFW_KEY_X:
-            return HCKeyboardKey::HCKeyboardKey_X;
+            return HCKeyboardKey_X;
         case GLFW_KEY_Y:
-            return HCKeyboardKey::HCKeyboardKey_Y;
+            return HCKeyboardKey_Y;
         case GLFW_KEY_Z:
-            return HCKeyboardKey::HCKeyboardKey_Z;
+            return HCKeyboardKey_Z;
         case GLFW_KEY_LEFT_BRACKET:
-            return HCKeyboardKey::HCKeyboardKey_LeftBracket;
+            return HCKeyboardKey_LeftBracket;
         case GLFW_KEY_BACKSLASH:
-            return HCKeyboardKey::HCKeyboardKey_Backslash;
+            return HCKeyboardKey_Backslash;
         case GLFW_KEY_RIGHT_BRACKET:
-            return HCKeyboardKey::HCKeyboardKey_RightBracket;
+            return HCKeyboardKey_RightBracket;
         case GLFW_KEY_GRAVE_ACCENT:
-            return HCKeyboardKey::HCKeyboardKey_GraveAccent;
+            return HCKeyboardKey_GraveAccent;
         case GLFW_KEY_WORLD_1:
-            return HCKeyboardKey::HCKeyboardKey_World1;
+            return HCKeyboardKey_World1;
         case GLFW_KEY_WORLD_2:
-            return HCKeyboardKey::HCKeyboardKey_World2;
+            return HCKeyboardKey_World2;
         case GLFW_KEY_ESCAPE:
-            return HCKeyboardKey::HCKeyboardKey_Escape;
+            return HCKeyboardKey_Escape;
         case GLFW_KEY_ENTER:
-            return HCKeyboardKey::HCKeyboardKey_Enter;
+            return HCKeyboardKey_Enter;
         case GLFW_KEY_TAB:
-            return HCKeyboardKey::HCKeyboardKey_Tab;
+            return HCKeyboardKey_Tab;
         case GLFW_KEY_BACKSPACE:
-            return HCKeyboardKey::HCKeyboardKey_Backspace;
+            return HCKeyboardKey_Backspace;
         case GLFW_KEY_INSERT:
-            return HCKeyboardKey::HCKeyboardKey_Insert;
+            return HCKeyboardKey_Insert;
         case GLFW_KEY_DELETE:
-            return HCKeyboardKey::HCKeyboardKey_Delete;
+            return HCKeyboardKey_Delete;
         case GLFW_KEY_RIGHT:
-            return HCKeyboardKey::HCKeyboardKey_Right;
+            return HCKeyboardKey_Right;
         case GLFW_KEY_LEFT:
-            return HCKeyboardKey::HCKeyboardKey_Left;
+            return HCKeyboardKey_Left;
         case GLFW_KEY_DOWN:
-            return HCKeyboardKey::HCKeyboardKey_Down;
+            return HCKeyboardKey_Down;
         case GLFW_KEY_UP:
-            return HCKeyboardKey::HCKeyboardKey_Up;
+            return HCKeyboardKey_Up;
         case GLFW_KEY_PAGE_UP:
-            return HCKeyboardKey::HCKeyboardKey_PageUp;
+            return HCKeyboardKey_PageUp;
         case GLFW_KEY_PAGE_DOWN:
-            return HCKeyboardKey::HCKeyboardKey_PageDown;
+            return HCKeyboardKey_PageDown;
         case GLFW_KEY_HOME:
-            return HCKeyboardKey::HCKeyboardKey_Home;
+            return HCKeyboardKey_Home;
         case GLFW_KEY_END:
-            return HCKeyboardKey::HCKeyboardKey_End;
+            return HCKeyboardKey_End;
         case GLFW_KEY_CAPS_LOCK:
-            return HCKeyboardKey::HCKeyboardKey_CapsLock;
+            return HCKeyboardKey_CapsLock;
         case GLFW_KEY_SCROLL_LOCK:
-            return HCKeyboardKey::HCKeyboardKey_ScrollLock;
+            return HCKeyboardKey_ScrollLock;
         case GLFW_KEY_NUM_LOCK:
-            return HCKeyboardKey::HCKeyboardKey_NumLock;
+            return HCKeyboardKey_NumLock;
         case GLFW_KEY_PRINT_SCREEN:
-            return HCKeyboardKey::HCKeyboardKey_PrintScreen;
+            return HCKeyboardKey_PrintScreen;
         case GLFW_KEY_PAUSE:
-            return HCKeyboardKey::HCKeyboardKey_Pause;
+            return HCKeyboardKey_Pause;
         case GLFW_KEY_F1:
-            return HCKeyboardKey::HCKeyboardKey_F1;
+            return HCKeyboardKey_F1;
         case GLFW_KEY_F2:
-            return HCKeyboardKey::HCKeyboardKey_F2;
+            return HCKeyboardKey_F2;
         case GLFW_KEY_F3:
-            return HCKeyboardKey::HCKeyboardKey_F3;
+            return HCKeyboardKey_F3;
         case GLFW_KEY_F4:
-            return HCKeyboardKey::HCKeyboardKey_F4;
+            return HCKeyboardKey_F4;
         case GLFW_KEY_F5:
-            return HCKeyboardKey::HCKeyboardKey_F5;
+            return HCKeyboardKey_F5;
         case GLFW_KEY_F6:
-            return HCKeyboardKey::HCKeyboardKey_F6;
+            return HCKeyboardKey_F6;
         case GLFW_KEY_F7:
-            return HCKeyboardKey::HCKeyboardKey_F7;
+            return HCKeyboardKey_F7;
         case GLFW_KEY_F8:
-            return HCKeyboardKey::HCKeyboardKey_F8;
+            return HCKeyboardKey_F8;
         case GLFW_KEY_F9:
-            return HCKeyboardKey::HCKeyboardKey_F9;
+            return HCKeyboardKey_F9;
         case GLFW_KEY_F10:
-            return HCKeyboardKey::HCKeyboardKey_F10;
+            return HCKeyboardKey_F10;
         case GLFW_KEY_F11:
-            return HCKeyboardKey::HCKeyboardKey_F11;
+            return HCKeyboardKey_F11;
         case GLFW_KEY_F12:
-            return HCKeyboardKey::HCKeyboardKey_F12;
+            return HCKeyboardKey_F12;
         case GLFW_KEY_F13:
-            return HCKeyboardKey::HCKeyboardKey_F13;
+            return HCKeyboardKey_F13;
         case GLFW_KEY_F14:
-            return HCKeyboardKey::HCKeyboardKey_F14;
+            return HCKeyboardKey_F14;
         case GLFW_KEY_F15:
-            return HCKeyboardKey::HCKeyboardKey_F15;
+            return HCKeyboardKey_F15;
         case GLFW_KEY_F16:
-            return HCKeyboardKey::HCKeyboardKey_F16;
+            return HCKeyboardKey_F16;
         case GLFW_KEY_F17:
-            return HCKeyboardKey::HCKeyboardKey_F17;
+            return HCKeyboardKey_F17;
         case GLFW_KEY_F18:
-            return HCKeyboardKey::HCKeyboardKey_F18;
+            return HCKeyboardKey_F18;
         case GLFW_KEY_F19:
-            return HCKeyboardKey::HCKeyboardKey_F19;
+            return HCKeyboardKey_F19;
         case GLFW_KEY_F20:
-            return HCKeyboardKey::HCKeyboardKey_F20;
+            return HCKeyboardKey_F20;
         case GLFW_KEY_F21:
-            return HCKeyboardKey::HCKeyboardKey_F21;
+            return HCKeyboardKey_F21;
         case GLFW_KEY_F22:
-            return HCKeyboardKey::HCKeyboardKey_F22;
+            return HCKeyboardKey_F22;
         case GLFW_KEY_F23:
-            return HCKeyboardKey::HCKeyboardKey_F23;
+            return HCKeyboardKey_F23;
         case GLFW_KEY_F24:
-            return HCKeyboardKey::HCKeyboardKey_F24;
+            return HCKeyboardKey_F24;
         case GLFW_KEY_F25:
-            return HCKeyboardKey::HCKeyboardKey_F25;
+            return HCKeyboardKey_F25;
         case GLFW_KEY_KP_0:
-            return HCKeyboardKey::HCKeyboardKey_Numpad0;
+            return HCKeyboardKey_Numpad0;
         case GLFW_KEY_KP_1:
-            return HCKeyboardKey::HCKeyboardKey_Numpad1;
+            return HCKeyboardKey_Numpad1;
         case GLFW_KEY_KP_2:
-            return HCKeyboardKey::HCKeyboardKey_Numpad2;
+            return HCKeyboardKey_Numpad2;
         case GLFW_KEY_KP_3:
-            return HCKeyboardKey::HCKeyboardKey_Numpad3;
+            return HCKeyboardKey_Numpad3;
         case GLFW_KEY_KP_4:
-            return HCKeyboardKey::HCKeyboardKey_Numpad4;
+            return HCKeyboardKey_Numpad4;
         case GLFW_KEY_KP_5:
-            return HCKeyboardKey::HCKeyboardKey_Numpad5;
+            return HCKeyboardKey_Numpad5;
         case GLFW_KEY_KP_6:
-            return HCKeyboardKey::HCKeyboardKey_Numpad6;
+            return HCKeyboardKey_Numpad6;
         case GLFW_KEY_KP_7:
-            return HCKeyboardKey::HCKeyboardKey_Numpad7;
+            return HCKeyboardKey_Numpad7;
         case GLFW_KEY_KP_8:
-            return HCKeyboardKey::HCKeyboardKey_Numpad8;
+            return HCKeyboardKey_Numpad8;
         case GLFW_KEY_KP_9:
-            return HCKeyboardKey::HCKeyboardKey_Numpad9;
+            return HCKeyboardKey_Numpad9;
         case GLFW_KEY_KP_DECIMAL:
-            return HCKeyboardKey::HCKeyboardKey_NumpadDecimal;
+            return HCKeyboardKey_NumpadDecimal;
         case GLFW_KEY_KP_DIVIDE:
-            return HCKeyboardKey::HCKeyboardKey_NumpadDivide;
+            return HCKeyboardKey_NumpadDivide;
         case GLFW_KEY_KP_MULTIPLY:
-            return HCKeyboardKey::HCKeyboardKey_NumpadMultiply;
+            return HCKeyboardKey_NumpadMultiply;
         case GLFW_KEY_KP_SUBTRACT:
-            return HCKeyboardKey::HCKeyboardKey_NumpadSubtract;
+            return HCKeyboardKey_NumpadSubtract;
         case GLFW_KEY_KP_ADD:
-            return HCKeyboardKey::HCKeyboardKey_NumpadAdd;
+            return HCKeyboardKey_NumpadAdd;
         case GLFW_KEY_KP_ENTER:
-            return HCKeyboardKey::HCKeyboardKey_NumpadEnter;
+            return HCKeyboardKey_NumpadEnter;
         case GLFW_KEY_KP_EQUAL:
-            return HCKeyboardKey::HCKeyboardKey_NumpadEqual;
+            return HCKeyboardKey_NumpadEqual;
         case GLFW_KEY_LEFT_SHIFT:
-            return HCKeyboardKey::HCKeyboardKey_LeftShift;
+            return HCKeyboardKey_LeftShift;
         case GLFW_KEY_LEFT_CONTROL:
-            return HCKeyboardKey::HCKeyboardKey_LeftControl;
+            return HCKeyboardKey_LeftControl;
         case GLFW_KEY_LEFT_ALT:
-            return HCKeyboardKey::HCKeyboardKey_LeftAlt;
+            return HCKeyboardKey_LeftAlt;
         case GLFW_KEY_LEFT_SUPER:
-            return HCKeyboardKey::HCKeyboardKey_LeftSuper;
+            return HCKeyboardKey_LeftSuper;
         case GLFW_KEY_RIGHT_SHIFT:
-            return HCKeyboardKey::HCKeyboardKey_RightShift;
+            return HCKeyboardKey_RightShift;
         case GLFW_KEY_RIGHT_CONTROL:
-            return HCKeyboardKey::HCKeyboardKey_RightControl;
+            return HCKeyboardKey_RightControl;
         case GLFW_KEY_RIGHT_ALT:
-            return HCKeyboardKey::HCKeyboardKey_RightAlt;
+            return HCKeyboardKey_RightAlt;
         case GLFW_KEY_RIGHT_SUPER:
-            return HCKeyboardKey::HCKeyboardKey_RightSuper;
+            return HCKeyboardKey_RightSuper;
         case GLFW_KEY_MENU:
-            return HCKeyboardKey::HCKeyboardKey_Menu;
-        default:
-            return HCKeyboardKey{};
+            return HCKeyboardKey_Menu;
+        default: HC_UNREACHABLE("All possible values must be handled");
         }
-#else
-        return static_cast<HCKeyboardKey>(key);
-#endif // HC_UNSAFE_TYPE_CASTS
     }
 
-    inline HCDeviceEvent from_glfw_event(int event) {
-#ifndef HC_UNSAFE_TYPE_CASTS
+    static inline HCDeviceEvent from_glfw_event(int event) {
         switch (event) {
         case GLFW_CONNECTED:
-            return HCDeviceEvent::HCDeviceEvent_Connected;
+            return HCDeviceEvent_Connected;
         case GLFW_DISCONNECTED:
-            return HCDeviceEvent::HCDeviceEvent_Disconnected;
-        default:
-            return HCDeviceEvent{};
+            return HCDeviceEvent_Disconnected;
+        default: HC_UNREACHABLE("All possible values must be handled");
         }
-#else
-        return static_cast<HCDeviceEvent>(event);
-#endif // HC_UNSAFE_TYPE_CASTS
     }
 }
-
-/**
- * @brief Static window callback function pointers.
- */
-struct StaticWindow {
-    Sz id = std::numeric_limits<Sz>::max();
-    u32 owning_device = std::numeric_limits<u32>::max();
-    bool resizing = false;
-    HCWindowPositionCallback position_callback = nullptr;
-    HCWindowSizeCallback size_callback = nullptr;
-    HCWindowCloseCallback close_callback = nullptr;
-    HCWindowRefreshCallback refresh_callback = nullptr;
-    HCWindowFocusCallback focus_callback = nullptr;
-    HCWindowMinimizeCallback minimize_callback = nullptr;
-    HCWindowMaximizeCallback maximize_callback = nullptr;
-    HCWindowFramebufferCallback framebuffer_callback = nullptr;
-    HCWindowScaleCallback scale_callback = nullptr;
-    HCWindowMouseButtonCallback mouse_button_callback = nullptr;
-    HCWindowCursorPositionCallback cursor_position_callback = nullptr;
-    HCWindowCursorEnterCallback cursor_enter_callback = nullptr;
-    HCWindowScrollCallback scroll_callback = nullptr;
-    HCWindowKeyCallback key_callback = nullptr;
-    HCWindowCharCallback char_callback = nullptr;
-    HCWindowCharModsCallback char_mod_callback = nullptr;
-    HCWindowDropCallback drop_callback = nullptr;
-};
-
-/**
- * @brief The mutex used to lock access to `window_map`.
- */
-static std::shared_mutex window_mutex;
-
-/**
- * @brief A map that takes a GLFWwindow pointer as a key, and stores the respective window callbacks.
- *
- * This is needed because GLFW window callbacks do not accept user data and only provide the GLFWwindow pointer within
- * the callback, so this is used to access each window's individual callbacks.
- */
-static std::unordered_map<void*, StaticWindow> window_map;
 
 void hc_poll_events() {
     glfwPollEvents();
 
     // Unsure if this needed, as callbacks should only be called from within glfwPollEvents.
-    std::unique_lock lock(window_mutex);
+    std::unique_lock lock(hc::window::window_mutex);
     // Set resizing to false, in order to allow swapchains to be recreated.
-    for (auto& static_window : window_map | std::views::values) {
+    for (auto& static_window : hc::window::window_map | std::views::values) {
         static_window.resizing = false;
     }
 }
@@ -411,11 +445,17 @@ HCWindow hc_new_window(HCWindowParams params) {
         return INVALID_WINDOW;
     }
 
+    glfwSetInputMode(window, GLFW_LOCK_KEY_MODS, GLFW_TRUE);
+
+    if (hc::window::raw_mouse_input_available) {
+        glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+    }
+
     // Find first available ID
-    std::unique_lock lock(window_mutex);
+    std::unique_lock lock(hc::window::window_mutex);
     std::vector<Sz> ids;
-    ids.reserve(window_map.size());
-    for (auto& static_window : window_map | std::views::values) {
+    ids.reserve(hc::window::window_map.size());
+    for (auto& static_window : hc::window::window_map | std::views::values) {
         ids.push_back(static_window.id);
     }
     std::ranges::sort(ids);
@@ -428,10 +468,10 @@ HCWindow hc_new_window(HCWindowParams params) {
         }
     }
 
-    StaticWindow static_window;
+    hc::window::StaticWindow static_window;
     static_window.id = id;
     static_window.owning_device = params.device;
-    window_map.emplace(window, static_window);
+    hc::window::window_map.emplace(window, static_window);
 
     HC_INFO("Created new window with id " << id);
 
@@ -466,8 +506,8 @@ void hc_destroy_window(HCWindow* window) {
 
     u32 device;
     {
-        std::shared_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(handle);
+        std::shared_lock lock(hc::window::window_mutex);
+        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         device = static_window.owning_device;
     }
     auto device_res = hc::render::device_at(device);
@@ -480,41 +520,52 @@ void hc_destroy_window(HCWindow* window) {
     window->handle = nullptr;
 }
 
-namespace hc::window {
-    void destroy(GLFWwindow* window) {
-        if (window) {
-            const char* name = glfwGetWindowTitle(window);
-            if (name) {
-                HC_INFO("Destroying window (handle: " << window << ')');
-                std::unique_lock lock(window_mutex);
-                window_map.erase(window);
-                glfwDestroyWindow(window);
-            } else {
-                HC_WARN("Invalid window or GLFW context");
-            }
-        }
+void hc_set_window_cursor_mode(HCWindow* window, HCCursorMode cursor_mode) {
+    if (!window || !window->handle) {
+        return;
     }
 
-    bool is_resizing(GLFWwindow* window) {
-        std::shared_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(window);
-        return static_window.resizing;
+    auto* handle = static_cast<GLFWwindow*>(window->handle);
+
+    u32 mode;
+    switch (cursor_mode) {
+    case HCCursorMode_Normal:
+        HC_TRACE("Setting cursor mode normal for window " << window->id);
+        mode = GLFW_CURSOR_NORMAL;
+        break;
+    case HCCursorMode_Hidden:
+        HC_TRACE("Setting cursor mode hidden for window " << window->id);
+        mode = GLFW_CURSOR_HIDDEN;
+        break;
+    case HCCursorMode_Captured:
+        HC_TRACE("Setting cursor mode captured for window " << window->id);
+        mode = GLFW_CURSOR_CAPTURED;
+        break;
+    case HCCursorMode_Disabled:
+        HC_TRACE("Setting cursor mode disabled for window " << window->id);
+        mode = GLFW_CURSOR_DISABLED;
+        break;
+    default:
+        HC_ERROR("Invalid cursor mode value.");
+        return;
     }
+
+    glfwSetInputMode(handle, GLFW_CURSOR, mode);
 }
 
 void hc_set_window_position_callback(HCWindow* window, HCWindowPositionCallback callback) {
     if (window->handle) {
         auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(handle);
+        std::unique_lock lock(hc::window::window_mutex);
+        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         static_window.position_callback = callback;
         if (callback) {
             HC_TRACE("Setting window position callback for window " << window->id);
             glfwSetWindowPosCallback(
                 handle,
                 [](GLFWwindow* glfw_window, int width, int height) {
-                    std::shared_lock lock(window_mutex);
-                    StaticWindow& static_window = window_map.at(glfw_window);
+                    std::shared_lock lock(hc::window::window_mutex);
+                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
                     static_window.position_callback(static_window.id, width, height);
                 }
             );
@@ -528,16 +579,16 @@ void hc_set_window_position_callback(HCWindow* window, HCWindowPositionCallback 
 void hc_set_window_size_callback(HCWindow* window, HCWindowSizeCallback callback) {
     if (window->handle) {
         auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(handle);
+        std::unique_lock lock(hc::window::window_mutex);
+        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         static_window.size_callback = callback;
         if (callback) {
             HC_TRACE("Setting window size callback for window " << window->id);
             glfwSetWindowSizeCallback(
                 handle,
                 [](GLFWwindow* glfw_window, int width, int height) {
-                    std::shared_lock lock(window_mutex);
-                    StaticWindow& static_window = window_map.at(glfw_window);
+                    std::shared_lock lock(hc::window::window_mutex);
+                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
                     static_window.size_callback(static_window.id, width, height);
                 }
             );
@@ -551,16 +602,16 @@ void hc_set_window_size_callback(HCWindow* window, HCWindowSizeCallback callback
 void hc_set_window_close_callback(HCWindow* window, HCWindowCloseCallback callback) {
     if (window->handle) {
         auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(handle);
+        std::unique_lock lock(hc::window::window_mutex);
+        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         static_window.close_callback = callback;
         if (callback) {
             HC_TRACE("Setting window close callback for window " << window->id);
             glfwSetWindowCloseCallback(
                 handle,
                 [](GLFWwindow* glfw_window) {
-                    std::shared_lock lock(window_mutex);
-                    StaticWindow& static_window = window_map.at(glfw_window);
+                    std::shared_lock lock(hc::window::window_mutex);
+                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
                     static_window.close_callback(static_window.id);
                 }
             );
@@ -574,16 +625,16 @@ void hc_set_window_close_callback(HCWindow* window, HCWindowCloseCallback callba
 void hc_set_window_refresh_callback(HCWindow* window, HCWindowRefreshCallback callback) {
     if (window->handle) {
         auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(handle);
+        std::unique_lock lock(hc::window::window_mutex);
+        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         static_window.refresh_callback = callback;
         if (callback) {
             HC_TRACE("Setting window refresh callback for window " << window->id);
             glfwSetWindowRefreshCallback(
                 handle,
                 [](GLFWwindow* glfw_window) {
-                    std::shared_lock lock(window_mutex);
-                    StaticWindow& static_window = window_map.at(glfw_window);
+                    std::shared_lock lock(hc::window::window_mutex);
+                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
                     static_window.refresh_callback(static_window.id);
                 }
             );
@@ -597,16 +648,16 @@ void hc_set_window_refresh_callback(HCWindow* window, HCWindowRefreshCallback ca
 void hc_set_window_focus_callback(HCWindow* window, HCWindowFocusCallback callback) {
     if (window->handle) {
         auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(handle);
+        std::unique_lock lock(hc::window::window_mutex);
+        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         static_window.focus_callback = callback;
         if (callback) {
             HC_TRACE("Setting window focus callback for window " << window->id);
             glfwSetWindowFocusCallback(
                 handle,
                 [](GLFWwindow* glfw_window, int focused) {
-                    std::shared_lock lock(window_mutex);
-                    StaticWindow& static_window = window_map.at(glfw_window);
+                    std::shared_lock lock(hc::window::window_mutex);
+                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
                     static_window.focus_callback(static_window.id, focused == GLFW_TRUE);
                 }
             );
@@ -620,16 +671,16 @@ void hc_set_window_focus_callback(HCWindow* window, HCWindowFocusCallback callba
 void hc_set_window_minimize_callback(HCWindow* window, HCWindowMinimizeCallback callback) {
     if (window->handle) {
         auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(handle);
+        std::unique_lock lock(hc::window::window_mutex);
+        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         static_window.minimize_callback = callback;
         if (callback) {
             HC_TRACE("Setting window minimize callback for window " << window->id);
             glfwSetWindowIconifyCallback(
                 handle,
                 [](GLFWwindow* glfw_window, int minimized) {
-                    std::shared_lock lock(window_mutex);
-                    StaticWindow& static_window = window_map.at(glfw_window);
+                    std::shared_lock lock(hc::window::window_mutex);
+                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
                     static_window.minimize_callback(static_window.id, minimized == GLFW_TRUE);
                 }
             );
@@ -643,16 +694,16 @@ void hc_set_window_minimize_callback(HCWindow* window, HCWindowMinimizeCallback 
 void hc_set_window_maximize_callback(HCWindow* window, HCWindowMaximizeCallback callback) {
     if (window->handle) {
         auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(handle);
+        std::unique_lock lock(hc::window::window_mutex);
+        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         static_window.maximize_callback = callback;
         if (callback) {
             HC_TRACE("Setting window maximize callback for window " << window->id);
             glfwSetWindowMaximizeCallback(
                 handle,
                 [](GLFWwindow* glfw_window, int maximized) {
-                    std::shared_lock lock(window_mutex);
-                    StaticWindow& static_window = window_map.at(glfw_window);
+                    std::shared_lock lock(hc::window::window_mutex);
+                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
                     static_window.maximize_callback(static_window.id, maximized == GLFW_TRUE);
                 }
             );
@@ -666,8 +717,8 @@ void hc_set_window_maximize_callback(HCWindow* window, HCWindowMaximizeCallback 
 void hc_set_window_framebuffer_callback(HCWindow* window, HCWindowFramebufferCallback callback) {
     if (window->handle) {
         auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(handle);
+        std::unique_lock lock(hc::window::window_mutex);
+        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         static_window.framebuffer_callback = callback;
         if (callback) {
             HC_TRACE("Setting window framebuffer callback for window " << window->id);
@@ -675,12 +726,12 @@ void hc_set_window_framebuffer_callback(HCWindow* window, HCWindowFramebufferCal
                 handle,
                 [](GLFWwindow* glfw_window, int width, int height) {
                     // Unique lock because a variable is being set.
-                    std::unique_lock lock(window_mutex);
-                    StaticWindow& static_window = window_map.at(glfw_window);
+                    std::unique_lock lock(hc::window::window_mutex);
+                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
                     // Set resizing to true to keep the window's swapchain from recreating itself,
                     // while glfwPollEvents is blocking.
-                    // This way, swapchains are only recreated at the end of glfwPollEvents, when the user stops resizing
-                    // the window.
+                    // This way, swapchains are only recreated at the end of glfwPollEvents, when the user stops
+                    // resizing the window.
                     static_window.resizing = true;
                     static_window.framebuffer_callback(static_window.id, width, height);
                 }
@@ -695,16 +746,16 @@ void hc_set_window_framebuffer_callback(HCWindow* window, HCWindowFramebufferCal
 void hc_set_window_scale_callback(HCWindow* window, HCWindowScaleCallback callback) {
     if (window->handle) {
         auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(handle);
+        std::unique_lock lock(hc::window::window_mutex);
+        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         static_window.scale_callback = callback;
         if (callback) {
             HC_TRACE("Setting window scale callback for window " << window->id);
             glfwSetWindowContentScaleCallback(
                 handle,
                 [](GLFWwindow* glfw_window, float x_scale, float y_scale) {
-                    std::shared_lock lock(window_mutex);
-                    StaticWindow& static_window = window_map.at(glfw_window);
+                    std::shared_lock lock(hc::window::window_mutex);
+                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
                     static_window.scale_callback(static_window.id, x_scale, y_scale);
                 }
             );
@@ -718,20 +769,20 @@ void hc_set_window_scale_callback(HCWindow* window, HCWindowScaleCallback callba
 void hc_set_window_mouse_button_callback(HCWindow* window, HCWindowMouseButtonCallback callback) {
     if (window->handle) {
         auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(handle);
+        std::unique_lock lock(hc::window::window_mutex);
+        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         static_window.mouse_button_callback = callback;
         if (callback) {
             HC_TRACE("Setting mouse button callback for window " << window->id);
             glfwSetMouseButtonCallback(
                 handle,
                 [](GLFWwindow* glfw_window, int button, int action, int mods) {
-                    std::shared_lock lock(window_mutex);
-                    StaticWindow& static_window = window_map.at(glfw_window);
+                    std::shared_lock lock(hc::window::window_mutex);
+                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
                     static_window.mouse_button_callback(
                         static_window.id,
-                        hc::from_glfw_button(button),
-                        hc::from_glfw_action(action),
+                        hc::window::from_glfw_button(button),
+                        hc::window::from_glfw_action(action),
                         mods
                     );
                 }
@@ -746,16 +797,16 @@ void hc_set_window_mouse_button_callback(HCWindow* window, HCWindowMouseButtonCa
 void hc_set_window_cursor_position_callback(HCWindow* window, HCWindowCursorPositionCallback callback) {
     if (window->handle) {
         auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(handle);
+        std::unique_lock lock(hc::window::window_mutex);
+        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         static_window.cursor_position_callback = callback;
         if (callback) {
             HC_TRACE("Setting cursor position callback for window " << window->id);
             glfwSetCursorPosCallback(
                 handle,
                 [](GLFWwindow* glfw_window, double x, double y) {
-                    std::shared_lock lock(window_mutex);
-                    StaticWindow& static_window = window_map.at(glfw_window);
+                    std::shared_lock lock(hc::window::window_mutex);
+                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
                     static_window.cursor_position_callback(static_window.id, x, y);
                 }
             );
@@ -769,16 +820,16 @@ void hc_set_window_cursor_position_callback(HCWindow* window, HCWindowCursorPosi
 void hc_set_window_cursor_enter_callback(HCWindow* window, HCWindowCursorEnterCallback callback) {
     if (window->handle) {
         auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(handle);
+        std::unique_lock lock(hc::window::window_mutex);
+        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         static_window.cursor_enter_callback = callback;
         if (callback) {
             HC_TRACE("Setting cursor enter callback for window " << window->id);
             glfwSetCursorEnterCallback(
                 handle,
                 [](GLFWwindow* glfw_window, int entered) {
-                    std::shared_lock lock(window_mutex);
-                    StaticWindow& static_window = window_map.at(glfw_window);
+                    std::shared_lock lock(hc::window::window_mutex);
+                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
                     static_window.cursor_enter_callback(static_window.id, entered == GLFW_TRUE);
                 }
             );
@@ -792,16 +843,16 @@ void hc_set_window_cursor_enter_callback(HCWindow* window, HCWindowCursorEnterCa
 void hc_set_window_scroll_callback(HCWindow* window, HCWindowScrollCallback callback) {
     if (window->handle) {
         auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(handle);
+        std::unique_lock lock(hc::window::window_mutex);
+        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         static_window.scroll_callback = callback;
         if (callback) {
             HC_TRACE("Setting scroll callback for window " << window->id);
             glfwSetScrollCallback(
                 handle,
                 [](GLFWwindow* glfw_window, double x_offset, double y_offset) {
-                    std::shared_lock lock(window_mutex);
-                    StaticWindow& static_window = window_map.at(glfw_window);
+                    std::shared_lock lock(hc::window::window_mutex);
+                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
                     static_window.scroll_callback(static_window.id, x_offset, y_offset);
                 }
             );
@@ -815,21 +866,21 @@ void hc_set_window_scroll_callback(HCWindow* window, HCWindowScrollCallback call
 void hc_set_window_key_callback(HCWindow* window, HCWindowKeyCallback callback) {
     if (window->handle) {
         auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(handle);
+        std::unique_lock lock(hc::window::window_mutex);
+        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         static_window.key_callback = callback;
         if (callback) {
             HC_TRACE("Setting key callback for window " << window->id);
             glfwSetKeyCallback(
                 handle,
                 [](GLFWwindow* glfw_window, int key, int scan_code, int action, int mods) {
-                    std::shared_lock lock(window_mutex);
-                    StaticWindow& static_window = window_map.at(glfw_window);
+                    std::shared_lock lock(hc::window::window_mutex);
+                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
                     static_window.key_callback(
                         static_window.id,
-                        hc::from_glfw_key(key),
+                        hc::window::from_glfw_key(key),
                         scan_code,
-                        hc::from_glfw_action(action),
+                        hc::window::from_glfw_action(action),
                         mods
                     );
                 }
@@ -844,16 +895,16 @@ void hc_set_window_key_callback(HCWindow* window, HCWindowKeyCallback callback) 
 void hc_set_window_char_callback(HCWindow* window, HCWindowCharCallback callback) {
     if (window->handle) {
         auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(handle);
+        std::unique_lock lock(hc::window::window_mutex);
+        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         static_window.char_callback = callback;
         if (callback) {
             HC_TRACE("Setting character callback for window " << window->id);
             glfwSetCharCallback(
                 handle,
                 [](GLFWwindow* glfw_window, unsigned int code_point) {
-                    std::shared_lock lock(window_mutex);
-                    StaticWindow& static_window = window_map.at(glfw_window);
+                    std::shared_lock lock(hc::window::window_mutex);
+                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
                     static_window.char_callback(static_window.id, code_point);
                 }
             );
@@ -867,16 +918,16 @@ void hc_set_window_char_callback(HCWindow* window, HCWindowCharCallback callback
 void hc_set_window_char_mods_callback(HCWindow* window, HCWindowCharModsCallback callback) {
     if (window->handle) {
         auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(handle);
+        std::unique_lock lock(hc::window::window_mutex);
+        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         static_window.char_mod_callback = callback;
         if (callback) {
             HC_TRACE("Setting character with mods callback for window " << window->id);
             glfwSetCharModsCallback(
                 handle,
                 [](GLFWwindow* glfw_window, unsigned int code_point, int mods) {
-                    std::shared_lock lock(window_mutex);
-                    StaticWindow& static_window = window_map.at(glfw_window);
+                    std::shared_lock lock(hc::window::window_mutex);
+                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
                     static_window.char_mod_callback(static_window.id, code_point, mods);
                 }
             );
@@ -890,16 +941,16 @@ void hc_set_window_char_mods_callback(HCWindow* window, HCWindowCharModsCallback
 void hc_set_window_drop_callback(HCWindow* window, HCWindowDropCallback callback) {
     if (window->handle) {
         auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(window_mutex);
-        StaticWindow& static_window = window_map.at(handle);
+        std::unique_lock lock(hc::window::window_mutex);
+        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         static_window.drop_callback = callback;
         if (callback) {
             HC_TRACE("Setting drop callback for window " << window->id);
             glfwSetDropCallback(
                 handle,
                 [](GLFWwindow* glfw_window, int path_count, const char* paths[]) {
-                    std::shared_lock lock(window_mutex);
-                    StaticWindow& static_window = window_map.at(glfw_window);
+                    std::shared_lock lock(hc::window::window_mutex);
+                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
                     static_window.drop_callback(static_window.id, path_count, paths);
                 }
             );

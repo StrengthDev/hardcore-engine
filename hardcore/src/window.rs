@@ -18,6 +18,8 @@ use std::ptr::addr_of_mut;
 use thiserror::Error;
 use tracing::error;
 
+pub use hardcore_sys::CursorMode;
+
 /// An error related to a [`Window`].
 #[derive(Error, Debug)]
 pub enum WindowError {
@@ -72,6 +74,10 @@ pub(super) enum GLFWCall {
         result_channel: tokio::sync::oneshot::Sender<Result<(), WindowError>>,
         window: hardcore_sys::Window,
     },
+    SetCursorMode {
+        window: *mut hardcore_sys::Window,
+        cursor_mode: CursorMode,
+    },
 }
 
 impl GLFWCall {
@@ -102,6 +108,10 @@ impl GLFWCall {
                     .send(Ok(()))
                     .map_err(move |_| GLFWCallError::SendToCaller)?
             }
+            GLFWCall::SetCursorMode {
+                window,
+                cursor_mode,
+            } => unsafe { hardcore_sys::set_window_cursor_mode(window, cursor_mode) },
         };
 
         Ok(())
@@ -138,7 +148,7 @@ impl<'c> Window<'c> {
             },
         };
 
-        GLFWCall::submit(call)?;
+        call.submit()?;
 
         let inner = rx
             .blocking_recv()
@@ -215,6 +225,17 @@ impl<'c> Window<'c> {
     pub fn id(&self) -> usize {
         self.handle.id
     }
+
+    /// Set the cursor mode for this window.
+    pub fn set_cursor_mode(&mut self, cursor_mode: CursorMode) {
+        let call = GLFWCall::SetCursorMode {
+            window: addr_of_mut!(self.handle),
+            cursor_mode,
+        };
+        if let Err(err) = call.submit() {
+            error!("Failed to submit set window cursor mode call: {err:?}")
+        }
+    }
 }
 
 impl<'c> Drop for Window<'c> {
@@ -225,7 +246,7 @@ impl<'c> Drop for Window<'c> {
             window: self.handle,
         };
 
-        if let Err(err) = GLFWCall::submit(call) {
+        if let Err(err) = call.submit() {
             error!("Failed to submit window destruction call: {err:?}")
         }
 

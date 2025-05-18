@@ -4,18 +4,10 @@
 
 #include <core/core.h>
 #ifndef HC_HEADLESS
-#include <core/glfw.hpp>
+#include <core/window.hpp>
 #endif // HC_HEADLESS
 
 #include <render/renderer.hpp>
-
-#ifndef HC_HEADLESS
-
-void glfw_error_callback(int error_code, const char* description) {
-    HC_ERROR("GLFW: " << description << "(code " << error_code << ')');
-}
-
-#endif // HC_HEADLESS
 
 int hc_init(HCInitParams params) {
 #ifdef HC_LOGGING
@@ -29,14 +21,9 @@ int hc_init(HCInitParams params) {
 #endif // HC_LOGGING
 
 #ifndef HC_HEADLESS
-    if (!glfwInit()) {
-        const char* description;
-        glfwGetError(&description);
-        HC_ERROR("Error initialising GLFW's context: %s\n" << description);
+    if (!hc::window::init_context()) {
         return -1;
     }
-
-    glfwSetErrorCallback(glfw_error_callback);
 #endif // HC_HEADLESS
 
     if (hc::render::init(params.app, params.render_params) != hc::render::InstanceResult::Success) {
@@ -54,7 +41,7 @@ int hc_term() {
     }
 
 #ifndef HC_HEADLESS
-    glfwTerminate();
+    hc::window::terminate_context();
 #endif // HC_HEADLESS
 
     return 0;
