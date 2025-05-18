@@ -4,8 +4,6 @@
 
 #include <core/log.hpp>
 
-#include <render/device.hpp>
-
 /*
 namespace hc::device {
     const VkDeviceSize staging_buffer_size = MEGABYTES(8);
@@ -705,16 +703,17 @@ namespace hc::device {
 }
 */
 
-namespace hc::render::device {
+namespace hc::render::device::memory {
     Result<Memory, MemoryResult> Memory::create(
         VkPhysicalDevice physical_device,
         VolkDeviceTable const&,
         VkDevice,
         const VkPhysicalDeviceLimits& limits
     ) {
-        auto manager = memory::HeapManager::create(physical_device);
-        if (!manager)
+        auto manager = HeapManager::create(physical_device);
+        if (!manager) {
             return Err(MemoryResult::HeapError);
+        }
 
         Memory memory;
         memory.limits = limits;
@@ -735,22 +734,22 @@ namespace hc::render::device {
     }
 
     void Memory::destroy(VolkDeviceTable const& fn_table, VkDevice device) {
-        for (auto& [flags, pools] : this->buffer_pools) {
-            for (auto& [id, pool] : pools) {
+        for (auto& pools : this->buffer_pools | std::views::values) {
+            for (auto& pool : pools | std::views::values) {
                 pool.free(fn_table, device, this->heap_manager);
             }
         }
         this->buffer_pools.clear();
 
-        for (auto& [flags, pools] : this->dynamic_buffer_pools) {
-            for (auto& [id, pool] : pools) {
+        for (auto& pools : this->dynamic_buffer_pools | std::views::values) {
+            for (auto& pool : pools | std::views::values) {
                 pool.free(fn_table, device, this->heap_manager);
             }
         }
         this->dynamic_buffer_pools.clear();
 
-        for (auto& [flags, pools] : this->texture_pools) {
-            for (auto& [id, pool] : pools) {
+        for (auto& pools : this->texture_pools | std::views::values) {
+            for (auto& pool : pools | std::views::values) {
                 pool.free(fn_table, device, this->heap_manager);
             }
         }
@@ -758,10 +757,10 @@ namespace hc::render::device {
     }
 
     MemoryResult Memory::map_ranges(VolkDeviceTable const& fn_table, VkDevice device, u8 frame_mod) {
-        for (auto& [flags, pools] : this->dynamic_buffer_pools) {
-            for (auto& [id, pool] : pools) {
-                memory::PoolResult res = pool.map(fn_table, device, frame_mod);
-                if (res != memory::PoolResult::Success)
+        for (auto& pools : this->dynamic_buffer_pools | std::views::values) {
+            for (auto& pool : pools | std::views::values) {
+                PoolResult res = pool.map(fn_table, device, frame_mod);
+                if (res != PoolResult::Success)
                     return MemoryResult::MapError;
                 // TODO might want to clean up already mapped ranges
             }
@@ -771,8 +770,8 @@ namespace hc::render::device {
     }
 
     void Memory::unmap_ranges(VolkDeviceTable const& fn_table, VkDevice device) {
-        for (auto& [flags, pools] : this->dynamic_buffer_pools) {
-            for (auto& [id, pool] : pools) {
+        for (auto& pools : this->dynamic_buffer_pools | std::views::values) {
+            for (auto& pool : pools | std::views::values) {
                 pool.unmap(fn_table, device);
             }
         }
@@ -819,7 +818,7 @@ namespace hc::render::device {
         return base * (static_cast<VkDeviceSize>(1) << static_cast<VkDeviceSize>(exp));
     }
 
-    Result<memory::BufferRef, MemoryResult> Memory::alloc(
+    Result<BufferRef, MemoryResult> Memory::alloc(
         VolkDeviceTable const& fn_table,
         VkDevice device,
         VkBufferUsageFlags flags,
@@ -831,7 +830,7 @@ namespace hc::render::device {
         VkDeviceSize alignment = this->alignment_of(flags);
         auto& pools = this->buffer_pools[flags];
         u64 pool_id = 0;
-        std::optional<memory::PoolRange> range_opt = std::nullopt;
+        std::optional<PoolRange> range_opt = std::nullopt;
         for (auto& [id, pool] : pools) {
             range_opt = pool.allocate(size, alignment);
             if (range_opt) {
@@ -842,19 +841,19 @@ namespace hc::render::device {
 
         if (!range_opt) {
             VkDeviceSize pool_size = increase_to_fit(MEBI(8), size);
-            auto pool_result = memory::BufferPool::create(fn_table, device, this->heap_manager, pool_size, flags);
+            auto pool_result = BufferPool::create(fn_table, device, this->heap_manager, pool_size, flags);
             if (pool_result) {
                 pool_id = pools.insert(std::move(pool_result).ok());
                 range_opt = pools[pool_id].allocate(size, alignment);
                 HC_ASSERT(range_opt, "Search must succeed here");
             } else {
-                memory::PoolResult err = pool_result.err();
+                PoolResult err = pool_result.err();
                 switch (err) {
-                case memory::PoolResult::OutOfDeviceMemory:
+                case PoolResult::OutOfDeviceMemory:
                     return Err(MemoryResult::OutOfHostMemory);
-                case memory::PoolResult::OutOfHostMemory:
+                case PoolResult::OutOfHostMemory:
                     return Err(MemoryResult::OutOfDeviceMemory);
-                case memory::PoolResult::UnsupportedHeap:
+                case PoolResult::UnsupportedHeap:
                     return Err(MemoryResult::HeapError);
                 default: HC_UNREACHABLE("BufferPool::create should not return any other values");
                 }
@@ -868,7 +867,7 @@ namespace hc::render::device {
         );
 
         return Ok(
-            memory::BufferRef{
+            BufferRef{
                 {
                     .pool = pool_id,
                     .pool_size = pools[pool_id].capacity(),
@@ -882,7 +881,7 @@ namespace hc::render::device {
         );
     }
 
-    Result<memory::DynamicBufferRef, MemoryResult> Memory::alloc_dyn(
+    Result<DynamicBufferRef, MemoryResult> Memory::alloc_dyn(
         VolkDeviceTable const& fn_table,
         VkDevice device,
         VkBufferUsageFlags flags,
@@ -895,7 +894,7 @@ namespace hc::render::device {
         VkDeviceSize alignment = this->alignment_of(flags);
         auto& pools = this->dynamic_buffer_pools[flags];
         u64 pool_id = 0;
-        std::optional<memory::PoolRange> range_opt = std::nullopt;
+        std::optional<PoolRange> range_opt = std::nullopt;
         for (auto& [id, pool] : pools) {
             range_opt = pool.allocate(size, alignment);
             if (range_opt) {
@@ -906,7 +905,7 @@ namespace hc::render::device {
 
         if (!range_opt) {
             VkDeviceSize pool_size = increase_to_fit(MEBI(8), size);
-            auto pool_result = memory::DynamicBufferPool::create(
+            auto pool_result = DynamicBufferPool::create(
                 fn_table,
                 device,
                 this->heap_manager,
@@ -916,8 +915,8 @@ namespace hc::render::device {
             if (pool_result) {
                 pool_id = pools.insert(std::move(pool_result).ok());
 
-                memory::PoolResult res = pools[pool_id].map(fn_table, device, frame_mod);
-                if (res != memory::PoolResult::Success) {
+                PoolResult res = pools[pool_id].map(fn_table, device, frame_mod);
+                if (res != PoolResult::Success) {
                     pools[pool_id].free(fn_table, device, this->heap_manager);
                     pools.erase(pool_id);
                     return Err(MemoryResult::MapError);
@@ -926,13 +925,13 @@ namespace hc::render::device {
                 range_opt = pools[pool_id].allocate(size, alignment);
                 HC_ASSERT(range_opt, "Search must succeed here");
             } else {
-                memory::PoolResult err = pool_result.err();
+                PoolResult err = pool_result.err();
                 switch (err) {
-                case memory::PoolResult::OutOfDeviceMemory:
+                case PoolResult::OutOfDeviceMemory:
                     return Err(MemoryResult::OutOfHostMemory);
-                case memory::PoolResult::OutOfHostMemory:
+                case PoolResult::OutOfHostMemory:
                     return Err(MemoryResult::OutOfDeviceMemory);
-                case memory::PoolResult::UnsupportedHeap:
+                case PoolResult::UnsupportedHeap:
                     return Err(MemoryResult::HeapError);
                 default: HC_UNREACHABLE("DynamicBufferPool::create should not return any other values");
                 }
@@ -946,7 +945,7 @@ namespace hc::render::device {
         );
 
         return Ok(
-            memory::DynamicBufferRef{
+            DynamicBufferRef{
                 {
                     {
                         .pool = pool_id,
@@ -963,7 +962,7 @@ namespace hc::render::device {
         );
     }
 
-    std::expected<memory::Ref, MemoryResult> Memory::alloc_texture(
+    std::expected<Ref, MemoryResult> Memory::alloc_texture(
         VolkDeviceTable const& fn_table,
         VkDevice device,
         VkImage image
@@ -973,7 +972,7 @@ namespace hc::render::device {
 
         auto& pools = this->texture_pools[requirements.memoryTypeBits];
         u64 pool_id = 0;
-        std::expected<memory::PoolRange, memory::PoolResult> range_res = std::unexpected(memory::PoolResult::NotEnoughSpace);
+        std::expected<PoolRange, PoolResult> range_res = std::unexpected(PoolResult::NotEnoughSpace);
         for (auto& [id, pool] : pools) {
             range_res = pool.allocate(fn_table, device, image, requirements.size, requirements.alignment);
             if (range_res) {
@@ -981,12 +980,12 @@ namespace hc::render::device {
                 break;
             } else {
                 switch (range_res.error()) {
-                case memory::PoolResult::NotEnoughSpace:
+                case PoolResult::NotEnoughSpace:
                     // Nothing, keep looking for a slot
                     break;
-                case memory::PoolResult::OutOfDeviceMemory:
+                case PoolResult::OutOfDeviceMemory:
                     return std::unexpected(MemoryResult::OutOfHostMemory);
-                case memory::PoolResult::OutOfHostMemory:
+                case PoolResult::OutOfHostMemory:
                     return std::unexpected(MemoryResult::OutOfDeviceMemory);
                 default: HC_UNREACHABLE("TexturePool::create should not return any other values");
                 }
@@ -996,7 +995,7 @@ namespace hc::render::device {
         if (!range_res) {
             VkDeviceSize pool_size = increase_to_fit(MEBI(128), requirements.size);
 
-            auto pool_result = memory::TexturePool::create(
+            auto pool_result = TexturePool::create(
                 fn_table,
                 device,
                 this->heap_manager,
@@ -1009,21 +1008,21 @@ namespace hc::render::device {
                 range_res = pools[pool_id].allocate(fn_table, device, image, requirements.size, requirements.alignment);
                 if (!range_res) {
                     switch (range_res.error()) {
-                    case memory::PoolResult::OutOfDeviceMemory:
+                    case PoolResult::OutOfDeviceMemory:
                         return std::unexpected(MemoryResult::OutOfHostMemory);
-                    case memory::PoolResult::OutOfHostMemory:
+                    case PoolResult::OutOfHostMemory:
                         return std::unexpected(MemoryResult::OutOfDeviceMemory);
                     default: HC_UNREACHABLE("TexturePool::create should not return any other values here");
                     }
                 }
             } else {
-                memory::PoolResult err = pool_result.error();
+                PoolResult err = pool_result.error();
                 switch (err) {
-                case memory::PoolResult::OutOfDeviceMemory:
+                case PoolResult::OutOfDeviceMemory:
                     return std::unexpected(MemoryResult::OutOfHostMemory);
-                case memory::PoolResult::OutOfHostMemory:
+                case PoolResult::OutOfHostMemory:
                     return std::unexpected(MemoryResult::OutOfDeviceMemory);
-                case memory::PoolResult::UnsupportedHeap:
+                case PoolResult::UnsupportedHeap:
                     return std::unexpected(MemoryResult::HeapError);
                 default: HC_UNREACHABLE("TexturePool::create should not return any other values");
                 }
@@ -1036,7 +1035,7 @@ namespace hc::render::device {
             << " bytes offset, " << allocated_size << " bytes + " << padding << " padding bytes"
         );
 
-        return memory::Ref{
+        return Ref{
             .pool = pool_id,
             .pool_size = pools[pool_id].capacity(),
             .size = allocated_size,

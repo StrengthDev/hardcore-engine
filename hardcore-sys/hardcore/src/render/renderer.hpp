@@ -1,32 +1,32 @@
 #pragma once
 
-#include "device.hpp"
+#include "device/device.hpp"
 
 #include <core/core.h>
 #include <util/number.hpp>
 #include <render/renderer.h>
 
 namespace hc::render {
-	enum class InstanceResult : u32 {
-		Success = 0,
-		VolkError,
-		VulkanInstanceError,
-		DebugCallbackError,
-		DeviceError,
-		NoDevicesFound,
-		SurfaceFailure,
-		Uninitialised,
-		OutOfBounds,
-		Unimplemented,
-	};
+    enum class InstanceResult : u32 {
+        Success = 0,
+        VolkError,
+        VulkanInstanceError,
+        DebugCallbackError,
+        DeviceError,
+        NoDevicesFound,
+        SurfaceFailure,
+        Uninitialised,
+        OutOfBounds,
+        Unimplemented,
+    };
 
-	InstanceResult init(const HCApplicationDescriptor &app, const HCRenderParams &params);
+    InstanceResult init(const HCApplicationDescriptor& app, const HCRenderParams& params);
 
-	InstanceResult term();
+    InstanceResult term();
 
-	VkInstance instance();
+    VkInstance instance();
 
-	std::vector<Device> &device_list() noexcept;
+    std::vector<device::Device>& device_list() noexcept;
 
-	Result<Device *, InstanceResult> device_at(u32 id) noexcept;
+    Result<device::Device*, InstanceResult> device_at(u32 id) noexcept;
 }

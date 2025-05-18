@@ -1,8 +1,6 @@
 #pragma once
 
-#pragma warning(push, 0)
 #include <spirv_reflect.h>
-#pragma warning(pop)
 
 namespace hc::render {
     /**

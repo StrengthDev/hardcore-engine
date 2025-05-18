@@ -405,7 +405,7 @@ HCWindow hc_new_window(HCWindowParams params) {
     }
 
     auto res = device_ptr->create_swapchain(hc::render::instance(), window);
-    if (res != hc::render::DeviceResult::Success) {
+    if (res != hc::render::device::DeviceResult::Success) {
         HC_ERROR("Failed to create swapchain");
         glfwDestroyWindow(window);
         return INVALID_WINDOW;

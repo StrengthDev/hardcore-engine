@@ -1,13 +1,15 @@
 #pragma once
 
-#include "device/scheduler.hpp"
-#include "device/graph.hpp"
-#include "device/memory.hpp"
-#include "device/destruction_mark.hpp"
-#include "device/swapchain.hpp"
-#include "resource/descriptor.hpp"
-#include "resource/buffer.hpp"
-#include "resource/texture.hpp"
+#include "scheduler.hpp"
+#include "graph.hpp"
+#include "destruction_mark.hpp"
+#include "swapchain.hpp"
+
+#include "memory/memory.hpp"
+
+#include "../resource/descriptor.hpp"
+#include "../resource/buffer.hpp"
+#include "../resource/texture.hpp"
 
 #include <core/glfw.hpp>
 
@@ -15,7 +17,7 @@
 
 #include <optional>
 
-namespace hc::render {
+namespace hc::render::device {
     enum class DeviceResult : u32 {
         Success = 0,
         VkFailure,
@@ -90,13 +92,13 @@ namespace hc::render {
         ExternalHandle<VkPhysicalDevice, VK_NULL_HANDLE> physical_handle;
         VkPhysicalDeviceProperties properties = {};
         VkPhysicalDeviceFeatures features = {};
-        device::Scheduler scheduler;
-        device::Graph graph;
-        device::Memory memory;
-        std::unordered_map<GLFWwindow*, device::Swapchain> swapchains;
+        Scheduler scheduler;
+        Graph graph;
+        memory::Memory memory;
+        std::unordered_map<GLFWwindow*, Swapchain> swapchains;
 
-        std::vector<std::vector<device::DestructionMark>> cleanup_queues;
-        std::vector<device::DestructionMark> cleanup_submissions;
+        std::vector<std::vector<DestructionMark>> cleanup_queues;
+        std::vector<DestructionMark> cleanup_submissions;
 
         ExternalHandle<VkDevice, VK_NULL_HANDLE> handle;
         VolkDeviceTable fn_table = {};

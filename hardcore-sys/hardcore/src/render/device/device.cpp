@@ -1,14 +1,15 @@
 #include <pch.hpp>
 
 #include "device.hpp"
-#include "util.hpp"
+
+#include "../util.hpp"
 
 #include <core/log.hpp>
 #include <core/window.hpp>
 #include <render/vars.hpp>
 #include <util/flow.hpp>
 
-namespace hc::render {
+namespace hc::render::device {
     std::optional<Device> Device::create(VkPhysicalDevice physical_handle, const std::vector<const char*>& layers) {
         Device device;
         vkGetPhysicalDeviceProperties(physical_handle, &device.properties);
@@ -23,7 +24,7 @@ namespace hc::render {
         std::vector<u32> graphics_queue_families;
         u32 compute_family = std::numeric_limits<u32>::max();
         u32 transfer_family = std::numeric_limits<u32>::max();
-        device::Scheduler::select_queue_families(
+        Scheduler::select_queue_families(
             queue_families,
             graphics_queue_families,
             compute_family,
@@ -90,7 +91,7 @@ namespace hc::render {
 
         volkLoadDeviceTable(&device.fn_table, handle);
 
-        std::optional<device::Scheduler> scheduler = device::Scheduler::create(
+        std::optional<Scheduler> scheduler = Scheduler::create(
             handle,
             device.fn_table,
             1,
@@ -107,7 +108,7 @@ namespace hc::render {
         }
         device.scheduler = std::move(*scheduler);
 
-        auto memory_res = device::Memory::create(physical_handle, device.fn_table, handle, device.properties.limits);
+        auto memory_res = memory::Memory::create(physical_handle, device.fn_table, handle, device.properties.limits);
         if (!memory_res) {
             HC_ERROR("Failed to create device memory");
             device.fn_table.vkDestroyDevice(handle, nullptr);
@@ -115,7 +116,7 @@ namespace hc::render {
         }
         device.memory = std::move(memory_res).ok();
 
-        device.graph = device::Graph::create(
+        device.graph = Graph::create(
             device.scheduler.graphics_queue_family(),
             device.scheduler.compute_queue_family(),
             device.scheduler.transfer_queue_family()
@@ -123,7 +124,7 @@ namespace hc::render {
 
         device.physical_handle = physical_handle;
         device.handle = handle;
-        device.cleanup_queues = std::vector<std::vector<device::DestructionMark>>(max_frames_in_flight());
+        device.cleanup_queues = std::vector<std::vector<DestructionMark>>(max_frames_in_flight());
 
         return device;
     }
@@ -143,21 +144,21 @@ namespace hc::render {
         this->cleanup(frame_mod);
 
         this->memory.unmap_ranges(this->fn_table, this->handle);
-        device::MemoryResult mem_res = this->memory.flush_ranges(this->fn_table, this->handle, frame_mod);
-        if (mem_res != device::MemoryResult::Success) {
+        memory::MemoryResult mem_res = this->memory.flush_ranges(this->fn_table, this->handle, frame_mod);
+        if (mem_res != memory::MemoryResult::Success) {
             HC_ERROR("Failed to flush memory ranges");
             return;
         }
 
-        device::GraphResult graph_res = this->graph.compile();
-        HC_ASSERT(graph_res == device::GraphResult::Success, "Graph compilation should always succeed");
+        GraphResult graph_res = this->graph.compile();
+        HC_ASSERT(graph_res == GraphResult::Success, "Graph compilation should always succeed");
 
         // this->graph.record();
 
         //this->present(frame_mod);
 
         mem_res = this->memory.map_ranges(this->fn_table, this->handle, next_frame_mod);
-        if (mem_res != device::MemoryResult::Success) {
+        if (mem_res != memory::MemoryResult::Success) {
             HC_ERROR("Failed to map memory ranges");
         }
     }
@@ -288,7 +289,7 @@ namespace hc::render {
             return DeviceResult::SurfaceFailure;
         }
 
-        device::SurfaceInfo surface_info = {
+        SurfaceInfo surface_info = {
             .capabilities = *capabilities,
             .available_formats = std::move(formats),
             .available_present_modes = std::move(present_modes),
@@ -297,7 +298,7 @@ namespace hc::render {
         int width = 0, height = 0;
         glfwGetFramebufferSize(window, &width, &height);
 
-        device::SwapchainParams params = {
+        SwapchainParams params = {
             .graphics_queue = graphics_present_queues.first,
             .present_queue = graphics_present_queues.second,
             .extent = VkExtent2D{.width = static_cast<u32>(width), .height = static_cast<u32>(height)},
@@ -308,7 +309,7 @@ namespace hc::render {
             },
         };
 
-        auto swapchain = device::Swapchain::create(
+        auto swapchain = Swapchain::create(
             this->fn_table,
             this->handle,
             std::move(surface),
@@ -324,7 +325,7 @@ namespace hc::render {
     }
 
     void Device::destroy_swapchain(VkInstance instance, GLFWwindow* window) {
-        device::WindowDestructionMark mark = {
+        WindowDestructionMark mark = {
             .instance = instance,
             .window = window
         };
@@ -490,7 +491,7 @@ namespace hc::render {
         if (!ref_res) {
             return std::unexpected(DeviceResult::AllocFailure);
         }
-        device::memory::Ref ref = *ref_res;
+        memory::Ref ref = *ref_res;
 
         texture::Params params = {};
         params.size = ref.size;
@@ -507,24 +508,24 @@ namespace hc::render {
         auto& cleanup_queue = this->cleanup_queues[frame_mod];
         for (auto& mark : cleanup_queue) {
             std::visit(
-                device::DestructionMarkHandler{
-                    [this](device::WindowDestructionMark const& window_mark) {
+                DestructionMarkHandler{
+                    [this](WindowDestructionMark const& window_mark) {
                         auto node = this->swapchains.extract(window_mark.window);
                         HC_ASSERT(!node.empty(), "A swapchain matching the mark's window should exist");
                         node.mapped().destroy(window_mark.instance, this->fn_table, this->handle);
                         window::destroy(window_mark.window);
                     },
-                    [this](device::SwapchainDestructionMark const& swapchain_mark) {
+                    [this](SwapchainDestructionMark const& swapchain_mark) {
                         HC_ASSERT(
                             this->swapchains.contains(swapchain_mark.window),
                             "A swapchain matching the mark's window should exist"
                         );
                         this->swapchains.at(swapchain_mark.window).destroy_old(this->fn_table, this->handle);
                     },
-                    [this](device::ResourceDestructionMark const& resource_mark) {
+                    [this](ResourceDestructionMark const& resource_mark) {
                         this->memory.free(resource_mark);
                     },
-                    [this](device::TextureDestructionMark const& texture_mark) {
+                    [this](TextureDestructionMark const& texture_mark) {
                         this->fn_table.vkDestroyImage(this->handle, texture_mark.image, nullptr);
                         this->memory.free(texture_mark);
                     },

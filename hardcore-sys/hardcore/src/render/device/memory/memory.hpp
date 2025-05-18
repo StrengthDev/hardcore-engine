@@ -1,10 +1,10 @@
 #pragma once
 
-#include "destruction_mark.hpp"
-#include "memory/heap_manager.hpp"
-#include "memory/resource_pool.hpp"
+#include "../destruction_mark.hpp"
+#include "heap_manager.hpp"
+#include "resource_pool.hpp"
 //#include "memory/staging_pool.hpp"
-#include "memory/reference.hpp"
+#include "reference.hpp"
 
 #include <util/number.hpp>
 #include <util/result.hpp>
@@ -14,7 +14,7 @@
 
 #include <expected>
 
-namespace hc::render::device {
+namespace hc::render::device::memory {
     /*
     // for operations such as allocations, which happen outside of device functions, memory needs access to some device
     // data, such as the VkDevice handle for operations like vkAllocateMemory
@@ -321,14 +321,14 @@ namespace hc::render::device {
 
         [[nodiscard]] MemoryResult flush_ranges(VolkDeviceTable const& fn_table, VkDevice device, u8 frame_mod);
 
-        [[nodiscard]] Result<memory::BufferRef, MemoryResult> alloc(
+        [[nodiscard]] Result<BufferRef, MemoryResult> alloc(
             VolkDeviceTable const& fn_table,
             VkDevice device,
             VkBufferUsageFlags flags,
             VkDeviceSize size
         );
 
-        [[nodiscard]] Result<memory::DynamicBufferRef, MemoryResult> alloc_dyn(
+        [[nodiscard]] Result<DynamicBufferRef, MemoryResult> alloc_dyn(
             VolkDeviceTable const& fn_table,
             VkDevice device,
             VkBufferUsageFlags flags,
@@ -336,7 +336,7 @@ namespace hc::render::device {
             u8 frame_mod
         );
 
-        [[nodiscard]] std::expected<memory::Ref, MemoryResult> alloc_texture(
+        [[nodiscard]] std::expected<Ref, MemoryResult> alloc_texture(
             const VolkDeviceTable& fn_table,
             VkDevice device,
             VkImage image
@@ -358,10 +358,10 @@ namespace hc::render::device {
 
         VkPhysicalDeviceLimits limits = {};
 
-        memory::HeapManager heap_manager;
+        HeapManager heap_manager;
 
-        std::unordered_map<u32, Bank<memory::BufferPool>> buffer_pools;
-        std::unordered_map<u32, Bank<memory::DynamicBufferPool>> dynamic_buffer_pools;
-        std::unordered_map<u32, Bank<memory::TexturePool>> texture_pools;
+        std::unordered_map<u32, Bank<BufferPool>> buffer_pools;
+        std::unordered_map<u32, Bank<DynamicBufferPool>> dynamic_buffer_pools;
+        std::unordered_map<u32, Bank<TexturePool>> texture_pools;
     };
 }

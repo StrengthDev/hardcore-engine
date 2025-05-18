@@ -3,7 +3,7 @@
 #include "util.hpp"
 #include "renderer.hpp"
 #include "vars.hpp"
-#include "device.hpp"
+#include "device/device.hpp"
 
 #include <core/log.hpp>
 #include <util/flow.hpp>
@@ -21,8 +21,8 @@
 }(0)
 
 namespace hc::render {
-    static auto VALIDATION_LAYER_NAME = "VK_LAYER_KHRONOS_validation";
-    static constexpr u32 VULKAN_API_VERSION = VK_API_VERSION_1_3;
+    static auto constexpr VALIDATION_LAYER_NAME = "VK_LAYER_KHRONOS_validation";
+    static u32 constexpr VULKAN_API_VERSION = VK_API_VERSION_1_3;
 
     static u8 max_frames_in_flight_count = std::numeric_limits<u8>::max();
     static u8 frame_mod = std::numeric_limits<u8>::max();
@@ -30,7 +30,7 @@ namespace hc::render {
     static VkInstance global_instance = VK_NULL_HANDLE;
     static VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
     static HCVulkanDebugCallbackFn user_debug_callback = nullptr;
-    static std::vector<Device> devices;
+    static std::vector<device::Device> devices;
 
 
     VkResult layer_support(const std::vector<const char*>& layer_names, std::vector<bool>& out_found_layers) {
@@ -249,7 +249,7 @@ namespace hc::render {
         }
 
         for (auto physical_handle : physical_handles) {
-            std::optional<Device> device = Device::create(physical_handle, layers);
+            std::optional<device::Device> device = device::Device::create(physical_handle, layers);
             if (device) {
                 devices.push_back(std::move(*device));
             }
@@ -363,11 +363,11 @@ namespace hc::render {
         return global_instance;
     }
 
-    std::vector<Device>& device_list() noexcept {
+    std::vector<device::Device>& device_list() noexcept {
         return devices;
     }
 
-    Result<Device*, InstanceResult> device_at(u32 id) noexcept {
+    Result<device::Device*, InstanceResult> device_at(u32 id) noexcept {
         if (devices.empty()) {
             HC_ERROR("No global instance currently initialised");
             return Err(InstanceResult::Uninitialised);

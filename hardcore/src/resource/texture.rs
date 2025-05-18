@@ -1,3 +1,4 @@
+use core::num::NonZeroU32;
 use hardcore_sys::{
     TextureDimensions1D, TextureDimensions2D, TextureDimensions3D, TextureDimensionsX,
     TextureFormatID, TextureType,
@@ -20,18 +21,18 @@ pub enum TextureError {
 
 pub enum TextureDimensions {
     Texture1D {
-        width: u32,
-        layers: u32,
+        width: NonZeroU32,
+        layers: NonZeroU32,
     },
     Texture2D {
-        width: u32,
-        height: u32,
-        layers: u32,
+        width: NonZeroU32,
+        height: NonZeroU32,
+        layers: NonZeroU32,
     },
     Texture3D {
-        width: u32,
-        height: u32,
-        depth: u32,
+        width: NonZeroU32,
+        height: NonZeroU32,
+        depth: NonZeroU32,
     },
 }
 
@@ -40,7 +41,10 @@ impl From<TextureDimensions> for hardcore_sys::TextureDimensions {
         match value {
             TextureDimensions::Texture1D { width, layers } => hardcore_sys::TextureDimensions {
                 dims: TextureDimensionsX {
-                    dims1D: TextureDimensions1D { width, layers },
+                    dims1D: TextureDimensions1D {
+                        width: width.get(),
+                        layers: layers.get(),
+                    },
                 },
                 texture_type: TextureType::Texture1D,
             },
@@ -51,9 +55,9 @@ impl From<TextureDimensions> for hardcore_sys::TextureDimensions {
             } => hardcore_sys::TextureDimensions {
                 dims: TextureDimensionsX {
                     dims2D: TextureDimensions2D {
-                        width,
-                        height,
-                        layers,
+                        width: width.get(),
+                        height: height.get(),
+                        layers: layers.get(),
                     },
                 },
                 texture_type: TextureType::Texture2D,
@@ -65,9 +69,9 @@ impl From<TextureDimensions> for hardcore_sys::TextureDimensions {
             } => hardcore_sys::TextureDimensions {
                 dims: TextureDimensionsX {
                     dims3D: TextureDimensions3D {
-                        width,
-                        height,
-                        depth,
+                        width: width.get(),
+                        height: height.get(),
+                        depth: depth.get(),
                     },
                 },
                 texture_type: TextureType::Texture3D,
