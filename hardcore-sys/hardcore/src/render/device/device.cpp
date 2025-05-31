@@ -16,42 +16,12 @@ namespace hc::render::device {
         HC_INFO("Physical device found: " << device.properties.deviceName);
         vkGetPhysicalDeviceFeatures(physical_handle, &device.features);
 
-        u32 queue_family_count = 0;
-        vkGetPhysicalDeviceQueueFamilyProperties(physical_handle, &queue_family_count, nullptr);
-        std::vector<VkQueueFamilyProperties> queue_families(queue_family_count);
-        vkGetPhysicalDeviceQueueFamilyProperties(physical_handle, &queue_family_count, queue_families.data());
-
-        std::vector<u32> graphics_queue_families;
-        u32 compute_family = std::numeric_limits<u32>::max();
-        u32 transfer_family = std::numeric_limits<u32>::max();
-        Scheduler::select_queue_families(
-            queue_families,
-            graphics_queue_families,
-            compute_family,
-            transfer_family
-        );
-        std::set<u32> unique_queue_families;
-
-        if (graphics_queue_families.empty()) {
-            HC_ERROR("No graphics queue families found");
+        auto scheduler_res = Scheduler::create(physical_handle);
+        if (!scheduler_res) {
             return std::nullopt;
         }
-        unique_queue_families.insert(graphics_queue_families.begin(), graphics_queue_families.end());
-
-        if (compute_family != std::numeric_limits<u32>::max()) {
-            HC_DEBUG("Selected compute queue family index: " << compute_family);
-            unique_queue_families.insert(compute_family);
-        } else {
-            HC_WARN("No compute queue family found");
-        }
-
-        if (transfer_family != std::numeric_limits<u32>::max()) {
-            HC_DEBUG("Selected transfer queue family index: " << transfer_family);
-        } else {
-            HC_ERROR("No transfer queue family found");
-            return std::nullopt;
-        }
-        unique_queue_families.insert(transfer_family);
+        device.scheduler = *std::move(scheduler_res);
+        std::set<u32> unique_queue_families = device.scheduler.unique_families();
 
         std::vector<VkDeviceQueueCreateInfo> queue_infos;
         queue_infos.reserve(unique_queue_families.size());
@@ -91,22 +61,7 @@ namespace hc::render::device {
 
         volkLoadDeviceTable(&device.fn_table, handle);
 
-        std::optional<Scheduler> scheduler = Scheduler::create(
-            handle,
-            device.fn_table,
-            1,
-            std::move(queue_families),
-            std::move(unique_queue_families),
-            std::move(graphics_queue_families),
-            compute_family,
-            transfer_family
-        );
-        if (!scheduler) {
-            HC_ERROR("Failed to create device scheduler");
-            device.fn_table.vkDestroyDevice(handle, nullptr);
-            return std::nullopt;
-        }
-        device.scheduler = std::move(*scheduler);
+        device.scheduler.init(handle, device.fn_table);
 
         auto memory_res = memory::Memory::create(physical_handle, device.fn_table, handle, device.properties.limits);
         if (!memory_res) {
@@ -117,9 +72,9 @@ namespace hc::render::device {
         device.memory = std::move(memory_res).ok();
 
         device.graph = Graph::create(
-            device.scheduler.graphics_queue_family(),
-            device.scheduler.compute_queue_family(),
-            device.scheduler.transfer_queue_family()
+            device.scheduler.graphics_queues()[0].family,
+            device.scheduler.compute_queue().family,
+            device.scheduler.transfer_queue().family
         );
 
         device.physical_handle = physical_handle;
@@ -132,7 +87,6 @@ namespace hc::render::device {
     Device::~Device() {
         if (this->handle != VK_NULL_HANDLE) {
             this->memory.destroy(this->fn_table, this->handle);
-            //            this->scheduler.destroy();
             this->fn_table.vkDestroyDevice(this->handle, nullptr);
             this->physical_handle.destroy();
             this->handle.destroy();
@@ -254,39 +208,31 @@ namespace hc::render::device {
         return present_modes;
     }
 
-    DeviceResult Device::create_swapchain(VkInstance instance, GLFWwindow* window) {
-        VkSurfaceKHR surface = VK_NULL_HANDLE;
-        VkResult res = glfwCreateWindowSurface(instance, window, nullptr, &surface);
-        if (res != VK_SUCCESS) {
-            HC_ERROR("Failed to create window surface: " << to_str(res));
-            return DeviceResult::SurfaceFailure;
-        }
-
-        auto graphics_present_queues = this->scheduler.present_support(this->physical_handle, surface);
-
-        if (graphics_present_queues.first == std::numeric_limits<u32>::max()
-            || graphics_present_queues.second == std::numeric_limits<u32>::max()) {
+    std::expected<void, DeviceResult> Device::create_swapchain(
+        GLFWwindow* window,
+        VkSurfaceKHR surface,
+        VkExtent2D extent
+    ) {
+        auto present_support_res = this->scheduler.present_support(this->physical_handle, surface);
+        if (!present_support_res) {
             HC_ERROR("Presentation not supported for swapchain surface");
-            vkDestroySurfaceKHR(instance, surface, nullptr);
-            return DeviceResult::SwapchainFailure;
+            return std::unexpected(DeviceResult::SwapchainFailure);
         }
+        u32 queue_index = *present_support_res;
 
         auto capabilities = surface_capabilities(this->physical_handle, surface);
         if (!capabilities) {
-            vkDestroySurfaceKHR(instance, surface, nullptr);
-            return DeviceResult::VkFailure;
+            return std::unexpected(DeviceResult::VkFailure);
         }
 
         std::vector<VkSurfaceFormat2KHR> formats = surface_formats(this->physical_handle, surface);
         if (formats.empty()) {
-            vkDestroySurfaceKHR(instance, surface, nullptr);
-            return DeviceResult::SurfaceFailure;
+            return std::unexpected(DeviceResult::SurfaceFailure);
         }
 
         std::vector<VkPresentModeKHR> present_modes = surface_present_modes(this->physical_handle, surface);
         if (present_modes.empty()) {
-            vkDestroySurfaceKHR(instance, surface, nullptr);
-            return DeviceResult::SurfaceFailure;
+            return std::unexpected(DeviceResult::SurfaceFailure);
         }
 
         SurfaceInfo surface_info = {
@@ -295,13 +241,8 @@ namespace hc::render::device {
             .available_present_modes = std::move(present_modes),
         };
 
-        int width = 0, height = 0;
-        glfwGetFramebufferSize(window, &width, &height);
-
         SwapchainParams params = {
-            .graphics_queue = graphics_present_queues.first,
-            .present_queue = graphics_present_queues.second,
-            .extent = VkExtent2D{.width = static_cast<u32>(width), .height = static_cast<u32>(height)},
+            .extent = extent,
             .preferred_present_mode = VK_PRESENT_MODE_MAILBOX_KHR,
             .preferred_format = {
                 .format = VK_FORMAT_B8G8R8A8_UNORM,
@@ -317,16 +258,26 @@ namespace hc::render::device {
             std::move(params)
         );
         if (swapchain) {
+            this->queue_windows[queue_index].push_back(window);
             this->swapchains.emplace(window, std::move(swapchain).ok());
-            return DeviceResult::Success;
+            return {};
         } else {
-            return DeviceResult::SwapchainFailure;
+            return std::unexpected(DeviceResult::SwapchainFailure);
         }
     }
 
     void Device::destroy_swapchain(VkInstance instance, GLFWwindow* window) {
+        u32 queue_index = std::numeric_limits<u32>::max();
+        for (auto const& [queue, windows] : this->queue_windows) {
+            if (std::ranges::find(windows, window) != windows.end()) {
+                queue_index = queue;
+                break;
+            }
+        }
+
         WindowDestructionMark mark = {
             .instance = instance,
+            .queue_index = queue_index,
             .window = window
         };
         this->cleanup_submissions.emplace_back(mark);
@@ -510,6 +461,7 @@ namespace hc::render::device {
             std::visit(
                 DestructionMarkHandler{
                     [this](WindowDestructionMark const& window_mark) {
+                        std::erase(this->queue_windows[window_mark.queue_index], window_mark.window);
                         auto node = this->swapchains.extract(window_mark.window);
                         HC_ASSERT(!node.empty(), "A swapchain matching the mark's window should exist");
                         node.mapped().destroy(window_mark.instance, this->fn_table, this->handle);
@@ -538,35 +490,39 @@ namespace hc::render::device {
     }
 
     void Device::present(u8 frame_mod) {
-        std::vector<VkSwapchainKHR> swapchain_handles;
-        std::vector<u32> image_indices;
-        std::vector<VkResult> results;
+        for (auto const& [queue, windows] : this->queue_windows) {
+            std::vector<VkSwapchainKHR> swapchain_handles;
+            std::vector<u32> image_indices;
+            std::vector<VkResult> results;
 
-        swapchain_handles.reserve(this->swapchains.size());
-        image_indices.reserve(this->swapchains.size());
-        results.reserve(this->swapchains.size());
+            swapchain_handles.reserve(this->swapchains.size());
+            image_indices.reserve(this->swapchains.size());
+            results.reserve(this->swapchains.size());
 
-        for (auto& [window, swapchain] : this->swapchains) {
-            auto res = swapchain.acquire_image(this->fn_table, this->handle, window, frame_mod);
-            if (!res) {
-                continue;
+            for (auto const& window : windows) {
+                auto& swapchain = this->swapchains.at(window);
+
+                auto res = swapchain.acquire_image(this->fn_table, this->handle, window, frame_mod);
+                if (!res) {
+                    continue;
+                }
+
+                u32 image_index = *res;
+                swapchain_handles.push_back(swapchain.handle());
+                image_indices.push_back(image_index);
+                results.push_back(VK_SUCCESS);
             }
 
-            u32 image_index = res.ok();
-            swapchain_handles.push_back(swapchain.handle());
-            image_indices.push_back(image_index);
-            results.push_back(VK_SUCCESS);
+            VkPresentInfoKHR presentInfo = {};
+            presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+            presentInfo.waitSemaphoreCount = 0;
+            presentInfo.pWaitSemaphores = nullptr; // TODO
+            presentInfo.swapchainCount = static_cast<u32>(swapchain_handles.size());
+            presentInfo.pSwapchains = swapchain_handles.data();
+            presentInfo.pImageIndices = image_indices.data();
+            presentInfo.pResults = results.data();
+
+            this->fn_table.vkQueuePresentKHR(this->scheduler.graphics_queues()[queue].handle, &presentInfo);
         }
-
-        VkPresentInfoKHR presentInfo = {};
-        presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        presentInfo.waitSemaphoreCount = 0;
-        presentInfo.pWaitSemaphores = nullptr; // TODO
-        presentInfo.swapchainCount = static_cast<u32>(swapchain_handles.size());
-        presentInfo.pSwapchains = swapchain_handles.data();
-        presentInfo.pImageIndices = image_indices.data();
-        presentInfo.pResults = results.data();
-
-        //this->fn_table.vkQueuePresentKHR(this->scheduler)
     }
 }

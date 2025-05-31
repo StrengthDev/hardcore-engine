@@ -1,6 +1,8 @@
 use crate::Version;
 
-/// Get the Vulkan API version that is used.
+/// Get the [Vulkan] API version that is used.
+///
+/// [Vulkan]: https://www.vulkan.org/
 pub fn vulkan_api_version() -> Version {
     Version {
         major: unsafe { hardcore_sys::VULKAN_API_VERSION.major },
@@ -9,16 +11,20 @@ pub fn vulkan_api_version() -> Version {
     }
 }
 
-/// Get the Vulkan header version that was compiled.
+/// Get the [Vulkan headers][vk_headers] version that was compiled.
+///
+/// [vk_headers]: https://github.com/KhronosGroup/Vulkan-Headers
 pub fn vulkan_header_version() -> Version {
     Version {
-        major: unsafe { hardcore_sys::VULKAN_HEADER_VERSION.major },
-        minor: unsafe { hardcore_sys::VULKAN_HEADER_VERSION.minor },
-        patch: unsafe { hardcore_sys::VULKAN_HEADER_VERSION.patch },
+        major: unsafe { hardcore_sys::VULKAN_HEADERS_VERSION.major },
+        minor: unsafe { hardcore_sys::VULKAN_HEADERS_VERSION.minor },
+        patch: unsafe { hardcore_sys::VULKAN_HEADERS_VERSION.patch },
     }
 }
 
-/// Get the Volk header version that was compiled.
+/// Get the [Volk] header version that was compiled.
+///
+/// [Volk]: https://github.com/zeux/volk
 pub fn volk_header_version() -> u32 {
     unsafe { hardcore_sys::VOLK_HEADER_VERSION }
 }

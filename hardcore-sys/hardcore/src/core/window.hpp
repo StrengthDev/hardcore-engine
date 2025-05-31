@@ -12,6 +12,8 @@ namespace hc::window {
     void destroy(GLFWwindow* window);
 
     bool is_resizing(GLFWwindow* window);
+
+    VkExtent2D extent(GLFWwindow* window);
 }
 
 #endif // HC_HEADLESS

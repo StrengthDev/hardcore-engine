@@ -26,8 +26,6 @@ namespace hc::render::device {
     };
 
     struct SwapchainParams {
-        u32 graphics_queue = std::numeric_limits<u32>::max();
-        u32 present_queue = std::numeric_limits<u32>::max();
         VkExtent2D extent = VkExtent2D{.width = 0, .height = 0};
         VkPresentModeKHR preferred_present_mode = VK_PRESENT_MODE_FIFO_KHR;
         VkSurfaceFormatKHR preferred_format = VkSurfaceFormatKHR{
@@ -67,7 +65,7 @@ namespace hc::render::device {
 
         VkSwapchainKHR handle() const noexcept { return this->inner.handle; }
 
-        [[nodiscard]] Result<u32, SwapchainResult> acquire_image(
+        [[nodiscard]] std::expected<u32, SwapchainResult> acquire_image(
             const VolkDeviceTable& fn_table,
             VkDevice device,
             GLFWwindow* window,
@@ -114,8 +112,6 @@ namespace hc::render::device {
          * @brief The parameters used to create a new swapchain.
          */
         struct CreationParams {
-            u32 graphics_queue_family = std::numeric_limits<u32>::max();
-            u32 present_queue_family = std::numeric_limits<u32>::max();
             u32 image_count = 0;
             VkSurfaceTransformFlagBitsKHR transform = VK_SURFACE_TRANSFORM_FLAG_BITS_MAX_ENUM_KHR;
         } creation_params;

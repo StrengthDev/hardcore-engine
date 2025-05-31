@@ -7,7 +7,7 @@ extern "C" {
 #endif // __cplusplus
 
 extern const struct HCVersion HC_VULKAN_API_VERSION; //!< The version of the Vulkan API that is used.
-extern const struct HCVersion HC_VULKAN_HEADER_VERSION; //!< The version of the Vulkan header that was compiled.
+extern const struct HCVersion HC_VULKAN_HEADERS_VERSION; //!< The version of the Vulkan headers that was compiled.
 extern const uint32_t HC_VOLK_HEADER_VERSION; //!< The version of the Volk header that was compiled.
 
 /**

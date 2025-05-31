@@ -9,6 +9,7 @@
 namespace hc::render::device {
     struct WindowDestructionMark {
         VkInstance instance;
+        u32 queue_index;
         GLFWwindow* window;
     };
 

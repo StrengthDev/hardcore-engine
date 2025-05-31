@@ -18,7 +18,7 @@
 #include <optional>
 
 namespace hc::render::device {
-    enum class DeviceResult : u32 {
+    enum class DeviceResult {
         Success = 0,
         VkFailure,
         SurfaceFailure,
@@ -45,7 +45,11 @@ namespace hc::render::device {
 
         [[nodiscard]] const char* name() const noexcept;
 
-        [[nodiscard]] DeviceResult create_swapchain(VkInstance instance, GLFWwindow* window);
+        [[nodiscard]] std::expected<void, DeviceResult> create_swapchain(
+            GLFWwindow* window,
+            VkSurfaceKHR surface,
+            VkExtent2D extent
+        );
 
         void destroy_swapchain(VkInstance instance, GLFWwindow* window);
 
@@ -95,6 +99,7 @@ namespace hc::render::device {
         Scheduler scheduler;
         Graph graph;
         memory::Memory memory;
+        std::unordered_map<u32, std::vector<GLFWwindow*>> queue_windows;
         std::unordered_map<GLFWwindow*, Swapchain> swapchains;
 
         std::vector<std::vector<DestructionMark>> cleanup_queues;

@@ -2,9 +2,13 @@
 
 #ifndef HC_HEADLESS
 
+#include "../core/version.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
+
+extern const struct HCVersion HC_GLFW_VERSION; //!< The version of GLFW that is compiled.
 
 #include <stdbool.h>
 

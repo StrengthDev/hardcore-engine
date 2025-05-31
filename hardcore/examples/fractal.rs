@@ -47,6 +47,7 @@ impl<'c> FractalLayer<'c> {
             cursor_mode: false,
         };
 
+        // TODO think of how something like a LayerID can be passed in the constructor so window doesnt have to be an optional
         s._window = Some(
             context.devices[0]
                 .create_window(&s, 1920, 1080, None, None, "Hardcore sample - Fractal")

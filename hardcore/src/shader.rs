@@ -174,7 +174,7 @@ impl Drop for Shader {
 }
 
 #[cfg(feature = "shader-compilation")]
-mod shader_compilation {
+mod compilation {
     use crate::render::vulkan_api_version;
     use crate::shader::{Shader, ShaderError, ShaderStage};
     use crate::Version;
@@ -354,4 +354,4 @@ mod shader_compilation {
 }
 
 #[cfg(feature = "shader-compilation")]
-pub use shader_compilation::*;
+pub use compilation::*;

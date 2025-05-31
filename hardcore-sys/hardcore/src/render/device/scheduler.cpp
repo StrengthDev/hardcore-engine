@@ -1,202 +1,168 @@
 #include <pch.hpp>
 
 #include <core/log.hpp>
-#include <render/vars.hpp>
 #include <render/util.hpp>
 
 #include "scheduler.hpp"
 
+#include "util/flow.hpp"
+
 namespace hc::render::device {
-    void Scheduler::select_queue_families(
-        const std::vector<VkQueueFamilyProperties>& queue_families,
-        std::vector<u32>& out_graphics_queue_families,
-        u32& out_compute_idx,
-        u32& out_transfer_idx
-    ) {
-        u32 compute_idx = out_compute_idx;
-        u32 transfer_idx = out_transfer_idx;
+    std::expected<Scheduler, SchedulerError> Scheduler::create(VkPhysicalDevice physical_device) {
+        Scheduler scheduler;
+        u32 queue_family_count = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, nullptr);
+        scheduler.queue_families = std::vector(queue_family_count, VkQueueFamilyProperties{});
+        vkGetPhysicalDeviceQueueFamilyProperties(
+            physical_device,
+            &queue_family_count,
+            scheduler.queue_families.data()
+        );
+
         u32 compute_score = 0;
         u32 transfer_score = 0;
 
-        for (u32 i = 0; i < queue_families.size(); i++) {
+        for (u32 i = 0; i < scheduler.queue_families.size(); i++) {
             // Does this even happen?
-            if (!queue_families[i].queueCount)
+            if (!scheduler.queue_families[i].queueCount) {
                 continue;
-
-            if (queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-                // Graphics queue is selected at runtime, depending on target surfaces
-                out_graphics_queue_families.push_back(i);
             }
 
-            if (compute_score < 1 && (queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT)) {
-                compute_idx = i;
+            if (scheduler.queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+                // Graphics queue is selected at runtime, depending on target surfaces
+                scheduler.device_graphics_queues.push_back({VK_NULL_HANDLE, i});
+            }
+
+            if (compute_score < 1 && (scheduler.queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT)) {
+                scheduler.device_compute_queue.family = i;
                 compute_score = 1;
             }
 
-            if (compute_score < 2 && (queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT) &&
-                !(queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
+            if (compute_score < 2 && (scheduler.queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT) &&
+                !(scheduler.queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
                 // Async compute queue is optimal
-                compute_idx = i;
+                scheduler.device_compute_queue.family = i;
                 compute_score = 2;
             }
 
-            if (transfer_score < 1 && (queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT)) {
-                transfer_idx = i;
+            if (transfer_score < 1 && (scheduler.queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT)) {
+                scheduler.device_transfer_queue.family = i;
                 transfer_score = 1;
             }
 
-            if (transfer_score < 2 && (queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT) &&
-                !(queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
-                transfer_idx = i;
+            if (transfer_score < 2 && (scheduler.queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT) &&
+                !(scheduler.queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
+                scheduler.device_transfer_queue.family = i;
                 transfer_score = 2;
             }
 
-            if (transfer_score < 3 && (queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT) &&
-                !(queue_families[i].queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT))) {
+            if (transfer_score < 3 && (scheduler.queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT) &&
+                !(scheduler.queue_families[i].queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT))) {
                 // Async transfer is optimal for host<->device transfers
-                transfer_idx = i;
+                scheduler.device_transfer_queue.family = i;
                 transfer_score = 3;
             }
 
             HC_TRACE(
-                "Queue family "
-                << i << " properties: Count: " << queue_families[i].queueCount << "\tFlags: "
-                //<< '(' << std::bitset<sizeof(VkQueueFlags) * 8>(queue_families[i].queueFlags) << ") => "
-                << (queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT ? "GRAPHICS | " : "")
-                << (queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT ? "COMPUTE | " : "")
-                << (queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT ? "TRANSFER | " : "")
-                << (queue_families[i].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT ? "SPARSE_BINDING | " : "")
-                << (queue_families[i].queueFlags & VK_QUEUE_PROTECTED_BIT ? "PROTECTED | " : "")
-                << (queue_families[i].queueFlags & VK_QUEUE_VIDEO_DECODE_BIT_KHR ? "VIDEO_DECODE | " : "")
-                << (queue_families[i].queueFlags & VK_QUEUE_VIDEO_ENCODE_BIT_KHR ? "VIDEO_ENCODE | " : "")
-                << (queue_families[i].queueFlags & VK_QUEUE_OPTICAL_FLOW_BIT_NV ? "OPTICAL_FLOW | " : "")
-                << (queue_families[i].queueFlags ? "\b\b  " : "NONE")
+                "Queue family " << i << " properties: Count: " << scheduler.queue_families[i].queueCount << "\tFlags: "
+                << (scheduler.queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT ? "GRAPHICS | " : "")
+                << (scheduler.queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT ? "COMPUTE | " : "")
+                << (scheduler.queue_families[i].queueFlags & VK_QUEUE_TRANSFER_BIT ? "TRANSFER | " : "")
+                << (scheduler.queue_families[i].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT ? "SPARSE_BINDING | " : "")
+                << (scheduler.queue_families[i].queueFlags & VK_QUEUE_PROTECTED_BIT ? "PROTECTED | " : "")
+                << (scheduler.queue_families[i].queueFlags & VK_QUEUE_VIDEO_DECODE_BIT_KHR ? "VIDEO_DECODE | " : "")
+                << (scheduler.queue_families[i].queueFlags & VK_QUEUE_VIDEO_ENCODE_BIT_KHR ? "VIDEO_ENCODE | " : "")
+                << (scheduler.queue_families[i].queueFlags & VK_QUEUE_OPTICAL_FLOW_BIT_NV ? "OPTICAL_FLOW | " : "")
+                << (scheduler.queue_families[i].queueFlags ? "\b\b  " : "NONE")
             );
         }
 
-        out_compute_idx = compute_idx;
-        out_transfer_idx = transfer_idx;
-    }
-
-    std::optional<Scheduler> Scheduler::create(
-        VkDevice const& device,
-        const VolkDeviceTable& fn_table,
-        //TODO is parallelism used?
-        u32,
-        std::vector<VkQueueFamilyProperties>&& queue_families,
-        std::set<u32>&& unique_queue_families,
-        std::vector<u32>&& graphics_queue_families,
-        u32 compute_family,
-        u32 transfer_family
-    ) {
-        Scheduler scheduler;
-
-        scheduler.queue_families = std::move(queue_families);
-        scheduler.graphics_queue_families = std::move(graphics_queue_families);
-        scheduler.compute_family = compute_family;
-        scheduler.transfer_family = transfer_family;
-
-        for (u32 queue_family : unique_queue_families) {
-            VkQueue queue = VK_NULL_HANDLE;
-            fn_table.vkGetDeviceQueue(device, queue_family, 0, &queue);
-            if (queue == VK_NULL_HANDLE) {
-                return std::nullopt;
-            }
-            if (scheduler.compute_family == queue_family) {
-                scheduler.compute_index = static_cast<u32>(scheduler.queues.size());
-            }
-            if (scheduler.transfer_family == queue_family) {
-                scheduler.transfer_index = static_cast<u32>(scheduler.queues.size());
-            }
-            scheduler.queues.emplace_back(queue_family, queue);
+        if (scheduler.device_graphics_queues.empty()) {
+            HC_ERROR("No graphics queue families found");
+            return std::unexpected(SchedulerError::NoGraphicsQueueFound);
         }
 
-        for (u32 queue_family : scheduler.graphics_queue_families) {
-            for (u32 i = 0; i < scheduler.queues.size(); i++) {
-                if (queue_family == scheduler.queues[i].first) {
-                    scheduler.graphics_queue_indexes.push_back(i);
-                    break;
-                }
-            }
+        if (scheduler.device_compute_queue.family != std::numeric_limits<u32>::max()) {
+            HC_DEBUG("Selected compute queue family index: " << scheduler.device_compute_queue.family);
+        } else {
+            HC_WARN("No compute queue family found");
+        }
+
+        if (scheduler.device_transfer_queue.family != std::numeric_limits<u32>::max()) {
+            HC_DEBUG("Selected transfer queue family index: " << scheduler.device_transfer_queue.family);
+        } else {
+            HC_ERROR("No transfer queue family found");
+            return std::unexpected(SchedulerError::NoTransferQueueFound);
         }
 
         return scheduler;
     }
 
-    Scheduler::Scheduler(Scheduler&& other) noexcept
-        : queue_families(std::move(other.queue_families)),
-        queues(std::move(other.queues)),
-        graphics_queue_families(std::move(other.graphics_queue_families)),
-        compute_family(
-            std::exchange(
-                other.compute_family,
-                std::numeric_limits<u32>::max()
-            )
-        ),
-        transfer_family(
-            std::exchange(
-                other.transfer_family,
-                std::numeric_limits<u32>::max()
-            )
-        ),
-        graphics_queue_indexes(std::move(other.graphics_queue_indexes)),
-        compute_index(
-            std::exchange(
-                other.compute_index,
-                std::numeric_limits<u32>::max()
-            )
-        ),
-        transfer_index(
-            std::exchange(
-                other.transfer_index,
-                std::numeric_limits<u32>::max()
-            )
-        ) {
+    std::set<u32> Scheduler::unique_families() const noexcept {
+        HC_ASSERT(!this->device_graphics_queues.empty(), "There must be at least 1 graphics queue");
+        HC_ASSERT(this->device_transfer_queue.family != std::numeric_limits<u32>::max(), "There must be a transfer queue");
+
+        std::set<u32> unique_families;
+
+        for (auto const& queue : this->device_graphics_queues) {
+            unique_families.insert(queue.family);
+        }
+
+        unique_families.insert(this->device_transfer_queue.family);
+
+        if (this->device_compute_queue.family != std::numeric_limits<u32>::max()) {
+            unique_families.insert(this->device_compute_queue.family);
+        }
+
+        return unique_families;
     }
 
-    Scheduler& Scheduler::operator=(Scheduler&& other) noexcept {
-        this->queue_families = std::move(other.queue_families);
-        this->queues = std::move(other.queues);
-        this->graphics_queue_families = std::move(other.graphics_queue_families);
-        this->compute_family = std::exchange(other.compute_family, std::numeric_limits<u32>::max());
-        this->transfer_family = std::exchange(other.transfer_family, std::numeric_limits<u32>::max());
-        this->graphics_queue_indexes = std::move(other.graphics_queue_indexes);
-        this->compute_index = std::exchange(other.compute_index, std::numeric_limits<u32>::max());
-        this->transfer_index = std::exchange(other.transfer_index, std::numeric_limits<u32>::max());
+    void Scheduler::init(const VkDevice& device, const VolkDeviceTable& fn_table) noexcept {
+        for (u32 const queue_family : this->unique_families()) {
+            VkQueue handle = VK_NULL_HANDLE;
+            fn_table.vkGetDeviceQueue(device, queue_family, 0, &handle);
 
-        return *this;
+            for (auto& queue : this->device_graphics_queues) {
+                if (queue.family == queue_family) {
+                    queue.handle = handle;
+                    break;
+                }
+            }
+
+            if (device_compute_queue.family == queue_family) {
+                device_compute_queue.handle = handle;
+            }
+
+            if (device_transfer_queue.family == queue_family) {
+                device_transfer_queue.handle = handle;
+            }
+        }
     }
 
-    std::pair<u32, u32> Scheduler::present_support(
+    std::optional<u32> Scheduler::present_support(
         VkPhysicalDevice const& physical_handle,
         VkSurfaceKHR const& surface
     ) const {
-        u32 found = std::numeric_limits<u32>::max();
-        for (u32 i = 0; i < this->queues.size(); i++) {
+        for (u32 i = 0; i < this->device_graphics_queues.size(); i++) {
+            u32 const family = this->device_graphics_queues[i].family;
             VkBool32 supported = VK_FALSE;
             VkResult res = vkGetPhysicalDeviceSurfaceSupportKHR(
                 physical_handle,
-                this->queues[i].first,
+                family,
                 surface,
                 &supported
             );
+
             if (res != VK_SUCCESS) {
-                HC_ERROR("Failed to query queue family surface support: " << to_str(res));
-                break;
+                HC_ERROR("Failed to query queue family surface support for queue family " << family << ": " << to_str(res));
+                continue;
             }
+
             if (supported == VK_TRUE) {
-                if (this->queue_families[this->queues[i].first].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-                    return {i, i};
-                } else if (found == std::numeric_limits<u32>::max()) {
-                    found = i;
-                }
+                return i;
             }
         }
 
-        if (this->graphics_queue_families.empty()) {
-            return {std::numeric_limits<u32>::max(), found};
-        } else {
-            return {this->graphics_queue_families[0], found};
-        }
+        return std::nullopt;
     }
 }

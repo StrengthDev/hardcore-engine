@@ -2,7 +2,7 @@
 
 // TODO add example
 
-use crate::GLFW_CALL_TX;
+use crate::{Version, GLFW_CALL_TX};
 use hardcore_sys::{
     destroy_window, new_window, set_window_char_callback, set_window_char_mods_callback,
     set_window_close_callback, set_window_cursor_enter_callback,
@@ -63,6 +63,17 @@ pub(super) struct WindowParams {
     pos_x: Option<i32>,
     pos_y: Option<i32>,
     name: String,
+}
+
+/// Get the [GLFW] version that was compiled.
+///
+/// [GLFW]: https://www.glfw.org/
+pub fn glfw_version() -> Version {
+    Version {
+        major: unsafe { hardcore_sys::GLFW_VERSION.major },
+        minor: unsafe { hardcore_sys::GLFW_VERSION.minor },
+        patch: unsafe { hardcore_sys::GLFW_VERSION.patch },
+    }
 }
 
 pub(super) enum GLFWCall {

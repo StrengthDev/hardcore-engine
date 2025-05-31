@@ -1,57 +1,52 @@
 #pragma once
 
-#include <optional>
-
 #include <util/number.hpp>
 
 namespace hc::render::device {
-	class Scheduler {
-	public:
-		static void select_queue_families(const std::vector<VkQueueFamilyProperties> &queue_families,
-										std::vector<u32> &out_graphics_queue_families,
-										u32 &out_compute_idx, u32 &out_transfer_idx);
+    struct Queue {
+        VkQueue handle = VK_NULL_HANDLE;
+        u32 family = std::numeric_limits<u32>::max();
+    };
 
-		Scheduler(const Scheduler &) = delete;
+    enum class SchedulerError {
+        NoGraphicsQueueFound,
+        NoTransferQueueFound,
+    };
 
-		Scheduler &operator=(const Scheduler &) = delete;
+    class Scheduler {
+    public:
+        static std::expected<Scheduler, SchedulerError> create(VkPhysicalDevice physical_device);
 
-		static std::optional<Scheduler>
-		create(const VkDevice &device, const VolkDeviceTable &fn_table, u32 parallelism,
-				std::vector<VkQueueFamilyProperties> &&queue_families,
-				std::set<u32> &&unique_queue_families,
-				std::vector<u32> &&graphics_queue_families,
-				u32 compute_family, u32 transfer_family);
+        Scheduler() = default;
 
-		Scheduler() = default;
+        Scheduler(const Scheduler&) = delete;
 
-		//        ~Scheduler();
-		//
-		//        void destroy();
+        Scheduler& operator=(const Scheduler&) = delete;
 
-		Scheduler(Scheduler &&other) noexcept;
+        Scheduler(Scheduler&& other) noexcept = default;
 
-		Scheduler &operator=(Scheduler &&other) noexcept;
+        Scheduler& operator=(Scheduler&& other) noexcept = default;
 
-		[[nodiscard]] std::pair<u32, u32>
-		present_support(const VkPhysicalDevice &physical_handle, const VkSurfaceKHR &surface) const;
+        std::set<u32> unique_families() const noexcept;
 
-		[[nodiscard]] inline u32 graphics_queue_family() const noexcept { return this->graphics_queue_families[0]; }
+        void init(const VkDevice& device, const VolkDeviceTable& fn_table) noexcept;
 
-		[[nodiscard]] inline u32 compute_queue_family() const noexcept { return this->compute_family; }
+        [[nodiscard]] std::optional<u32> present_support(
+            const VkPhysicalDevice& physical_handle,
+            const VkSurfaceKHR& surface
+        ) const;
 
-		[[nodiscard]] inline u32 transfer_queue_family() const noexcept { return this->transfer_family; }
+        [[nodiscard]] std::vector<Queue> const& graphics_queues() const noexcept { return this->device_graphics_queues; }
 
-	private:
-		std::vector<VkQueueFamilyProperties> queue_families; //!< The properties of a device's queue families.
+        [[nodiscard]] Queue const& compute_queue() const noexcept { return this->device_compute_queue; }
 
-		std::vector<std::pair<u32, VkQueue> > queues;
-		//!< The instanced queues, the first item of the pair is the queue's family.
+        [[nodiscard]] Queue const& transfer_queue() const noexcept { return this->device_transfer_queue; }
 
-		std::vector<u32> graphics_queue_families;
-		u32 compute_family = std::numeric_limits<u32>::max();
-		u32 transfer_family = std::numeric_limits<u32>::max();
-		std::vector<u32> graphics_queue_indexes;
-		u32 compute_index = std::numeric_limits<u32>::max();
-		u32 transfer_index = std::numeric_limits<u32>::max();
-	};
+    private:
+        std::vector<VkQueueFamilyProperties> queue_families; //!< The properties of a device's queue families.
+
+        std::vector<Queue> device_graphics_queues;
+        Queue device_compute_queue;
+        Queue device_transfer_queue;
+    };
 }

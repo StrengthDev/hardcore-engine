@@ -6,6 +6,7 @@
 #include <core/window.hpp>
 #include <core/log.hpp>
 #include <render/renderer.hpp>
+#include "render/util.hpp"
 #include <util/number.hpp>
 
 namespace hc::window {
@@ -16,6 +17,7 @@ namespace hc::window {
         Sz id = std::numeric_limits<Sz>::max();
         u32 owning_device = std::numeric_limits<u32>::max();
         bool resizing = false;
+        VkExtent2D extent;
         HCWindowPositionCallback position_callback = nullptr;
         HCWindowSizeCallback size_callback = nullptr;
         HCWindowCloseCallback close_callback = nullptr;
@@ -36,7 +38,12 @@ namespace hc::window {
     };
 
     /**
-     * @brief The mutex used to lock access to `window_map`.
+     * @brief The list of windows that will be destroyed in the next call to `hc_poll_events`.
+     */
+    static std::vector<GLFWwindow*> windows_to_destroy;
+
+    /**
+     * @brief The mutex used to lock access to `window_map` and `windows_to_destroy`.
      */
     static std::shared_mutex window_mutex;
 
@@ -46,12 +53,22 @@ namespace hc::window {
      * This is needed because GLFW window callbacks do not accept user data and only provide the GLFWwindow pointer within
      * the callback, so this is used to access each window's individual callbacks.
      */
-    static std::unordered_map<void*, StaticWindow> window_map;
+    static std::unordered_map<GLFWwindow*, StaticWindow> window_map;
 
     static bool raw_mouse_input_available = false;
 
     static void glfw_error_callback(int error_code, const char* description) {
         HC_ERROR("GLFW: " << description << "(code " << error_code << ')');
+    }
+
+    static inline void system_framebuffer_callback(StaticWindow& static_window, int width, int height) {
+        // Set resizing to true to keep the window's swapchain from recreating itself, while glfwPollEvents is blocking.
+        // This way, swapchains are only recreated at the end of glfwPollEvents, when the user stops
+        // resizing the window.
+        static_window.resizing = true;
+
+        static_window.extent.width = static_cast<u32>(width);
+        static_window.extent.height = static_cast<u32>(height);
     }
 
     bool init_context() {
@@ -62,9 +79,7 @@ namespace hc::window {
             return false;
         }
 
-        int major, minor, rev;
-        glfwGetVersion(&major, &minor, &rev);
-        HC_INFO("GLFW v" << major << '.' << minor << '.' << rev);
+        HC_INFO("GLFW v" << HC_GLFW_VERSION.major << '.' << HC_GLFW_VERSION.minor << '.' << HC_GLFW_VERSION.patch);
 
         glfwSetErrorCallback(glfw_error_callback);
 
@@ -79,27 +94,33 @@ namespace hc::window {
     }
 
     void terminate_context() {
+        std::unique_lock lock(window_mutex);
+
+        for (GLFWwindow* window : window_map | std::views::keys) {
+            glfwDestroyWindow(window);
+        }
+
+        windows_to_destroy.clear();
+        window_map.clear();
+
         glfwTerminate();
     }
 
     void destroy(GLFWwindow* window) {
-        if (window) {
-            const char* name = glfwGetWindowTitle(window);
-            if (name) {
-                HC_INFO("Destroying window (handle: " << window << ')');
-                std::unique_lock lock(window_mutex);
-                window_map.erase(window);
-                glfwDestroyWindow(window);
-            } else {
-                HC_WARN("Invalid window or GLFW context");
-            }
-        }
+        std::unique_lock lock(window_mutex);
+        windows_to_destroy.push_back(window);
     }
 
     bool is_resizing(GLFWwindow* window) {
         std::shared_lock lock(window_mutex);
         StaticWindow& static_window = window_map.at(window);
         return static_window.resizing;
+    }
+
+    VkExtent2D extent(GLFWwindow* window) {
+        std::shared_lock lock(window_mutex);
+        StaticWindow& static_window = window_map.at(window);
+        return static_window.extent;
     }
 
     static inline HCMouseButton from_glfw_button(int button) {
@@ -393,14 +414,24 @@ namespace hc::window {
     }
 }
 
+const HCVersion HC_GLFW_VERSION = {GLFW_VERSION_MAJOR, GLFW_VERSION_MINOR, GLFW_VERSION_REVISION};
+
 void hc_poll_events() {
     glfwPollEvents();
 
     // Unsure if this needed, as callbacks should only be called from within glfwPollEvents.
     std::unique_lock lock(hc::window::window_mutex);
+
+    for (GLFWwindow* window : hc::window::windows_to_destroy) {
+        HC_INFO("Destroying window " << hc::window::window_map.at(window).id << " (handle: " << window << ')');
+        hc::window::window_map.erase(window);
+        glfwDestroyWindow(window);
+    }
+    hc::window::windows_to_destroy.clear();
+
     // Set resizing to false, in order to allow swapchains to be recreated.
-    for (auto& static_window : hc::window::window_map | std::views::values) {
-        static_window.resizing = false;
+    for (auto& window : hc::window::window_map | std::views::values) {
+        window.resizing = false;
     }
 }
 
@@ -438,17 +469,40 @@ HCWindow hc_new_window(HCWindowParams params) {
         return INVALID_WINDOW;
     }
 
-    auto res = device_ptr->create_swapchain(hc::render::instance(), window);
-    if (res != hc::render::device::DeviceResult::Success) {
-        HC_ERROR("Failed to create swapchain");
-        glfwDestroyWindow(window);
-        return INVALID_WINDOW;
-    }
-
     glfwSetInputMode(window, GLFW_LOCK_KEY_MODS, GLFW_TRUE);
 
     if (hc::window::raw_mouse_input_available) {
         glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+    }
+    glfwSetFramebufferSizeCallback(
+        window,
+        [](GLFWwindow* glfw_window, int width, int height) {
+            // Unique lock because a variable is being set.
+            std::unique_lock lock(hc::window::window_mutex);
+            hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+            hc::window::system_framebuffer_callback(static_window, width, height);
+        }
+    );
+
+    int width, height;
+    glfwGetFramebufferSize(window, &width, &height);
+    VkExtent2D extent{static_cast<u32>(width), static_cast<u32>(height)};
+
+    VkInstance instance = hc::render::instance();
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
+    VkResult vk_res = glfwCreateWindowSurface(instance, window, nullptr, &surface);
+    if (vk_res != VK_SUCCESS) {
+        HC_ERROR("Failed to create window surface: " << hc::render::to_str(vk_res));
+        glfwDestroyWindow(window);
+        return INVALID_WINDOW;
+    }
+
+    auto swapchain_res = device_ptr->create_swapchain(window, surface, extent);
+    if (!swapchain_res) {
+        HC_ERROR("Failed to create swapchain");
+        vkDestroySurfaceKHR(instance, surface, nullptr);
+        glfwDestroyWindow(window);
+        return INVALID_WINDOW;
     }
 
     // Find first available ID
@@ -471,6 +525,7 @@ HCWindow hc_new_window(HCWindowParams params) {
     hc::window::StaticWindow static_window;
     static_window.id = id;
     static_window.owning_device = params.device;
+    static_window.extent = extent;
     hc::window::window_map.emplace(window, static_window);
 
     HC_INFO("Created new window with id " << id);
@@ -554,410 +609,567 @@ void hc_set_window_cursor_mode(HCWindow* window, HCCursorMode cursor_mode) {
 }
 
 void hc_set_window_position_callback(HCWindow* window, HCWindowPositionCallback callback) {
-    if (window->handle) {
-        auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(hc::window::window_mutex);
-        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
-        static_window.position_callback = callback;
-        if (callback) {
-            HC_TRACE("Setting window position callback for window " << window->id);
-            glfwSetWindowPosCallback(
-                handle,
-                [](GLFWwindow* glfw_window, int width, int height) {
-                    std::shared_lock lock(hc::window::window_mutex);
-                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
-                    static_window.position_callback(static_window.id, width, height);
-                }
-            );
-        } else {
-            HC_TRACE("Unsetting window position callback for window " << window->id);
-            glfwSetWindowPosCallback(handle, nullptr);
-        }
+    if (!window->handle) {
+        HC_WARN("Null window handle");
+        return;
+    }
+
+    auto* handle = static_cast<GLFWwindow*>(window->handle);
+    std::unique_lock lock(hc::window::window_mutex);
+
+    if (!hc::window::window_map.contains(handle)) {
+        HC_WARN("No such window: " << handle);
+        return;
+    }
+
+    hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
+    static_window.position_callback = callback;
+    if (callback) {
+        HC_TRACE("Setting window position callback for window " << window->id);
+        glfwSetWindowPosCallback(
+            handle,
+            [](GLFWwindow* glfw_window, int width, int height) {
+                std::shared_lock lock(hc::window::window_mutex);
+                hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+                static_window.position_callback(static_window.id, width, height);
+            }
+        );
+    } else {
+        HC_TRACE("Unsetting window position callback for window " << window->id);
+        glfwSetWindowPosCallback(handle, nullptr);
     }
 }
 
 void hc_set_window_size_callback(HCWindow* window, HCWindowSizeCallback callback) {
-    if (window->handle) {
-        auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(hc::window::window_mutex);
-        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
-        static_window.size_callback = callback;
-        if (callback) {
-            HC_TRACE("Setting window size callback for window " << window->id);
-            glfwSetWindowSizeCallback(
-                handle,
-                [](GLFWwindow* glfw_window, int width, int height) {
-                    std::shared_lock lock(hc::window::window_mutex);
-                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
-                    static_window.size_callback(static_window.id, width, height);
-                }
-            );
-        } else {
-            HC_TRACE("Unsetting window size callback for window " << window->id);
-            glfwSetWindowSizeCallback(handle, nullptr);
-        }
+    if (!window->handle) {
+        HC_WARN("Null window handle");
+        return;
+    }
+
+    auto* handle = static_cast<GLFWwindow*>(window->handle);
+    std::unique_lock lock(hc::window::window_mutex);
+
+    if (!hc::window::window_map.contains(handle)) {
+        HC_WARN("No such window: " << handle);
+        return;
+    }
+
+    hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
+    static_window.size_callback = callback;
+    if (callback) {
+        HC_TRACE("Setting window size callback for window " << window->id);
+        glfwSetWindowSizeCallback(
+            handle,
+            [](GLFWwindow* glfw_window, int width, int height) {
+                std::shared_lock lock(hc::window::window_mutex);
+                hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+                static_window.size_callback(static_window.id, width, height);
+            }
+        );
+    } else {
+        HC_TRACE("Unsetting window size callback for window " << window->id);
+        glfwSetWindowSizeCallback(handle, nullptr);
     }
 }
 
 void hc_set_window_close_callback(HCWindow* window, HCWindowCloseCallback callback) {
-    if (window->handle) {
-        auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(hc::window::window_mutex);
-        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
-        static_window.close_callback = callback;
-        if (callback) {
-            HC_TRACE("Setting window close callback for window " << window->id);
-            glfwSetWindowCloseCallback(
-                handle,
-                [](GLFWwindow* glfw_window) {
-                    std::shared_lock lock(hc::window::window_mutex);
-                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
-                    static_window.close_callback(static_window.id);
-                }
-            );
-        } else {
-            HC_TRACE("Unsetting window close callback for window " << window->id);
-            glfwSetWindowCloseCallback(handle, nullptr);
-        }
+    if (!window->handle) {
+        HC_WARN("Null window handle");
+        return;
+    }
+
+    auto* handle = static_cast<GLFWwindow*>(window->handle);
+    std::unique_lock lock(hc::window::window_mutex);
+
+    if (!hc::window::window_map.contains(handle)) {
+        HC_WARN("No such window: " << handle);
+        return;
+    }
+
+    hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
+    static_window.close_callback = callback;
+    if (callback) {
+        HC_TRACE("Setting window close callback for window " << window->id);
+        glfwSetWindowCloseCallback(
+            handle,
+            [](GLFWwindow* glfw_window) {
+                std::shared_lock lock(hc::window::window_mutex);
+                hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+                static_window.close_callback(static_window.id);
+            }
+        );
+    } else {
+        HC_TRACE("Unsetting window close callback for window " << window->id);
+        glfwSetWindowCloseCallback(handle, nullptr);
     }
 }
 
 void hc_set_window_refresh_callback(HCWindow* window, HCWindowRefreshCallback callback) {
-    if (window->handle) {
-        auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(hc::window::window_mutex);
-        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
-        static_window.refresh_callback = callback;
-        if (callback) {
-            HC_TRACE("Setting window refresh callback for window " << window->id);
-            glfwSetWindowRefreshCallback(
-                handle,
-                [](GLFWwindow* glfw_window) {
-                    std::shared_lock lock(hc::window::window_mutex);
-                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
-                    static_window.refresh_callback(static_window.id);
-                }
-            );
-        } else {
-            HC_TRACE("Unsetting window refresh callback for window " << window->id);
-            glfwSetWindowRefreshCallback(handle, nullptr);
-        }
+    if (!window->handle) {
+        HC_WARN("Null window handle");
+        return;
+    }
+
+    auto* handle = static_cast<GLFWwindow*>(window->handle);
+    std::unique_lock lock(hc::window::window_mutex);
+
+    if (!hc::window::window_map.contains(handle)) {
+        HC_WARN("No such window: " << handle);
+        return;
+    }
+
+    hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
+    static_window.refresh_callback = callback;
+    if (callback) {
+        HC_TRACE("Setting window refresh callback for window " << window->id);
+        glfwSetWindowRefreshCallback(
+            handle,
+            [](GLFWwindow* glfw_window) {
+                std::shared_lock lock(hc::window::window_mutex);
+                hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+                static_window.refresh_callback(static_window.id);
+            }
+        );
+    } else {
+        HC_TRACE("Unsetting window refresh callback for window " << window->id);
+        glfwSetWindowRefreshCallback(handle, nullptr);
     }
 }
 
 void hc_set_window_focus_callback(HCWindow* window, HCWindowFocusCallback callback) {
-    if (window->handle) {
-        auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(hc::window::window_mutex);
-        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
-        static_window.focus_callback = callback;
-        if (callback) {
-            HC_TRACE("Setting window focus callback for window " << window->id);
-            glfwSetWindowFocusCallback(
-                handle,
-                [](GLFWwindow* glfw_window, int focused) {
-                    std::shared_lock lock(hc::window::window_mutex);
-                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
-                    static_window.focus_callback(static_window.id, focused == GLFW_TRUE);
-                }
-            );
-        } else {
-            HC_TRACE("Unsetting window focus callback for window " << window->id);
-            glfwSetWindowFocusCallback(handle, nullptr);
-        }
+    if (!window->handle) {
+        HC_WARN("Null window handle");
+        return;
+    }
+
+    auto* handle = static_cast<GLFWwindow*>(window->handle);
+    std::unique_lock lock(hc::window::window_mutex);
+
+    if (!hc::window::window_map.contains(handle)) {
+        HC_WARN("No such window: " << handle);
+        return;
+    }
+
+    hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
+    static_window.focus_callback = callback;
+    if (callback) {
+        HC_TRACE("Setting window focus callback for window " << window->id);
+        glfwSetWindowFocusCallback(
+            handle,
+            [](GLFWwindow* glfw_window, int focused) {
+                std::shared_lock lock(hc::window::window_mutex);
+                hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+                static_window.focus_callback(static_window.id, focused == GLFW_TRUE);
+            }
+        );
+    } else {
+        HC_TRACE("Unsetting window focus callback for window " << window->id);
+        glfwSetWindowFocusCallback(handle, nullptr);
     }
 }
 
 void hc_set_window_minimize_callback(HCWindow* window, HCWindowMinimizeCallback callback) {
-    if (window->handle) {
-        auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(hc::window::window_mutex);
-        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
-        static_window.minimize_callback = callback;
-        if (callback) {
-            HC_TRACE("Setting window minimize callback for window " << window->id);
-            glfwSetWindowIconifyCallback(
-                handle,
-                [](GLFWwindow* glfw_window, int minimized) {
-                    std::shared_lock lock(hc::window::window_mutex);
-                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
-                    static_window.minimize_callback(static_window.id, minimized == GLFW_TRUE);
-                }
-            );
-        } else {
-            HC_TRACE("Unsetting window minimize callback for window " << window->id);
-            glfwSetWindowIconifyCallback(handle, nullptr);
-        }
+    if (!window->handle) {
+        HC_WARN("Null window handle");
+        return;
+    }
+
+    auto* handle = static_cast<GLFWwindow*>(window->handle);
+    std::unique_lock lock(hc::window::window_mutex);
+
+    if (!hc::window::window_map.contains(handle)) {
+        HC_WARN("No such window: " << handle);
+        return;
+    }
+
+    hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
+    static_window.minimize_callback = callback;
+    if (callback) {
+        HC_TRACE("Setting window minimize callback for window " << window->id);
+        glfwSetWindowIconifyCallback(
+            handle,
+            [](GLFWwindow* glfw_window, int minimized) {
+                std::shared_lock lock(hc::window::window_mutex);
+                hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+                static_window.minimize_callback(static_window.id, minimized == GLFW_TRUE);
+            }
+        );
+    } else {
+        HC_TRACE("Unsetting window minimize callback for window " << window->id);
+        glfwSetWindowIconifyCallback(handle, nullptr);
     }
 }
 
 void hc_set_window_maximize_callback(HCWindow* window, HCWindowMaximizeCallback callback) {
-    if (window->handle) {
-        auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(hc::window::window_mutex);
-        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
-        static_window.maximize_callback = callback;
-        if (callback) {
-            HC_TRACE("Setting window maximize callback for window " << window->id);
-            glfwSetWindowMaximizeCallback(
-                handle,
-                [](GLFWwindow* glfw_window, int maximized) {
-                    std::shared_lock lock(hc::window::window_mutex);
-                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
-                    static_window.maximize_callback(static_window.id, maximized == GLFW_TRUE);
-                }
-            );
-        } else {
-            HC_TRACE("Unsetting window maximize callback for window " << window->id);
-            glfwSetWindowMaximizeCallback(handle, nullptr);
-        }
+    if (!window->handle) {
+        HC_WARN("Null window handle");
+        return;
+    }
+
+    auto* handle = static_cast<GLFWwindow*>(window->handle);
+    std::unique_lock lock(hc::window::window_mutex);
+
+    if (!hc::window::window_map.contains(handle)) {
+        HC_WARN("No such window: " << handle);
+        return;
+    }
+
+    hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
+    static_window.maximize_callback = callback;
+    if (callback) {
+        HC_TRACE("Setting window maximize callback for window " << window->id);
+        glfwSetWindowMaximizeCallback(
+            handle,
+            [](GLFWwindow* glfw_window, int maximized) {
+                std::shared_lock lock(hc::window::window_mutex);
+                hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+                static_window.maximize_callback(static_window.id, maximized == GLFW_TRUE);
+            }
+        );
+    } else {
+        HC_TRACE("Unsetting window maximize callback for window " << window->id);
+        glfwSetWindowMaximizeCallback(handle, nullptr);
     }
 }
 
 void hc_set_window_framebuffer_callback(HCWindow* window, HCWindowFramebufferCallback callback) {
-    if (window->handle) {
-        auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(hc::window::window_mutex);
-        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
-        static_window.framebuffer_callback = callback;
-        if (callback) {
-            HC_TRACE("Setting window framebuffer callback for window " << window->id);
-            glfwSetFramebufferSizeCallback(
-                handle,
-                [](GLFWwindow* glfw_window, int width, int height) {
-                    // Unique lock because a variable is being set.
-                    std::unique_lock lock(hc::window::window_mutex);
-                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
-                    // Set resizing to true to keep the window's swapchain from recreating itself,
-                    // while glfwPollEvents is blocking.
-                    // This way, swapchains are only recreated at the end of glfwPollEvents, when the user stops
-                    // resizing the window.
-                    static_window.resizing = true;
-                    static_window.framebuffer_callback(static_window.id, width, height);
-                }
-            );
-        } else {
-            HC_TRACE("Unsetting window framebuffer callback for window " << window->id);
-            glfwSetFramebufferSizeCallback(handle, nullptr);
-        }
+    if (!window->handle) {
+        HC_WARN("Null window handle");
+        return;
+    }
+
+    auto* handle = static_cast<GLFWwindow*>(window->handle);
+    std::unique_lock lock(hc::window::window_mutex);
+
+    if (!hc::window::window_map.contains(handle)) {
+        HC_WARN("No such window: " << handle);
+        return;
+    }
+
+    hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
+    static_window.framebuffer_callback = callback;
+    if (callback) {
+        HC_TRACE("Setting window framebuffer callback for window " << window->id);
+        glfwSetFramebufferSizeCallback(
+            handle,
+            [](GLFWwindow* glfw_window, int width, int height) {
+                // Unique lock because a variable is being set.
+                std::unique_lock lock(hc::window::window_mutex);
+                hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+                hc::window::system_framebuffer_callback(static_window, width, height);
+
+                static_window.framebuffer_callback(static_window.id, width, height);
+            }
+        );
+    } else {
+        HC_TRACE("Unsetting window framebuffer callback for window " << window->id);
+        glfwSetFramebufferSizeCallback(
+            handle,
+            [](GLFWwindow* glfw_window, int width, int height) {
+                // Unique lock because a variable is being set.
+                std::unique_lock lock(hc::window::window_mutex);
+                hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+                hc::window::system_framebuffer_callback(static_window, width, height);
+            }
+        );
     }
 }
 
 void hc_set_window_scale_callback(HCWindow* window, HCWindowScaleCallback callback) {
-    if (window->handle) {
-        auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(hc::window::window_mutex);
-        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
-        static_window.scale_callback = callback;
-        if (callback) {
-            HC_TRACE("Setting window scale callback for window " << window->id);
-            glfwSetWindowContentScaleCallback(
-                handle,
-                [](GLFWwindow* glfw_window, float x_scale, float y_scale) {
-                    std::shared_lock lock(hc::window::window_mutex);
-                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
-                    static_window.scale_callback(static_window.id, x_scale, y_scale);
-                }
-            );
-        } else {
-            HC_TRACE("Unsetting window scale callback for window " << window->id);
-            glfwSetWindowContentScaleCallback(handle, nullptr);
-        }
+    if (!window->handle) {
+        HC_WARN("Null window handle");
+        return;
+    }
+
+    auto* handle = static_cast<GLFWwindow*>(window->handle);
+    std::unique_lock lock(hc::window::window_mutex);
+
+    if (!hc::window::window_map.contains(handle)) {
+        HC_WARN("No such window: " << handle);
+        return;
+    }
+
+    hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
+    static_window.scale_callback = callback;
+    if (callback) {
+        HC_TRACE("Setting window scale callback for window " << window->id);
+        glfwSetWindowContentScaleCallback(
+            handle,
+            [](GLFWwindow* glfw_window, float x_scale, float y_scale) {
+                std::shared_lock lock(hc::window::window_mutex);
+                hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+                static_window.scale_callback(static_window.id, x_scale, y_scale);
+            }
+        );
+    } else {
+        HC_TRACE("Unsetting window scale callback for window " << window->id);
+        glfwSetWindowContentScaleCallback(handle, nullptr);
     }
 }
 
 void hc_set_window_mouse_button_callback(HCWindow* window, HCWindowMouseButtonCallback callback) {
-    if (window->handle) {
-        auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(hc::window::window_mutex);
-        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
-        static_window.mouse_button_callback = callback;
-        if (callback) {
-            HC_TRACE("Setting mouse button callback for window " << window->id);
-            glfwSetMouseButtonCallback(
-                handle,
-                [](GLFWwindow* glfw_window, int button, int action, int mods) {
-                    std::shared_lock lock(hc::window::window_mutex);
-                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
-                    static_window.mouse_button_callback(
-                        static_window.id,
-                        hc::window::from_glfw_button(button),
-                        hc::window::from_glfw_action(action),
-                        mods
-                    );
-                }
-            );
-        } else {
-            HC_TRACE("Unsetting mouse button callback for window " << window->id);
-            glfwSetMouseButtonCallback(handle, nullptr);
-        }
+    if (!window->handle) {
+        HC_WARN("Null window handle");
+        return;
+    }
+
+    auto* handle = static_cast<GLFWwindow*>(window->handle);
+    std::unique_lock lock(hc::window::window_mutex);
+
+    if (!hc::window::window_map.contains(handle)) {
+        HC_WARN("No such window: " << handle);
+        return;
+    }
+
+    hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
+    static_window.mouse_button_callback = callback;
+    if (callback) {
+        HC_TRACE("Setting mouse button callback for window " << window->id);
+        glfwSetMouseButtonCallback(
+            handle,
+            [](GLFWwindow* glfw_window, int button, int action, int mods) {
+                std::shared_lock lock(hc::window::window_mutex);
+                hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+                static_window.mouse_button_callback(
+                    static_window.id,
+                    hc::window::from_glfw_button(button),
+                    hc::window::from_glfw_action(action),
+                    mods
+                );
+            }
+        );
+    } else {
+        HC_TRACE("Unsetting mouse button callback for window " << window->id);
+        glfwSetMouseButtonCallback(handle, nullptr);
     }
 }
 
 void hc_set_window_cursor_position_callback(HCWindow* window, HCWindowCursorPositionCallback callback) {
-    if (window->handle) {
-        auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(hc::window::window_mutex);
-        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
-        static_window.cursor_position_callback = callback;
-        if (callback) {
-            HC_TRACE("Setting cursor position callback for window " << window->id);
-            glfwSetCursorPosCallback(
-                handle,
-                [](GLFWwindow* glfw_window, double x, double y) {
-                    std::shared_lock lock(hc::window::window_mutex);
-                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
-                    static_window.cursor_position_callback(static_window.id, x, y);
-                }
-            );
-        } else {
-            HC_TRACE("Unsetting cursor position callback for window " << window->id);
-            glfwSetCursorPosCallback(handle, nullptr);
-        }
+    if (!window->handle) {
+        HC_WARN("Null window handle");
+        return;
+    }
+    auto* handle = static_cast<GLFWwindow*>(window->handle);
+    std::unique_lock lock(hc::window::window_mutex);
+
+    if (!hc::window::window_map.contains(handle)) {
+        HC_WARN("No such window: " << handle);
+        return;
+    }
+
+    hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
+    static_window.cursor_position_callback = callback;
+    if (callback) {
+        HC_TRACE("Setting cursor position callback for window " << window->id);
+        glfwSetCursorPosCallback(
+            handle,
+            [](GLFWwindow* glfw_window, double x, double y) {
+                std::shared_lock lock(hc::window::window_mutex);
+                hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+                static_window.cursor_position_callback(static_window.id, x, y);
+            }
+        );
+    } else {
+        HC_TRACE("Unsetting cursor position callback for window " << window->id);
+        glfwSetCursorPosCallback(handle, nullptr);
     }
 }
 
 void hc_set_window_cursor_enter_callback(HCWindow* window, HCWindowCursorEnterCallback callback) {
-    if (window->handle) {
-        auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(hc::window::window_mutex);
-        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
-        static_window.cursor_enter_callback = callback;
-        if (callback) {
-            HC_TRACE("Setting cursor enter callback for window " << window->id);
-            glfwSetCursorEnterCallback(
-                handle,
-                [](GLFWwindow* glfw_window, int entered) {
-                    std::shared_lock lock(hc::window::window_mutex);
-                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
-                    static_window.cursor_enter_callback(static_window.id, entered == GLFW_TRUE);
-                }
-            );
-        } else {
-            HC_TRACE("Unsetting cursor enter callback for window " << window->id);
-            glfwSetCursorEnterCallback(handle, nullptr);
-        }
+    if (!window->handle) {
+        HC_WARN("Null window handle");
+        return;
+    }
+
+    auto* handle = static_cast<GLFWwindow*>(window->handle);
+    std::unique_lock lock(hc::window::window_mutex);
+
+    if (!hc::window::window_map.contains(handle)) {
+        HC_WARN("No such window: " << handle);
+        return;
+    }
+
+    hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
+    static_window.cursor_enter_callback = callback;
+    if (callback) {
+        HC_TRACE("Setting cursor enter callback for window " << window->id);
+        glfwSetCursorEnterCallback(
+            handle,
+            [](GLFWwindow* glfw_window, int entered) {
+                std::shared_lock lock(hc::window::window_mutex);
+                hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+                static_window.cursor_enter_callback(static_window.id, entered == GLFW_TRUE);
+            }
+        );
+    } else {
+        HC_TRACE("Unsetting cursor enter callback for window " << window->id);
+        glfwSetCursorEnterCallback(handle, nullptr);
     }
 }
 
 void hc_set_window_scroll_callback(HCWindow* window, HCWindowScrollCallback callback) {
-    if (window->handle) {
-        auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(hc::window::window_mutex);
-        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
-        static_window.scroll_callback = callback;
-        if (callback) {
-            HC_TRACE("Setting scroll callback for window " << window->id);
-            glfwSetScrollCallback(
-                handle,
-                [](GLFWwindow* glfw_window, double x_offset, double y_offset) {
-                    std::shared_lock lock(hc::window::window_mutex);
-                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
-                    static_window.scroll_callback(static_window.id, x_offset, y_offset);
-                }
-            );
-        } else {
-            HC_TRACE("Unsetting scroll callback for window " << window->id);
-            glfwSetScrollCallback(handle, nullptr);
-        }
+    if (!window->handle) {
+        HC_WARN("Null window handle");
+        return;
+    }
+
+    auto* handle = static_cast<GLFWwindow*>(window->handle);
+    std::unique_lock lock(hc::window::window_mutex);
+
+    if (!hc::window::window_map.contains(handle)) {
+        HC_WARN("No such window: " << handle);
+        return;
+    }
+
+    hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
+    static_window.scroll_callback = callback;
+    if (callback) {
+        HC_TRACE("Setting scroll callback for window " << window->id);
+        glfwSetScrollCallback(
+            handle,
+            [](GLFWwindow* glfw_window, double x_offset, double y_offset) {
+                std::shared_lock lock(hc::window::window_mutex);
+                hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+                static_window.scroll_callback(static_window.id, x_offset, y_offset);
+            }
+        );
+    } else {
+        HC_TRACE("Unsetting scroll callback for window " << window->id);
+        glfwSetScrollCallback(handle, nullptr);
     }
 }
 
 void hc_set_window_key_callback(HCWindow* window, HCWindowKeyCallback callback) {
-    if (window->handle) {
-        auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(hc::window::window_mutex);
-        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
-        static_window.key_callback = callback;
-        if (callback) {
-            HC_TRACE("Setting key callback for window " << window->id);
-            glfwSetKeyCallback(
-                handle,
-                [](GLFWwindow* glfw_window, int key, int scan_code, int action, int mods) {
-                    std::shared_lock lock(hc::window::window_mutex);
-                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
-                    static_window.key_callback(
-                        static_window.id,
-                        hc::window::from_glfw_key(key),
-                        scan_code,
-                        hc::window::from_glfw_action(action),
-                        mods
-                    );
-                }
-            );
-        } else {
-            HC_TRACE("Unsetting key callback for window " << window->id);
-            glfwSetKeyCallback(handle, nullptr);
-        }
+    if (!window->handle) {
+        HC_WARN("Null window handle");
+        return;
+    }
+
+    auto* handle = static_cast<GLFWwindow*>(window->handle);
+    std::unique_lock lock(hc::window::window_mutex);
+
+    if (!hc::window::window_map.contains(handle)) {
+        HC_WARN("No such window: " << handle);
+        return;
+    }
+
+    hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
+    static_window.key_callback = callback;
+    if (callback) {
+        HC_TRACE("Setting key callback for window " << window->id);
+        glfwSetKeyCallback(
+            handle,
+            [](GLFWwindow* glfw_window, int key, int scan_code, int action, int mods) {
+                std::shared_lock lock(hc::window::window_mutex);
+                hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+                static_window.key_callback(
+                    static_window.id,
+                    hc::window::from_glfw_key(key),
+                    scan_code,
+                    hc::window::from_glfw_action(action),
+                    mods
+                );
+            }
+        );
+    } else {
+        HC_TRACE("Unsetting key callback for window " << window->id);
+        glfwSetKeyCallback(handle, nullptr);
     }
 }
 
 void hc_set_window_char_callback(HCWindow* window, HCWindowCharCallback callback) {
-    if (window->handle) {
-        auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(hc::window::window_mutex);
-        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
-        static_window.char_callback = callback;
-        if (callback) {
-            HC_TRACE("Setting character callback for window " << window->id);
-            glfwSetCharCallback(
-                handle,
-                [](GLFWwindow* glfw_window, unsigned int code_point) {
-                    std::shared_lock lock(hc::window::window_mutex);
-                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
-                    static_window.char_callback(static_window.id, code_point);
-                }
-            );
-        } else {
-            HC_TRACE("Unsetting character callback for window " << window->id);
-            glfwSetCharCallback(handle, nullptr);
-        }
+    if (!window->handle) {
+        HC_WARN("Null window handle");
+        return;
+    }
+
+    auto* handle = static_cast<GLFWwindow*>(window->handle);
+    std::unique_lock lock(hc::window::window_mutex);
+
+    if (!hc::window::window_map.contains(handle)) {
+        HC_WARN("No such window: " << handle);
+        return;
+    }
+
+    hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
+    static_window.char_callback = callback;
+    if (callback) {
+        HC_TRACE("Setting character callback for window " << window->id);
+        glfwSetCharCallback(
+            handle,
+            [](GLFWwindow* glfw_window, unsigned int code_point) {
+                std::shared_lock lock(hc::window::window_mutex);
+                hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+                static_window.char_callback(static_window.id, code_point);
+            }
+        );
+    } else {
+        HC_TRACE("Unsetting character callback for window " << window->id);
+        glfwSetCharCallback(handle, nullptr);
     }
 }
 
 void hc_set_window_char_mods_callback(HCWindow* window, HCWindowCharModsCallback callback) {
-    if (window->handle) {
-        auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(hc::window::window_mutex);
-        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
-        static_window.char_mod_callback = callback;
-        if (callback) {
-            HC_TRACE("Setting character with mods callback for window " << window->id);
-            glfwSetCharModsCallback(
-                handle,
-                [](GLFWwindow* glfw_window, unsigned int code_point, int mods) {
-                    std::shared_lock lock(hc::window::window_mutex);
-                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
-                    static_window.char_mod_callback(static_window.id, code_point, mods);
-                }
-            );
-        } else {
-            HC_TRACE("Unsetting character with mods callback for window " << window->id);
-            glfwSetCharModsCallback(handle, nullptr);
-        }
+    if (!window->handle) {
+        HC_WARN("Null window handle");
+        return;
+    }
+
+    auto* handle = static_cast<GLFWwindow*>(window->handle);
+    std::unique_lock lock(hc::window::window_mutex);
+
+    if (!hc::window::window_map.contains(handle)) {
+        HC_WARN("No such window: " << handle);
+        return;
+    }
+
+    hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
+    static_window.char_mod_callback = callback;
+    if (callback) {
+        HC_TRACE("Setting character with mods callback for window " << window->id);
+        glfwSetCharModsCallback(
+            handle,
+            [](GLFWwindow* glfw_window, unsigned int code_point, int mods) {
+                std::shared_lock lock(hc::window::window_mutex);
+                hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+                static_window.char_mod_callback(static_window.id, code_point, mods);
+            }
+        );
+    } else {
+        HC_TRACE("Unsetting character with mods callback for window " << window->id);
+        glfwSetCharModsCallback(handle, nullptr);
     }
 }
 
 void hc_set_window_drop_callback(HCWindow* window, HCWindowDropCallback callback) {
-    if (window->handle) {
-        auto* handle = static_cast<GLFWwindow*>(window->handle);
-        std::unique_lock lock(hc::window::window_mutex);
-        hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
-        static_window.drop_callback = callback;
-        if (callback) {
-            HC_TRACE("Setting drop callback for window " << window->id);
-            glfwSetDropCallback(
-                handle,
-                [](GLFWwindow* glfw_window, int path_count, const char* paths[]) {
-                    std::shared_lock lock(hc::window::window_mutex);
-                    hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
-                    static_window.drop_callback(static_window.id, path_count, paths);
-                }
-            );
-        } else {
-            HC_TRACE("Unsetting drop callback for window " << window->id);
-            glfwSetDropCallback(handle, nullptr);
-        }
+    if (!window->handle) {
+        HC_WARN("Null window handle");
+        return;
+    }
+
+    auto* handle = static_cast<GLFWwindow*>(window->handle);
+    std::unique_lock lock(hc::window::window_mutex);
+
+    if (!hc::window::window_map.contains(handle)) {
+        HC_WARN("No such window: " << handle);
+        return;
+    }
+
+    hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
+    static_window.drop_callback = callback;
+    if (callback) {
+        HC_TRACE("Setting drop callback for window " << window->id);
+        glfwSetDropCallback(
+            handle,
+            [](GLFWwindow* glfw_window, int path_count, const char* paths[]) {
+                std::shared_lock lock(hc::window::window_mutex);
+                hc::window::StaticWindow& static_window = hc::window::window_map.at(glfw_window);
+                static_window.drop_callback(static_window.id, path_count, paths);
+            }
+        );
+    } else {
+        HC_TRACE("Unsetting drop callback for window " << window->id);
+        glfwSetDropCallback(handle, nullptr);
     }
 }
 

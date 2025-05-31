@@ -123,31 +123,20 @@ namespace hc::render::device {
         create_info.imageExtent = params.extent;
         create_info.imageArrayLayers = 1; //usually always 1
         create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-        //how image is used, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT when direct rendering, VK_IMAGE_USAGE_TRANSFER_DST_BIT if theres post processing
-
-        u32 queue_families[2];
-        if (params.graphics_queue == params.present_queue) {
-            create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-            create_info.queueFamilyIndexCount = 0;
-            create_info.pQueueFamilyIndices = nullptr;
-        } else {
-            create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-            create_info.queueFamilyIndexCount = 2;
-            queue_families[0] = params.graphics_queue;
-            queue_families[1] = params.present_queue;
-            create_info.pQueueFamilyIndices = queue_families;
-        }
-
+        create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        create_info.queueFamilyIndexCount = 0;
+        create_info.pQueueFamilyIndices = nullptr;
+        //image transforms such as rotations or flipping, current means no transforms applied
         create_info.preTransform = surface_capabilities.surfaceCapabilities.currentTransform;
-        //image transforms such as rotations or flipping, current means no tranforms applied
         create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR; //image opacity
         create_info.presentMode = present_mode;
         create_info.clipped = VK_TRUE;
         create_info.oldSwapchain = VK_NULL_HANDLE; //used when it's needed to create a new target
 
         auto inner_res = create_inner_swapchain(fn_table, device, create_info);
-        if (!inner_res)
+        if (!inner_res) {
             return Err(std::move(inner_res).err());
+        }
 
         Swapchain swapchain;
         swapchain.inner = std::move(inner_res).ok();
@@ -155,8 +144,6 @@ namespace hc::render::device {
         swapchain.surface_format = surface_format;
         swapchain.present_mode = present_mode;
         swapchain.extent = params.extent;
-        swapchain.creation_params.graphics_queue_family = params.graphics_queue;
-        swapchain.creation_params.present_queue_family = params.present_queue;
         swapchain.creation_params.image_count = image_count;
         swapchain.creation_params.transform = surface_capabilities.surfaceCapabilities.currentTransform;
 
@@ -189,7 +176,7 @@ namespace hc::render::device {
         old_swapchains.pop();
     }
 
-    Result<u32, SwapchainResult> Swapchain::acquire_image(
+    std::expected<u32, SwapchainResult> Swapchain::acquire_image(
         const VolkDeviceTable& fn_table,
         VkDevice device,
         GLFWwindow* window,
@@ -199,7 +186,7 @@ namespace hc::render::device {
         VkResult res = fn_table.vkWaitForFences(device, 1, &this->presentation_fences[frame_mod], VK_TRUE, timeout);
         if (res != VK_SUCCESS) {
             HC_ERROR("Failed to wait for presentation fence: " << to_str(res));
-            return Err(SwapchainResult::FenceFailure);
+            return std::unexpected(SwapchainResult::FenceFailure);
         }
 
         u32 index = std::numeric_limits<u32>::max();
@@ -211,28 +198,41 @@ namespace hc::render::device {
             VK_NULL_HANDLE,
             &index
         );
-        if (res == VK_ERROR_OUT_OF_DATE_KHR && !window::is_resizing(window)) {
-            HC_DEBUG("Swapchain out of date, recreating");
-            SwapchainResult swapchain_result = this->recreate(fn_table, device, window);
-            if (swapchain_result != SwapchainResult::Success) {
-                return Err(std::move(swapchain_result));
+
+        switch (res) {
+        case VK_SUBOPTIMAL_KHR:
+            if (!window::is_resizing(window)) {
+                HC_DEBUG("Suboptimal swapchain, recreating..");
+                SwapchainResult swapchain_result = this->recreate(fn_table, device, window);
+                if (swapchain_result != SwapchainResult::Success) {
+                    return std::unexpected(std::move(swapchain_result));
+                }
             }
-
-            return Err(SwapchainResult::SkipFrame);
-        } else if (res != VK_SUCCESS && res != VK_SUBOPTIMAL_KHR) {
-            HC_ERROR("Failed to acquire swapchain image: " << to_str(res));
-            return Err(SwapchainResult::ImageAcquisitionFailure);
+        case VK_SUCCESS:
+            return index;
+        case VK_ERROR_OUT_OF_DATE_KHR:
+            if (!window::is_resizing(window)) {
+                HC_DEBUG("Swapchain out of date, recreating..");
+                SwapchainResult swapchain_result = this->recreate(fn_table, device, window);
+                if (swapchain_result != SwapchainResult::Success) {
+                    return std::unexpected(std::move(swapchain_result));
+                }
+            }
+        case VK_TIMEOUT:
+        case VK_NOT_READY: // Returned when timeout is 0 and image is not ready
+            return std::unexpected(SwapchainResult::SkipFrame);
+        case VK_ERROR_OUT_OF_HOST_MEMORY:
+        case VK_ERROR_OUT_OF_DEVICE_MEMORY:
+        case VK_ERROR_DEVICE_LOST:
+        case VK_ERROR_SURFACE_LOST_KHR:
+        case VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT:
+            return std::unexpected(SwapchainResult::ImageAcquisitionFailure);
+        default: HC_UNREACHABLE("No other errors should be returned by vkAcquireNextImageKHR");
         }
-
-        return Ok(std::move(index));
     }
 
     SwapchainResult Swapchain::recreate(const VolkDeviceTable& fn_table, VkDevice device, GLFWwindow* window) {
-        int width = 0, height = 0;
-        glfwGetFramebufferSize(window, &width, &height);
-
-        this->extent.width = static_cast<u32>(width);
-        this->extent.height = static_cast<u32>(height);
+        this->extent = window::extent(window);
 
         VkSwapchainCreateInfoKHR create_info = {};
         create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -245,20 +245,9 @@ namespace hc::render::device {
         create_info.imageExtent = this->extent;
         create_info.imageArrayLayers = 1;
         create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-
-        u32 queue_families[2];
-        if (this->creation_params.graphics_queue_family == this->creation_params.present_queue_family) {
-            create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-            create_info.queueFamilyIndexCount = 0;
-            create_info.pQueueFamilyIndices = nullptr;
-        } else {
-            create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-            create_info.queueFamilyIndexCount = 2;
-            queue_families[0] = this->creation_params.graphics_queue_family;
-            queue_families[1] = this->creation_params.present_queue_family;
-            create_info.pQueueFamilyIndices = queue_families;
-        }
-
+        create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        create_info.queueFamilyIndexCount = 0;
+        create_info.pQueueFamilyIndices = nullptr;
         create_info.preTransform = this->creation_params.transform;
         create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
         create_info.presentMode = this->present_mode;
