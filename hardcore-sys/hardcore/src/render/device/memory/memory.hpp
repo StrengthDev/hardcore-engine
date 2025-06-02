@@ -307,8 +307,6 @@ namespace hc::render::device::memory {
             VkPhysicalDeviceLimits const& limits
         );
 
-        ~Memory();
-
         void destroy(VolkDeviceTable const& fn_table, VkDevice device);
 
         Memory(Memory&&) noexcept = default;

@@ -721,18 +721,6 @@ namespace hc::render::device::memory {
         return Ok(std::move(memory));
     }
 
-    Memory::~Memory() {
-        HC_ASSERT(this->buffer_pools.empty(), "Memory must be externally freed using `destroy` before the destruction");
-        HC_ASSERT(
-            this->dynamic_buffer_pools.empty(),
-            "Memory must be externally freed using `destroy` before the destruction"
-        );
-        HC_ASSERT(
-            this->texture_pools.empty(),
-            "Memory must be externally freed using `destroy` before the destruction"
-        );
-    }
-
     void Memory::destroy(VolkDeviceTable const& fn_table, VkDevice device) {
         for (auto& pools : this->buffer_pools | std::views::values) {
             for (auto& pool : pools | std::views::values) {

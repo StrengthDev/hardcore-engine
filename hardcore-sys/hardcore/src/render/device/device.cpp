@@ -16,12 +16,15 @@ namespace hc::render::device {
         HC_INFO("Physical device found: " << device.properties.deviceName);
         vkGetPhysicalDeviceFeatures(physical_handle, &device.features);
 
-        auto scheduler_res = Scheduler::create(physical_handle);
-        if (!scheduler_res) {
+        auto selection_res = Scheduler::select_queues(physical_handle);
+        if (!selection_res) {
             return std::nullopt;
         }
-        device.scheduler = *std::move(scheduler_res);
-        std::set<u32> unique_queue_families = device.scheduler.unique_families();
+        QueueSelection queue_selection = *std::move(selection_res);
+        std::set<u32> unique_queue_families;
+        unique_queue_families.insert(queue_selection.graphics_families.begin(), queue_selection.graphics_families.end());
+        unique_queue_families.insert(queue_selection.compute_family);
+        unique_queue_families.insert(queue_selection.transfer_family);
 
         std::vector<VkDeviceQueueCreateInfo> queue_infos;
         queue_infos.reserve(unique_queue_families.size());
@@ -61,7 +64,11 @@ namespace hc::render::device {
 
         volkLoadDeviceTable(&device.fn_table, handle);
 
-        device.scheduler.init(handle, device.fn_table);
+        auto scheduler_res = Scheduler::create(device.fn_table, handle, queue_selection);
+        if (!scheduler_res) {
+            return std::nullopt;
+        }
+        device.scheduler = *std::move(scheduler_res);
 
         auto memory_res = memory::Memory::create(physical_handle, device.fn_table, handle, device.properties.limits);
         if (!memory_res) {
@@ -72,7 +79,7 @@ namespace hc::render::device {
         device.memory = std::move(memory_res).ok();
 
         device.graph = Graph::create(
-            device.scheduler.graphics_queues()[0].family,
+            device.scheduler.graphics_queues()[0].get().family,
             device.scheduler.compute_queue().family,
             device.scheduler.transfer_queue().family
         );
@@ -87,6 +94,7 @@ namespace hc::render::device {
     Device::~Device() {
         if (this->handle != VK_NULL_HANDLE) {
             this->memory.destroy(this->fn_table, this->handle);
+            this->scheduler.destroy(this->fn_table, this->handle);
             this->fn_table.vkDestroyDevice(this->handle, nullptr);
             this->physical_handle.destroy();
             this->handle.destroy();
@@ -522,7 +530,7 @@ namespace hc::render::device {
             presentInfo.pImageIndices = image_indices.data();
             presentInfo.pResults = results.data();
 
-            this->fn_table.vkQueuePresentKHR(this->scheduler.graphics_queues()[queue].handle, &presentInfo);
+            this->fn_table.vkQueuePresentKHR(this->scheduler.graphics_queues()[queue].get().handle, &presentInfo);
         }
     }
 }
