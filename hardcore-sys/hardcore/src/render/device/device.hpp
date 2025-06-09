@@ -43,15 +43,17 @@ namespace hc::render::device {
 
         void tick(u8 frame_mod, u8 next_frame_mod);
 
+        void finish(std::vector<u8> const& frame_mods);
+
         [[nodiscard]] const char* name() const noexcept;
 
         [[nodiscard]] std::expected<void, DeviceResult> create_swapchain(
             GLFWwindow* window,
-            VkSurfaceKHR surface,
+            ExternalHandle<VkSurfaceKHR, VK_NULL_HANDLE>&& surface,
             VkExtent2D extent
         );
 
-        void destroy_swapchain(VkInstance instance, GLFWwindow* window);
+        void destroy_swapchain(GLFWwindow* window);
 
         [[nodiscard]] Result<buffer::Params, DeviceResult> new_buffer(
             HCBufferKind kind,

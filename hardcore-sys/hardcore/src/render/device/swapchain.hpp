@@ -3,20 +3,23 @@
 #include <core/glfw.hpp>
 
 #include <util/number.hpp>
-#include <util/result.hpp>
 #include <util/uncopyable.hpp>
 
 #include <queue>
 
 namespace hc::render::device {
     enum class SwapchainResult : u8 {
-        Success = 0,
         SkipFrame,
         FenceFailure,
+        SemaphoreFailure,
         ImageAcquisitionFailure,
         CreationFailure,
         ImageViewFailure,
+        FramebufferFailure,
         UnsupportedSurface,
+        OutOfHostMemory,
+        OutOfDeviceMemory,
+        OutOfDate,
     };
 
     struct SurfaceInfo {
@@ -34,9 +37,24 @@ namespace hc::render::device {
         };
     };
 
+    struct ImageDetails {
+        u32 index = std::numeric_limits<u32>::max();
+        VkSemaphore image_ready_semaphore = VK_NULL_HANDLE;
+    };
+
     struct InnerSwapchain {
         ExternalHandle<VkSwapchainKHR, VK_NULL_HANDLE> handle;
-        std::vector<VkImageView> image_views;
+        std::vector<ExternalHandle<VkImageView, VK_NULL_HANDLE>> image_views;
+        std::vector<ExternalHandle<VkFramebuffer, VK_NULL_HANDLE>> framebuffers;
+
+        static std::expected<InnerSwapchain, SwapchainResult> create(
+            const VolkDeviceTable& fn_table,
+            VkDevice device,
+            const VkSwapchainCreateInfoKHR& create_info,
+            VkRenderPass render_pass
+        );
+
+        void destroy(const VolkDeviceTable& fn_table, VkDevice device);
     };
 
     class Swapchain {
@@ -45,10 +63,10 @@ namespace hc::render::device {
 
         Swapchain& operator=(const Swapchain&) = delete;
 
-        [[nodiscard]] static Result<Swapchain, SwapchainResult> create(
+        [[nodiscard]] static std::expected<Swapchain, SwapchainResult> create(
             const VolkDeviceTable& fn_table,
             VkDevice device,
-            VkSurfaceKHR&& surface,
+            ExternalHandle<VkSurfaceKHR, VK_NULL_HANDLE>&& surface,
             SurfaceInfo&& surface_info,
             SwapchainParams&& params
         );
@@ -59,23 +77,7 @@ namespace hc::render::device {
 
         Swapchain& operator=(Swapchain&& other) noexcept = default;
 
-        void destroy(VkInstance instance, const VolkDeviceTable& fn_table, VkDevice device);
-
-        void destroy_old(const VolkDeviceTable& fn_table, VkDevice device);
-
-        VkSwapchainKHR handle() const noexcept { return this->inner.handle; }
-
-        [[nodiscard]] std::expected<u32, SwapchainResult> acquire_image(
-            const VolkDeviceTable& fn_table,
-            VkDevice device,
-            GLFWwindow* window,
-            u8 frame_mod,
-            u64 timeout = std::numeric_limits<u64>::max()
-        );
-
-    private:
-        // Hide default constructor, swapchains should be created using the factory function `Swapchain::create`.
-        Swapchain() = default;
+        void destroy(const VolkDeviceTable& fn_table, VkDevice device);
 
         /**
          * @brief Recreate the swapchain according to the new window specifications.
@@ -86,7 +88,34 @@ namespace hc::render::device {
          * @return `SwapchainResult::Success` if the operation was successful, otherwise an error describing what went
          * wrong.
          */
-        SwapchainResult recreate(const VolkDeviceTable& fn_table, VkDevice device, GLFWwindow* window);
+        std::expected<bool, SwapchainResult> recreate(
+            VkPhysicalDevice physical_device,
+            const VolkDeviceTable& fn_table,
+            VkDevice device,
+            GLFWwindow* window,
+            bool out_of_date
+        );
+
+        void destroy_old(const VolkDeviceTable& fn_table, VkDevice device);
+
+        [[nodiscard]] VkSwapchainKHR handle() const noexcept { return this->inner.handle; }
+
+        [[nodiscard]] VkRenderPassBeginInfo render_pass_info(u32 image_index);
+
+        [[nodiscard]] std::expected<ImageDetails, SwapchainResult> acquire_image(
+            const VolkDeviceTable& fn_table,
+            VkDevice device,
+            u8 frame_mod,
+            u64 timeout = std::numeric_limits<u64>::max()
+        );
+
+        void set_out_of_date() noexcept;
+
+        [[nodiscard]] bool is_out_of_date() const noexcept { return this->images_out_of_date; }
+
+    private:
+        // Hide default constructor, swapchains should be created using the factory function `Swapchain::create`.
+        Swapchain() = default;
 
         InnerSwapchain inner; //!< The properties of a device's queue families.
 
@@ -107,6 +136,8 @@ namespace hc::render::device {
         VkExtent2D extent = VkExtent2D{.width = 0, .height = 0}; //!< The extent (dimensions) of the swapchain images.
         VkViewport viewport;
         VkRect2D scissor;
+        VkClearValue clear_value = {0.5f, 0.5f, 0.5f, 1.0f};
+        ExternalHandle<VkRenderPass, VK_NULL_HANDLE> render_pass;
 
         /**
          * @brief The parameters used to create a new swapchain.
@@ -117,22 +148,18 @@ namespace hc::render::device {
         } creation_params;
 
         /**
-         * @brief Collection of fences used to sync access by the host CPU to the swapchain images.
-         *
-         * Size matches the maximum number of frames in flight.
-         */
-        std::vector<VkFence> presentation_fences;
-        /**
          * @brief Collection of semaphores used to sync access by the device to the swapchain images.
          *
          * Size matches the maximum number of frames in flight.
          */
-        std::vector<VkSemaphore> image_semaphores;
+        std::vector<ExternalHandle<VkSemaphore, VK_NULL_HANDLE>> image_semaphores;
 
         // Old inner swapchains must not be destroyed while their resources are still in use.
         /**
          * @brief A queue containing old inner swapchains, in order of deprecation.
          */
         std::queue<InnerSwapchain> old_swapchains;
+
+        bool images_out_of_date = false;
     };
 }

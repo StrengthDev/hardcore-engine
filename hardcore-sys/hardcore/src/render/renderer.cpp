@@ -27,8 +27,8 @@ namespace hc::render {
     static u8 max_frames_in_flight_count = std::numeric_limits<u8>::max();
     static u8 frame_mod = std::numeric_limits<u8>::max();
 
-    static VkInstance global_instance = VK_NULL_HANDLE;
-    static VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
+    static ExternalHandle<VkInstance, VK_NULL_HANDLE> global_instance;
+    static ExternalHandle<VkDebugUtilsMessengerEXT, VK_NULL_HANDLE> debug_messenger;
     static HCVulkanDebugCallbackFn user_debug_callback = nullptr;
     static std::vector<device::Device> devices;
 
@@ -229,7 +229,7 @@ namespace hc::render {
         instance_info.enabledLayerCount = static_cast<u32>(layers.size());
         instance_info.ppEnabledLayerNames = layers.data();
 
-        return vkCreateInstance(&instance_info, nullptr, &global_instance);
+        return vkCreateInstance(&instance_info, nullptr, &global_instance.get());
     }
 
 
@@ -308,7 +308,7 @@ namespace hc::render {
         debug_info.pUserData = nullptr;
 
         // vkCreateDebugUtilsMessengerEXT is loaded via Volk
-        res = vkCreateDebugUtilsMessengerEXT(global_instance, &debug_info, nullptr, &debug_messenger);
+        res = vkCreateDebugUtilsMessengerEXT(global_instance, &debug_info, nullptr, &debug_messenger.get());
         if (res != VK_SUCCESS) {
             HC_ERROR("Failed to initialize debug messenger: " << to_str(res));
             return InstanceResult::DebugCallbackError;
@@ -337,16 +337,16 @@ namespace hc::render {
         devices.clear();
 
 #ifdef HC_LOGGING
-        if (debug_messenger != VK_NULL_HANDLE) {
+        if (debug_messenger.valid()) {
             vkDestroyDebugUtilsMessengerEXT(global_instance, debug_messenger, nullptr);
-            debug_messenger = VK_NULL_HANDLE;
+            debug_messenger.destroy();
             user_debug_callback = nullptr;
         }
 #endif // HC_LOGGING
 
-        if (global_instance != VK_NULL_HANDLE) {
+        if (global_instance.valid()) {
             vkDestroyInstance(global_instance, nullptr);
-            global_instance = VK_NULL_HANDLE;
+            global_instance.destroy();
         }
 
         volkFinalize();
@@ -364,7 +364,7 @@ namespace hc::render {
         return frame_mod;
     }
 
-    VkInstance instance() {
+    VkInstance vk_instance() {
         return global_instance;
     }
 
@@ -417,10 +417,19 @@ int hc_render_tick() {
 }
 
 int hc_render_finish() {
-    for (u8 i = 0; i < hc::render::max_frames_in_flight_count + 1; ++i) {
-        int res = hc_render_tick();
-        if (res)
-            return res;
+    u8 frame_count = hc::render::max_frames_in_flight_count + 1;
+    std::vector<u8> frame_mods;
+    frame_mods.reserve(frame_count);
+
+    for (u8 i = 0; i < frame_count; ++i) {
+        frame_mods.push_back(hc::render::frame_mod);
+
+        u8 next_mod = hc::render::frame_mod + 1;
+        hc::render::frame_mod = next_mod < hc::render::max_frames_in_flight_count ? next_mod : 0;
+    }
+
+    for (auto& device : hc::render::devices) {
+        device.finish(frame_mods);
     }
 
     return 0;

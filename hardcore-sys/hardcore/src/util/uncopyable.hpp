@@ -15,7 +15,7 @@
  * @tparam T The type of the inner value.
  * @tparam DEFAULT The default value assigned by the default constructor, move constructor and move assignment.
  */
-template <typename T, T DEFAULT>
+template<typename T, T DEFAULT>
 class Uncopyable {
 public:
     Uncopyable() = default;
@@ -26,7 +26,7 @@ public:
     * @param value The value to assign to this uncopyable variable.
     */
 
-    Uncopyable(const T& value) : value(value) { ; } // NOLINT(*-explicit-constructor) intentionally implicit
+    Uncopyable(const T& value) : value(value) { ; }
 
     Uncopyable(const Uncopyable&) = delete;
 
@@ -41,9 +41,13 @@ public:
         return *this;
     }
 
-    operator T() const { return value; } // NOLINT(*-explicit-constructor) intentionally implicit
+    operator T() const noexcept { return this->value; }
 
-    operator T&() { return value; } // NOLINT(*-explicit-constructor) intentionally implicit
+    operator T&() noexcept { return this->value; }
+
+    T& get() noexcept { return this->value; }
+
+    T const& const_get() const noexcept { return this->value; }
 
 private:
     T value = DEFAULT;
@@ -64,7 +68,7 @@ private:
  * @tparam T The type of the inner value.
  * @tparam DEFAULT The default value assigned by the default constructor, move constructor and move assignment.
  */
-template <typename T, T DEFAULT>
+template<typename T, T DEFAULT>
 class ExternalHandle {
 public:
     ExternalHandle() = default;
@@ -74,7 +78,7 @@ public:
     *
     * @param value The value to assign to this external handle.
     */
-    ExternalHandle(const T& value) : value(value) { ; } // NOLINT(*-explicit-constructor) intentionally implicit
+    ExternalHandle(const T& value) : value(value) { ; }
 
     ~ExternalHandle() {
         HC_ASSERT(this->value == DEFAULT, "Inner value must be externally cleaned up");
@@ -94,9 +98,15 @@ public:
         return *this;
     }
 
-    operator T() const { return value; } // NOLINT(*-explicit-constructor) intentionally implicit
+    operator T() const noexcept { return this->value; }
 
-    operator T&() { return value; } // NOLINT(*-explicit-constructor) intentionally implicit
+    operator T&() noexcept { return this->value; }
+
+    T& get() noexcept { return this->value; }
+
+    T const& const_get() const noexcept { return this->value; }
+
+    bool valid() const noexcept { return this->value != DEFAULT; }
 
     /**
     * @brief "Destroy" this handle by setting it to the default value.

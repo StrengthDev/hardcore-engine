@@ -488,19 +488,18 @@ HCWindow hc_new_window(HCWindowParams params) {
     glfwGetFramebufferSize(window, &width, &height);
     VkExtent2D extent{static_cast<u32>(width), static_cast<u32>(height)};
 
-    VkInstance instance = hc::render::instance();
-    VkSurfaceKHR surface = VK_NULL_HANDLE;
-    VkResult vk_res = glfwCreateWindowSurface(instance, window, nullptr, &surface);
+    VkInstance instance = hc::render::vk_instance();
+    ExternalHandle<VkSurfaceKHR, VK_NULL_HANDLE> surface;
+    VkResult vk_res = glfwCreateWindowSurface(instance, window, nullptr, &surface.get());
     if (vk_res != VK_SUCCESS) {
         HC_ERROR("Failed to create window surface: " << hc::render::to_str(vk_res));
         glfwDestroyWindow(window);
         return INVALID_WINDOW;
     }
 
-    auto swapchain_res = device_ptr->create_swapchain(window, surface, extent);
+    auto swapchain_res = device_ptr->create_swapchain(window, std::move(surface), extent);
     if (!swapchain_res) {
         HC_ERROR("Failed to create swapchain");
-        vkDestroySurfaceKHR(instance, surface, nullptr);
         glfwDestroyWindow(window);
         return INVALID_WINDOW;
     }
@@ -570,7 +569,7 @@ void hc_destroy_window(HCWindow* window) {
         HC_UNREACHABLE("Windows should always refer to a valid device");
     }
     auto device_ptr = device_res.ok();
-    device_ptr->destroy_swapchain(hc::render::instance(), handle);
+    device_ptr->destroy_swapchain(handle);
 
     window->handle = nullptr;
 }

@@ -1,8 +1,7 @@
 #pragma once
 
-#include "util/uncopyable.hpp"
-
 #include <util/number.hpp>
+#include "util/uncopyable.hpp"
 
 namespace hc::render::device {
     enum class SchedulerError {
@@ -20,12 +19,26 @@ namespace hc::render::device {
         u32 transfer_family;
     };
 
+    struct CommandPool {
+        ExternalHandle<VkCommandPool, VK_NULL_HANDLE> handle;
+        ExternalHandle<VkCommandBuffer, VK_NULL_HANDLE> buffer;
+        ExternalHandle<VkFence, VK_NULL_HANDLE> fence;
+        ExternalHandle<VkSemaphore, VK_NULL_HANDLE> semaphore;
+
+        static std::expected<CommandPool, SchedulerError> create(
+            const VolkDeviceTable& fn_table,
+            VkDevice device,
+            u32 queue_family
+        );
+
+        void destroy(const VolkDeviceTable& fn_table, VkDevice device);
+    };
+
     struct Queue {
         ExternalHandle<VkQueue, VK_NULL_HANDLE> handle;
         u32 family = std::numeric_limits<u32>::max();
         VkQueueFamilyProperties family_properties;
-        ExternalHandle<VkCommandPool, VK_NULL_HANDLE> pool;
-        ExternalHandle<VkCommandBuffer, VK_NULL_HANDLE> buffer;
+        std::vector<CommandPool> pools;
     };
 
     class Scheduler {
@@ -37,7 +50,8 @@ namespace hc::render::device {
         static std::expected<Scheduler, SchedulerError> create(
             const VolkDeviceTable& fn_table,
             VkDevice device,
-            QueueSelection const& selection
+            QueueSelection const& selection,
+            u8 max_frames_in_flight
         );
 
         void destroy(VolkDeviceTable const& fn_table, VkDevice device);
@@ -63,12 +77,14 @@ namespace hc::render::device {
 
         [[nodiscard]] Queue const& transfer_queue() const noexcept { return this->queues[this->transfer_queue_index]; }
 
+        std::expected<void, SchedulerError> reset_pools(const VolkDeviceTable& fn_table, VkDevice device, u8 frame_mod);
+
     private:
         std::vector<Queue> queues;
 
         std::vector<u32> graphics_queue_indexes;
-        u32 compute_queue_index;
-        u32 transfer_queue_index;
+        u32 compute_queue_index = std::numeric_limits<u32>::max();
+        u32 transfer_queue_index = std::numeric_limits<u32>::max();
 
         std::vector<std::reference_wrapper<const Queue>> graphics_queue_refs;
     };

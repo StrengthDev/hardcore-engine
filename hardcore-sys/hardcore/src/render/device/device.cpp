@@ -6,6 +6,7 @@
 
 #include <core/log.hpp>
 #include <core/window.hpp>
+#include <render/renderer.hpp>
 #include <render/vars.hpp>
 #include <util/flow.hpp>
 
@@ -64,7 +65,7 @@ namespace hc::render::device {
 
         volkLoadDeviceTable(&device.fn_table, handle);
 
-        auto scheduler_res = Scheduler::create(device.fn_table, handle, queue_selection);
+        auto scheduler_res = Scheduler::create(device.fn_table, handle, queue_selection, max_frames_in_flight());
         if (!scheduler_res) {
             return std::nullopt;
         }
@@ -117,11 +118,21 @@ namespace hc::render::device {
 
         // this->graph.record();
 
-        //this->present(frame_mod);
+        this->present(frame_mod);
 
         mem_res = this->memory.map_ranges(this->fn_table, this->handle, next_frame_mod);
         if (mem_res != memory::MemoryResult::Success) {
             HC_ERROR("Failed to map memory ranges");
+        }
+    }
+
+    void Device::finish(std::vector<u8> const& frame_mods) {
+        this->memory.unmap_ranges(this->fn_table, this->handle);
+
+        this->fn_table.vkDeviceWaitIdle(this->handle);
+
+        for (u8 frame_mod : frame_mods) {
+            this->cleanup(frame_mod);
         }
     }
 
@@ -218,28 +229,37 @@ namespace hc::render::device {
 
     std::expected<void, DeviceResult> Device::create_swapchain(
         GLFWwindow* window,
-        VkSurfaceKHR surface,
+        ExternalHandle<VkSurfaceKHR, VK_NULL_HANDLE>&& surface,
         VkExtent2D extent
     ) {
         auto present_support_res = this->scheduler.present_support(this->physical_handle, surface);
         if (!present_support_res) {
             HC_ERROR("Presentation not supported for swapchain surface");
+            vkDestroySurfaceKHR(vk_instance(), surface, nullptr);
+            surface.destroy();
             return std::unexpected(DeviceResult::SwapchainFailure);
         }
         u32 queue_index = *present_support_res;
 
         auto capabilities = surface_capabilities(this->physical_handle, surface);
         if (!capabilities) {
+            vkDestroySurfaceKHR(vk_instance(), surface, nullptr);
+            surface.destroy();
             return std::unexpected(DeviceResult::VkFailure);
         }
 
         std::vector<VkSurfaceFormat2KHR> formats = surface_formats(this->physical_handle, surface);
         if (formats.empty()) {
+            vkDestroySurfaceKHR(vk_instance(), surface, nullptr);
+            surface.destroy();
             return std::unexpected(DeviceResult::SurfaceFailure);
         }
 
         std::vector<VkPresentModeKHR> present_modes = surface_present_modes(this->physical_handle, surface);
         if (present_modes.empty()) {
+            vkDestroySurfaceKHR(vk_instance(), surface, nullptr);
+            surface.destroy();
+
             return std::unexpected(DeviceResult::SurfaceFailure);
         }
 
@@ -267,28 +287,31 @@ namespace hc::render::device {
         );
         if (swapchain) {
             this->queue_windows[queue_index].push_back(window);
-            this->swapchains.emplace(window, std::move(swapchain).ok());
+            this->swapchains.emplace(window, *std::move(swapchain));
             return {};
         } else {
             return std::unexpected(DeviceResult::SwapchainFailure);
         }
     }
 
-    void Device::destroy_swapchain(VkInstance instance, GLFWwindow* window) {
-        u32 queue_index = std::numeric_limits<u32>::max();
-        for (auto const& [queue, windows] : this->queue_windows) {
-            if (std::ranges::find(windows, window) != windows.end()) {
-                queue_index = queue;
-                break;
+    void Device::destroy_swapchain(GLFWwindow* window) {
+        const auto it = std::ranges::find_if(
+            this->queue_windows,
+            [window](auto const& value) {
+                return std::ranges::find(value.second, window) != value.second.end();
             }
-        }
+        );
+
+        HC_ASSERT(it != this->queue_windows.end(), "A swapchain matching the window must exist");
+        u32 queue_index = it->first;
+        std::erase(this->queue_windows[queue_index], window);
+        auto node = this->swapchains.extract(window);
 
         WindowDestructionMark mark = {
-            .instance = instance,
-            .queue_index = queue_index,
-            .window = window
+            .window = window,
+            .swapchain = std::move(node.mapped()),
         };
-        this->cleanup_submissions.emplace_back(mark);
+        this->cleanup_submissions.emplace_back(std::move(mark));
     }
 
     Result<buffer::Params, DeviceResult> Device::new_buffer(
@@ -468,14 +491,11 @@ namespace hc::render::device {
         for (auto& mark : cleanup_queue) {
             std::visit(
                 DestructionMarkHandler{
-                    [this](WindowDestructionMark const& window_mark) {
-                        std::erase(this->queue_windows[window_mark.queue_index], window_mark.window);
-                        auto node = this->swapchains.extract(window_mark.window);
-                        HC_ASSERT(!node.empty(), "A swapchain matching the mark's window should exist");
-                        node.mapped().destroy(window_mark.instance, this->fn_table, this->handle);
+                    [this](WindowDestructionMark& window_mark) {
+                        window_mark.swapchain.destroy(this->fn_table, this->handle);
                         window::destroy(window_mark.window);
                     },
-                    [this](SwapchainDestructionMark const& swapchain_mark) {
+                    [this](OldSwapchainDestructionMark const& swapchain_mark) {
                         HC_ASSERT(
                             this->swapchains.contains(swapchain_mark.window),
                             "A swapchain matching the mark's window should exist"
@@ -498,39 +518,138 @@ namespace hc::render::device {
     }
 
     void Device::present(u8 frame_mod) {
-        for (auto const& [queue, windows] : this->queue_windows) {
+        for (auto const& [graphics_queue_index, windows] : this->queue_windows) {
+            Queue const& queue = this->scheduler.graphics_queues()[graphics_queue_index].get();
+            VkCommandBuffer cmd_buffer = queue.pools[frame_mod].buffer;
+            VkFence render_finished_fence = queue.pools[frame_mod].fence;
+            VkSemaphore render_finished_semaphore = queue.pools[frame_mod].semaphore;
+
+            VkResult res = fn_table.vkWaitForFences(
+                this->handle,
+                1,
+                &render_finished_fence,
+                VK_TRUE,
+                UINT64_MAX
+            );
+            if (res != VK_SUCCESS) {
+                HC_ERROR("Failed to wait for command buffer fence");
+                // TODO proper error stuff
+                return;;
+            }
+
             std::vector<VkSwapchainKHR> swapchain_handles;
             std::vector<u32> image_indices;
-            std::vector<VkResult> results;
+            std::vector<VkSemaphore> image_semaphores;
+            std::vector<VkPipelineStageFlags> semaphore_stage_flags;
+            std::vector<VkRenderPassBeginInfo> render_pass_infos;
+            std::vector<VkResult> presentation_results;
+            std::vector<GLFWwindow*> unskipped_windows;
 
             swapchain_handles.reserve(this->swapchains.size());
             image_indices.reserve(this->swapchains.size());
-            results.reserve(this->swapchains.size());
+            image_semaphores.reserve(this->swapchains.size());
+            semaphore_stage_flags.reserve(this->swapchains.size());
+            render_pass_infos.reserve(this->swapchains.size());
+            presentation_results.reserve(this->swapchains.size());
+            unskipped_windows.reserve(this->swapchains.size());
 
             for (auto const& window : windows) {
                 auto& swapchain = this->swapchains.at(window);
 
-                auto res = swapchain.acquire_image(this->fn_table, this->handle, window, frame_mod);
-                if (!res) {
-                    continue;
+                if (swapchain.is_out_of_date()) {
+                    auto recreation_res = swapchain.recreate(
+                        this->physical_handle,
+                        this->fn_table,
+                        this->handle,
+                        window,
+                        true
+                    );
+
+                    if (recreation_res && *recreation_res) {
+                        this->cleanup_submissions.emplace_back(OldSwapchainDestructionMark{window});
+                    } else {
+                        continue;
+                    }
                 }
 
-                u32 image_index = *res;
+                auto image_details = swapchain.acquire_image(this->fn_table, this->handle, frame_mod);
+                if (!image_details) {
+                    continue;
+                }
+                auto [index, image_ready_semaphore] = *image_details;
+
                 swapchain_handles.push_back(swapchain.handle());
-                image_indices.push_back(image_index);
-                results.push_back(VK_SUCCESS);
+                image_indices.push_back(index);
+                image_semaphores.push_back(image_ready_semaphore);
+                semaphore_stage_flags.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+                render_pass_infos.push_back(swapchain.render_pass_info(index));
+                presentation_results.push_back(VK_SUCCESS);
+                unskipped_windows.push_back(window);
             }
 
-            VkPresentInfoKHR presentInfo = {};
-            presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-            presentInfo.waitSemaphoreCount = 0;
-            presentInfo.pWaitSemaphores = nullptr; // TODO
-            presentInfo.swapchainCount = static_cast<u32>(swapchain_handles.size());
-            presentInfo.pSwapchains = swapchain_handles.data();
-            presentInfo.pImageIndices = image_indices.data();
-            presentInfo.pResults = results.data();
+            this->fn_table.vkResetCommandPool(this->handle, queue.pools[frame_mod].handle, 0);
 
-            this->fn_table.vkQueuePresentKHR(this->scheduler.graphics_queues()[queue].get().handle, &presentInfo);
+            VkCommandBufferBeginInfo begin_info = {
+                .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+                .pNext = nullptr,
+                .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+                .pInheritanceInfo = nullptr,
+            };
+            this->fn_table.vkBeginCommandBuffer(cmd_buffer, &begin_info);
+
+            for (auto const& render_pass_info : render_pass_infos) {
+                this->fn_table.vkCmdBeginRenderPass(cmd_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+                this->fn_table.vkCmdEndRenderPass(cmd_buffer);
+            }
+
+            this->fn_table.vkEndCommandBuffer(cmd_buffer);
+
+            VkSubmitInfo submit_info = {
+                .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+                .pNext = nullptr,
+                .waitSemaphoreCount = static_cast<u32>(image_semaphores.size()),
+                .pWaitSemaphores = image_semaphores.data(),
+                .pWaitDstStageMask = semaphore_stage_flags.data(),
+                .commandBufferCount = 1,
+                .pCommandBuffers = &cmd_buffer,
+                .signalSemaphoreCount = swapchain_handles.empty() ? 0U : 1U,
+                .pSignalSemaphores = swapchain_handles.empty() ? nullptr : &render_finished_semaphore,
+            };
+
+            this->fn_table.vkResetFences(this->handle, 1, &render_finished_fence);
+            this->fn_table.vkQueueSubmit(queue.handle, 1, &submit_info, render_finished_fence);
+
+            if (!swapchain_handles.empty()) {
+                VkPresentInfoKHR present_info = {
+                    .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+                    .pNext = nullptr,
+                    .waitSemaphoreCount = 1,
+                    .pWaitSemaphores = &render_finished_semaphore,
+                    .swapchainCount = static_cast<u32>(swapchain_handles.size()),
+                    .pSwapchains = swapchain_handles.data(),
+                    .pImageIndices = image_indices.data(),
+                    .pResults = presentation_results.data(),
+                };
+
+                res = this->fn_table.vkQueuePresentKHR(queue.handle, &present_info);
+                if (res != VK_SUCCESS) {
+                    for (const auto& [window, result] : std::views::zip(unskipped_windows, presentation_results)) {
+                        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+                            auto recreation_res = this->swapchains.at(window).recreate(
+                                this->physical_handle,
+                                this->fn_table,
+                                this->handle,
+                                window,
+                                result == VK_ERROR_OUT_OF_DATE_KHR
+                            );
+
+                            if (recreation_res && *recreation_res) {
+                                this->cleanup_submissions.emplace_back(OldSwapchainDestructionMark{window});
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

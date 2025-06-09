@@ -1,19 +1,19 @@
 #pragma once
 
 #include <core/glfw.hpp>
-
 #include <util/number.hpp>
+
+#include <render/device/swapchain.hpp>
 
 #include <variant>
 
 namespace hc::render::device {
     struct WindowDestructionMark {
-        VkInstance instance;
-        u32 queue_index;
         GLFWwindow* window;
+        Swapchain swapchain;
     };
 
-    struct SwapchainDestructionMark {
+    struct OldSwapchainDestructionMark {
         GLFWwindow* window;
     };
 
@@ -36,7 +36,7 @@ namespace hc::render::device {
     */
     typedef std::variant<
         WindowDestructionMark,
-        SwapchainDestructionMark,
+        OldSwapchainDestructionMark,
         ResourceDestructionMark,
         TextureDestructionMark
     > DestructionMark;

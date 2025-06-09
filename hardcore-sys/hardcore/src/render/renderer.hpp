@@ -24,7 +24,7 @@ namespace hc::render {
 
     InstanceResult term();
 
-    VkInstance instance();
+    VkInstance vk_instance();
 
     std::vector<device::Device>& device_list() noexcept;
 
