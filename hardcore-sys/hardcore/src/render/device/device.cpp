@@ -221,8 +221,9 @@ namespace hc::render::device {
         }
 
         // The specification requires that this present mode is supported, if the surface is supported
-        if (present_modes.empty())
+        if (present_modes.empty()) {
             present_modes.push_back(VK_PRESENT_MODE_FIFO_KHR);
+        }
 
         return present_modes;
     }
@@ -305,6 +306,10 @@ namespace hc::render::device {
         HC_ASSERT(it != this->queue_windows.end(), "A swapchain matching the window must exist");
         u32 queue_index = it->first;
         std::erase(this->queue_windows[queue_index], window);
+        if (this->queue_windows[queue_index].empty()) {
+            this->queue_windows.erase(queue_index);
+        }
+
         auto node = this->swapchains.extract(window);
 
         WindowDestructionMark mark = {

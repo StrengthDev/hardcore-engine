@@ -1,10 +1,10 @@
+
 add_subdirectory(memory)
 
-list(APPEND SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/device.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/scheduler.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/graph.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/swapchain.cpp
+target_sources(${PROJECT_NAME}
+    PRIVATE
+        device.cpp
+        scheduler.cpp
+        graph.cpp
+        swapchain.cpp
 )
-
-set(SOURCES ${SOURCES} PARENT_SCOPE)

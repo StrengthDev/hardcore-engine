@@ -1,3 +1,4 @@
+
 cmake_minimum_required(VERSION 3.14)
 project("hardcore" C CXX)
 set(CMAKE_CXX_STANDARD 23)
@@ -57,15 +58,13 @@ endif ()
 
 add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${FLAGS}>")
 
-# Add source files to SOURCES
-add_subdirectory(src)
-
 # Setup library target
 add_library(${PROJECT_NAME})
+add_subdirectory(src)
 target_include_directories(${PROJECT_NAME} PUBLIC "include" PRIVATE ${PRIVATE_INCLUDES})
 # Instead of calling target_link_libraries(${PROJECT_NAME} PRIVATE ${LIBRARIES}), the compiled library objects are
 # linked directly so that everything is included in hardcore's library
-target_sources(${PROJECT_NAME} PUBLIC ${SOURCES} PRIVATE ${LIB_OBJECTS})
+target_sources(${PROJECT_NAME} PRIVATE ${LIB_OBJECTS})
 target_precompile_headers(${PROJECT_NAME} PRIVATE "src/pch.hpp")
 
 install(TARGETS ${PROJECT_NAME}

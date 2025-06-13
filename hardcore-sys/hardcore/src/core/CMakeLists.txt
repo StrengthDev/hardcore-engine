@@ -1,7 +1,7 @@
-list(APPEND SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/core.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/log.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/window.cpp
-)
 
-set(SOURCES ${SOURCES} PARENT_SCOPE)
+target_sources(${PROJECT_NAME}
+    PRIVATE
+        core.cpp
+        log.cpp
+        window.cpp
+)
