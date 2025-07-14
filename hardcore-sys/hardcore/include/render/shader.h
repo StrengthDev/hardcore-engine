@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../core/result.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -30,7 +32,7 @@ struct HCShader {
     void* inner;
 };
 
-struct HCShader hc_create_shader(const uint32_t* bytecode, size_t size, enum HCShaderStage stage);
+struct HCResult hc_create_shader(struct HCShader* shader, const uint32_t* bytecode, size_t size, enum HCShaderStage stage);
 
 void hc_destroy_shader(struct HCShader* shader);
 

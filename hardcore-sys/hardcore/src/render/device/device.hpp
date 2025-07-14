@@ -11,29 +11,19 @@
 #include "../resource/buffer.hpp"
 #include "../resource/texture.hpp"
 
+#include <core/error.hpp>
 #include <core/glfw.hpp>
 
 #include <render/buffer.h>
 
-#include <optional>
-
 namespace hc::render::device {
-    enum class DeviceResult {
-        Success = 0,
-        VkFailure,
-        SurfaceFailure,
-        SwapchainFailure,
-        AllocFailure,
-        TextureFailure,
-    };
-
     class Device {
     public:
         Device(const Device&) = delete;
 
         Device& operator=(const Device&) = delete;
 
-        static std::optional<Device> create(VkPhysicalDevice physical_handle, const std::vector<const char*>& layers);
+        static std::expected<Device, Error> create(VkPhysicalDevice physical_handle, const std::vector<const char*>& layers);
 
         ~Device();
 
@@ -41,13 +31,13 @@ namespace hc::render::device {
 
         Device& operator=(Device&& other) noexcept = default;
 
-        void tick(u8 frame_mod, u8 next_frame_mod);
+        std::expected<void, Error> tick(u8 frame_mod, u8 next_frame_mod);
 
         void finish(std::vector<u8> const& frame_mods);
 
         [[nodiscard]] const char* name() const noexcept;
 
-        [[nodiscard]] std::expected<void, DeviceResult> create_swapchain(
+        [[nodiscard]] std::expected<void, Error> create_swapchain(
             GLFWwindow* window,
             ExternalHandle<VkSurfaceKHR, VK_NULL_HANDLE>&& surface,
             VkExtent2D extent
@@ -55,20 +45,20 @@ namespace hc::render::device {
 
         void destroy_swapchain(GLFWwindow* window);
 
-        [[nodiscard]] Result<buffer::Params, DeviceResult> new_buffer(
+        [[nodiscard]] std::expected<buffer::Params, Error> new_buffer(
             HCBufferKind kind,
             resource::Descriptor&& descriptor,
             u64 count,
             bool writable
         );
 
-        [[nodiscard]] Result<buffer::Params, DeviceResult> new_index_buffer(
+        [[nodiscard]] std::expected<buffer::Params, Error> new_index_buffer(
             HCPrimitive index_type,
             u64 count,
             bool writable
         );
 
-        [[nodiscard]] Result<buffer::DynamicParams, DeviceResult> new_dynamic_buffer(
+        [[nodiscard]] std::expected<buffer::DynamicParams, Error> new_dynamic_buffer(
             HCBufferKind kind,
             resource::Descriptor&& descriptor,
             u64 count,
@@ -76,7 +66,7 @@ namespace hc::render::device {
             u8 frame_mod
         );
 
-        [[nodiscard]] Result<buffer::DynamicParams, DeviceResult> new_dynamic_index_buffer(
+        [[nodiscard]] std::expected<buffer::DynamicParams, Error> new_dynamic_index_buffer(
             HCPrimitive index_type,
             u64 count,
             bool writable,
@@ -85,7 +75,7 @@ namespace hc::render::device {
 
         void destroy_buffer(u64 id);
 
-        [[nodiscard]] std::expected<texture::Params, DeviceResult> create_texture(VkImageCreateInfo const& image_info);
+        [[nodiscard]] std::expected<texture::Params, Error> create_texture(VkImageCreateInfo const& image_info);
 
         void destroy_texture(u64 id);
 
@@ -93,7 +83,12 @@ namespace hc::render::device {
         Device() = default;
 
         void cleanup(u8 frame_mod);
-        void present(u8 frame_mod);
+        [[nodiscard]] std::expected<void, Error> present(u8 frame_mod);
+        [[nodiscard]] std::expected<void, Error> present_queue_windows(
+            u8 frame_mod,
+            Queue const& queue,
+            const std::vector<GLFWwindow*>& windows
+        );
 
         ExternalHandle<VkPhysicalDevice, VK_NULL_HANDLE> physical_handle;
         VkPhysicalDeviceProperties properties = {};

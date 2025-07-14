@@ -10,193 +10,101 @@
 #include <core/log.hpp>
 #include <util/number.hpp>
 
-static constexpr HCBuffer INVALID_BUFFER = {
-    .id = std::numeric_limits<u64>::max(),
-    .size = 0,
-    .device = std::numeric_limits<u32>::max(),
-};
-
-static constexpr HCDynamicBuffer INVALID_DYNAMIC_BUFFER = {
-    .id = std::numeric_limits<u64>::max(),
-    .size = 0,
-    .data = nullptr,
-    .data_offset = std::numeric_limits<u64>::max(),
-    .device = std::numeric_limits<u32>::max(),
-};
-
-HCBuffer hc_new_buffer(u32 device, HCBufferKind kind, const HCDescriptor* descriptor, u64 count, bool writable) {
-    if (kind == HCBufferKind_Index) {
-        HC_ERROR("Invalid buffer kind (call `hc_new_index_buffer` instead)");
-        return INVALID_BUFFER;
-    }
-    if (!descriptor) {
-        HC_ERROR("Descriptor cannot be null");
-        return INVALID_BUFFER;
-    }
-    if (!descriptor->fields || !descriptor->field_count) {
-        HC_ERROR("Invalid descriptor");
-        return INVALID_BUFFER;
-    }
-    if (!count) {
-        HC_ERROR("Invalid element count");
-        return INVALID_BUFFER;
-    }
-
-    auto device_res = hc::render::device_at(device);
-    if (!device_res) {
-        return INVALID_BUFFER;
-    }
-    auto device_ptr = device_res.ok();
-
-    auto res = device_ptr->new_buffer(kind, hc::render::resource::Descriptor(*descriptor), count, writable);
-    if (!res) {
-        return INVALID_BUFFER;
-    }
-
-    auto params = std::move(res).ok();
-    return {
-        .id = params.id,
-        .size = params.size,
-        .device = device,
-    };
-}
-
-HCBuffer hc_new_index_buffer(u32 device, HCPrimitive index_type, u64 count, bool writable) {
-    if (index_type != HCPrimitive_U8 && index_type != HCPrimitive_U16 && index_type != HCPrimitive_U32) {
-        HC_ERROR("Invalid index type");
-        return INVALID_BUFFER;
-    }
-    if (!count) {
-        HC_ERROR("Invalid element count");
-        return INVALID_BUFFER;
-    }
-
-    auto device_res = hc::render::device_at(device);
-    if (!device_res) {
-        return INVALID_BUFFER;
-    }
-    auto device_ptr = device_res.ok();
-
-    auto res = device_ptr->new_index_buffer(index_type, count, writable);
-    if (!res) {
-        return INVALID_BUFFER;
-    }
-
-    auto params = std::move(res).ok();
-    return {
-        .id = params.id,
-        .size = params.size,
-        .device = device,
-    };
-}
-
-void hc_destroy_buffer(HCBuffer* buffer) {
-    if (!buffer) {
-        return;
-    }
-
-    if (!buffer->size) {
-        HC_WARN("Attempted to destroy invalid buffer");
-        return;
-    }
-
-    const auto device_id = buffer->device;
-    auto device_res = hc::render::device_at(device_id);
-    if (!device_res) {
-        return;
-    }
-    auto device_ptr = device_res.ok();
-
-    device_ptr->destroy_buffer(buffer->id);
-    *buffer = INVALID_BUFFER;
-}
-
-HCDynamicBuffer hc_new_dynamic_buffer(
+HCResult hc_new_buffer(
+    HCBuffer* buffer,
     u32 device,
     HCBufferKind kind,
     const HCDescriptor* descriptor,
     u64 count,
     bool writable
 ) {
-    if (kind == HCBufferKind_Index) {
-        HC_ERROR("Invalid buffer kind (call `hc_new_dynamic_index_buffer` instead)");
-        return INVALID_DYNAMIC_BUFFER;
+    if (!buffer) {
+        HC_ERROR("Null buffer pointer");
+        return {.error = HCError_InvalidParams, .success = false};
     }
+
+    if (kind == HCBufferKind_Index) {
+        HC_ERROR("Invalid buffer kind (call `hc_new_index_buffer` instead)");
+        return {.error = HCError_InvalidParams, .success = false};
+    }
+
     if (!descriptor) {
         HC_ERROR("Descriptor cannot be null");
-        return INVALID_DYNAMIC_BUFFER;
+        return {.error = HCError_InvalidParams, .success = false};
     }
+
     if (!descriptor->fields || !descriptor->field_count) {
         HC_ERROR("Invalid descriptor");
-        return INVALID_DYNAMIC_BUFFER;
+        return {.error = HCError_InvalidParams, .success = false};
     }
+
     if (!count) {
         HC_ERROR("Invalid element count");
-        return INVALID_DYNAMIC_BUFFER;
+        return {.error = HCError_InvalidParams, .success = false};
     }
 
-    auto frame_mod = hc::render::current_frame_mod();
-    auto device_res = hc::render::device_at(device);
-    if (!device_res) {
-        return INVALID_DYNAMIC_BUFFER;
+    auto device_result = hc::render::device_at(device);
+    if (!device_result) {
+        return device_result.error();
     }
-    auto device_ptr = device_res.ok();
 
-    auto res = device_ptr->new_dynamic_buffer(
+    auto buffer_result = (*device_result)->new_buffer(
         kind,
         hc::render::resource::Descriptor(*descriptor),
         count,
-        writable,
-        frame_mod
+        writable
     );
-    if (!res) {
-        return INVALID_DYNAMIC_BUFFER;
+    if (!buffer_result) {
+        return buffer_result.error();
     }
 
-    auto params = std::move(res).ok();
-    return {
-        .id = params.id,
-        .size = params.size,
-        .data = params.data,
-        .data_offset = params.data_offset,
+    *buffer = {
+        .id = buffer_result->id,
+        .size = buffer_result->size,
         .device = device,
     };
+
+    return {.success = true};
 }
 
-HCDynamicBuffer hc_new_dynamic_index_buffer(u32 device, HCPrimitive index_type, u64 count, bool writable) {
+HCResult hc_new_index_buffer(HCBuffer* buffer, u32 device, HCPrimitive index_type, u64 count, bool writable) {
+    if (!buffer) {
+        HC_ERROR("Null buffer pointer");
+        return {.error = HCError_InvalidParams, .success = false};
+    }
+
     if (index_type != HCPrimitive_U8 && index_type != HCPrimitive_U16 && index_type != HCPrimitive_U32) {
         HC_ERROR("Invalid index type");
-        return INVALID_DYNAMIC_BUFFER;
+        return {.error = HCError_InvalidParams, .success = false};
     }
+
     if (!count) {
         HC_ERROR("Invalid element count");
-        return INVALID_DYNAMIC_BUFFER;
+        return {.error = HCError_InvalidParams, .success = false};
     }
 
-    auto frame_mod = hc::render::current_frame_mod();
-    auto device_res = hc::render::device_at(device);
-    if (!device_res) {
-        return INVALID_DYNAMIC_BUFFER;
-    }
-    auto device_ptr = device_res.ok();
-
-    auto res = device_ptr->new_dynamic_index_buffer(index_type, count, writable, frame_mod);
-    if (!res) {
-        return INVALID_DYNAMIC_BUFFER;
+    auto device_result = hc::render::device_at(device);
+    if (!device_result) {
+        return device_result.error();
     }
 
-    auto params = std::move(res).ok();
-    return {
-        .id = params.id,
-        .size = params.size,
-        .data = params.data,
-        .data_offset = params.data_offset,
+    auto buffer_result = (*device_result)->new_index_buffer(index_type, count, writable);
+    if (!buffer_result) {
+        return buffer_result.error();
+    }
+
+    *buffer = {
+        .id = buffer_result->id,
+        .size = buffer_result->size,
         .device = device,
     };
+
+    return {.success = true};
 }
 
-void hc_destroy_dynamic_buffer(HCDynamicBuffer* buffer) {
+void hc_destroy_buffer(HCBuffer* buffer) {
     if (!buffer) {
+        HC_WARN("Null buffer pointer");
         return;
     }
 
@@ -206,12 +114,137 @@ void hc_destroy_dynamic_buffer(HCDynamicBuffer* buffer) {
     }
 
     const auto device_id = buffer->device;
-    auto device_res = hc::render::device_at(device_id);
-    if (!device_res) {
+    auto device_result = hc::render::device_at(device_id);
+    if (!device_result) {
         return;
     }
-    auto device_ptr = device_res.ok();
 
-    device_ptr->destroy_buffer(buffer->id);
-    *buffer = INVALID_DYNAMIC_BUFFER;
+    (*device_result)->destroy_buffer(buffer->id);
+    *buffer = {};
+}
+
+HCResult hc_new_dynamic_buffer(
+    HCDynamicBuffer* buffer,
+    u32 device,
+    HCBufferKind kind,
+    const HCDescriptor* descriptor,
+    u64 count,
+    bool writable
+) {
+    if (!buffer) {
+        HC_ERROR("Null buffer pointer");
+        return {.error = HCError_InvalidParams, .success = false};
+    }
+
+    if (kind == HCBufferKind_Index) {
+        HC_ERROR("Invalid buffer kind (call `hc_new_dynamic_index_buffer` instead)");
+        return {.error = HCError_InvalidParams, .success = false};
+    }
+
+    if (!descriptor) {
+        HC_ERROR("Descriptor cannot be null");
+        return {.error = HCError_InvalidParams, .success = false};
+    }
+
+    if (!descriptor->fields || !descriptor->field_count) {
+        HC_ERROR("Invalid descriptor");
+        return {.error = HCError_InvalidParams, .success = false};
+    }
+
+    if (!count) {
+        HC_ERROR("Invalid element count");
+        return {.error = HCError_InvalidParams, .success = false};
+    }
+
+    auto frame_mod = hc::render::current_frame_mod();
+    auto device_result = hc::render::device_at(device);
+    if (!device_result) {
+        return device_result.error();
+    }
+
+    auto buffer_result = (*device_result)->new_dynamic_buffer(
+        kind,
+        hc::render::resource::Descriptor(*descriptor),
+        count,
+        writable,
+        frame_mod
+    );
+    if (!buffer_result) {
+        return buffer_result.error();
+    }
+
+    *buffer = {
+        .id = buffer_result->id,
+        .size = buffer_result->size,
+        .data = buffer_result->data,
+        .data_offset = buffer_result->data_offset,
+        .device = device,
+    };
+
+    return {.success = true};
+}
+
+HCResult hc_new_dynamic_index_buffer(
+    HCDynamicBuffer* buffer,
+    u32 device,
+    HCPrimitive index_type,
+    u64 count,
+    bool writable
+) {
+    if (!buffer) {
+        HC_ERROR("Null buffer pointer");
+        return {.error = HCError_InvalidParams, .success = false};
+    }
+
+    if (index_type != HCPrimitive_U8 && index_type != HCPrimitive_U16 && index_type != HCPrimitive_U32) {
+        HC_ERROR("Invalid index type");
+        return {.error = HCError_InvalidParams, .success = false};
+    }
+
+    if (!count) {
+        HC_ERROR("Invalid element count");
+        return {.error = HCError_InvalidParams, .success = false};
+    }
+
+    auto frame_mod = hc::render::current_frame_mod();
+    auto device_result = hc::render::device_at(device);
+    if (!device_result) {
+        return device_result.error();
+    }
+
+    auto buffer_result = (*device_result)->new_dynamic_index_buffer(index_type, count, writable, frame_mod);
+    if (!buffer_result) {
+        return buffer_result.error();
+    }
+
+    *buffer = {
+        .id = buffer_result->id,
+        .size = buffer_result->size,
+        .data = buffer_result->data,
+        .data_offset = buffer_result->data_offset,
+        .device = device,
+    };
+
+    return {.success = true};
+}
+
+void hc_destroy_dynamic_buffer(HCDynamicBuffer* buffer) {
+    if (!buffer) {
+        HC_WARN("Null buffer pointer");
+        return;
+    }
+
+    if (!buffer->size) {
+        HC_WARN("Attempted to destroy invalid buffer");
+        return;
+    }
+
+    const auto device_id = buffer->device;
+    auto device_result = hc::render::device_at(device_id);
+    if (!device_result) {
+        return;
+    }
+
+    (*device_result)->destroy_buffer(buffer->id);
+    *buffer = {};
 }

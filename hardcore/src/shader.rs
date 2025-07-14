@@ -8,6 +8,10 @@ use tokio::io::{AsyncReadExt, BufReader};
 
 #[derive(Error, Debug)]
 pub enum ShaderError {
+    /// An error has occurred withing the system crate.
+    #[error(transparent)]
+    SystemError(#[from] hardcore_sys::Error),
+
     #[error(transparent)]
     IoError(#[from] std::io::Error),
     #[error("Invalid hardcore_sys::ShaderStage value")]
@@ -128,11 +132,18 @@ unsafe impl Send for Shader {}
 
 impl Shader {
     pub fn try_from_bytecode(bytecode: &[u32], stage: ShaderStage) -> Result<Shader, ShaderError> {
-        let inner =
-            unsafe { hardcore_sys::create_shader(bytecode.as_ptr(), bytecode.len(), stage.into()) };
-        if inner.inner.is_null() {
-            todo!()
-        }
+        let mut inner = Default::default();
+
+        unsafe {
+            hardcore_sys::create_shader(
+                ptr::addr_of_mut!(inner),
+                bytecode.as_ptr(),
+                bytecode.len(),
+                stage.into(),
+            )
+            .into_std_result()?
+        };
+
         Ok(Shader { inner, stage })
     }
 

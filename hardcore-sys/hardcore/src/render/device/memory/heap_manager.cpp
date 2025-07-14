@@ -2,6 +2,7 @@
 
 #include "heap_manager.hpp"
 
+#include <render/util.hpp>
 #include <util/flow.hpp>
 
 static constexpr VkMemoryPropertyFlags MAIN_REQUIRED_FLAGS = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
@@ -21,7 +22,7 @@ static constexpr VkMemoryPropertyFlags DOWNLOAD_REQUIRED_FLAGS = VK_MEMORY_PROPE
 static constexpr VkMemoryPropertyFlags DOWNLOAD_UNWANTED_FLAGS = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
 namespace hc::render::device::memory {
-    Result<HeapManager, HeapResult> HeapManager::create(VkPhysicalDevice physical_device) {
+    std::expected<HeapManager, Error> HeapManager::create(VkPhysicalDevice physical_device) {
         HeapManager manager;
         vkGetPhysicalDeviceMemoryProperties(physical_device, &manager.mem_properties);
 
@@ -114,8 +115,9 @@ namespace hc::render::device::memory {
             HC_ERROR("Could not find suitable download heap");
             missing_heaps = true;
         }
-        if (missing_heaps)
-            return Err(HeapResult::HeapNotFound);
+        if (missing_heaps) {
+            return Error(HCError_UnmetHeapRequirements);
+        }
 
         HC_TRACE(
             "Heap type indexes: " << "main = " << manager.heap_indexes[static_cast<Sz>(Heap::Main)] << " ; dynamic = "
@@ -136,112 +138,94 @@ namespace hc::render::device::memory {
             HC_DEBUG("Upload heap is NOT host coherent");
         }
 
-        return Ok(std::move(manager));
+        return std::move(manager);
     }
 
-    HeapResult HeapManager::alloc_buffer(
+    std::expected<std::pair<VkDeviceMemory, VkBuffer>, Error> HeapManager::alloc_buffer(
         const VolkDeviceTable& fn_table,
         VkDevice device,
-        VkDeviceMemory& memory,
-        VkBuffer& buffer,
         VkDeviceSize size,
         VkBufferUsageFlags usage,
         Heap heap
     ) noexcept {
-        HC_ASSERT(heap != Heap::MaxEnum, "Heap must be valid");
+        VkBuffer buffer = VK_NULL_HANDLE;
 
-        VkBufferCreateInfo buffer_info = {};
-        buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        buffer_info.size = size;
-        buffer_info.usage = usage;
-        buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        VkBufferCreateInfo buffer_info = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .size = size,
+            .usage = usage,
+            .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+            .queueFamilyIndexCount = 0,
+            .pQueueFamilyIndices = nullptr,
+        };
 
-        VkResult res = fn_table.vkCreateBuffer(device, &buffer_info, nullptr, &buffer);
-        switch (res) {
-        case VK_SUCCESS:
-            // Nothing, keep going
-            break;
-        case VK_ERROR_OUT_OF_HOST_MEMORY:
-            return HeapResult::OutOfHostMemory;
-        case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-            return HeapResult::OutOfDeviceMemory;
-        case VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS_KHR:
-            return HeapResult::InvalidCapture;
-        default: HC_UNREACHABLE("vkCreateBuffer should not return any other VkResult values");
+        VkResult result = fn_table.vkCreateBuffer(device, &buffer_info, nullptr, &buffer);
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to create buffer: " << to_str(result));
+            return Error(result);
         }
 
         VkMemoryRequirements memory_requirements;
         fn_table.vkGetBufferMemoryRequirements(device, buffer, &memory_requirements);
-        if (!this->is_valid_heap(heap, memory_requirements.memoryTypeBits)) {
+        if (!this->heap_meets_requirements(heap, memory_requirements.memoryTypeBits)) {
+            HC_ERROR("Requested heap does not satisfy requirements");
             fn_table.vkDestroyBuffer(device, buffer, nullptr);
-            buffer = VK_NULL_HANDLE;
-            return HeapResult::UnsupportedHeap;
+            return Error(HCError_UnmetHeapRequirements);
         }
 
-        u32 heap_index = this->heap_indexes[static_cast<Sz>(heap)];
+        VkMemoryAllocateInfo memory_info = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .pNext = nullptr,
+            .allocationSize = memory_requirements.size,
+            .memoryTypeIndex = this->heap_indexes[static_cast<Sz>(heap)],
+        };
 
-        VkMemoryAllocateInfo memory_info = {};
-        memory_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        memory_info.allocationSize = memory_requirements.size;
-        memory_info.memoryTypeIndex = heap_index;
-
-        auto memory_res = this->allocate_memory(fn_table, device, memory_info);
-        if (!memory_res) {
+        auto memory_result = this->allocate_memory(fn_table, device, memory_info);
+        if (!memory_result) {
             fn_table.vkDestroyBuffer(device, buffer, nullptr);
             buffer = VK_NULL_HANDLE;
-            return memory_res.error();
+            return memory_result.error();
         }
-        memory = *memory_res;
+        VkDeviceMemory memory = *memory_result;
 
-        res = fn_table.vkBindBufferMemory(device, buffer, memory, 0);
-        if (res != VK_SUCCESS) {
+        result = fn_table.vkBindBufferMemory(device, buffer, memory, 0);
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to bind buffer memory: " << to_str(result));
             this->free(fn_table, device, memory);
             fn_table.vkDestroyBuffer(device, buffer, nullptr);
-            buffer = VK_NULL_HANDLE;
-        }
-        switch (res) {
-        case VK_SUCCESS:
-            // Nothing, keep going
-            break;
-        case VK_ERROR_OUT_OF_HOST_MEMORY:
-            return HeapResult::OutOfHostMemory;
-        case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-            return HeapResult::OutOfDeviceMemory;
-        case VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS_KHR:
-            return HeapResult::InvalidCapture;
-        default: HC_UNREACHABLE("vkBindBufferMemory should not return any other VkResult values");
+            return Error(result);
         }
 
-        return HeapResult::Success;
+        return std::pair(memory, buffer);
     }
 
-    std::expected<void, HeapResult> HeapManager::alloc_texture_memory(
+    std::expected<VkDeviceMemory, Error> HeapManager::alloc_texture_memory(
         const VolkDeviceTable& fn_table,
         VkDevice device,
-        VkDeviceMemory& memory,
         VkDeviceSize size,
         Heap heap,
         u32 memory_type_bits
     ) {
-        HC_ASSERT(heap != Heap::MaxEnum, "Heap must be valid");
-
-        if (!this->is_valid_heap(heap, memory_type_bits)) {
-            return std::unexpected(HeapResult::UnsupportedHeap);
+        if (!this->heap_meets_requirements(heap, memory_type_bits)) {
+            HC_ERROR("Requested heap does not satisfy requirements");
+            return Error(HCError_UnmetHeapRequirements);
         }
-        u32 heap_index = this->heap_indexes[static_cast<Sz>(heap)];
 
-        VkMemoryAllocateInfo memory_info = {};
-        memory_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        memory_info.allocationSize = size;
-        memory_info.memoryTypeIndex = heap_index;
+        VkMemoryAllocateInfo memory_info = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .pNext = nullptr,
+            .allocationSize = size,
+            .memoryTypeIndex = this->heap_indexes[static_cast<Sz>(heap)],
+        };
 
-        auto res = this->allocate_memory(fn_table, device, memory_info);
-        if (!res) {
-            return std::unexpected(res.error());
+        auto result = this->allocate_memory(fn_table, device, memory_info);
+        if (!result) {
+            return result.error();
         }
-        memory = *res;
 
-        return {};
+        return *result;
     }
 
     void HeapManager::free(const VolkDeviceTable& fn_table, VkDevice device, VkDeviceMemory& memory) noexcept {
@@ -279,8 +263,7 @@ namespace hc::render::device::memory {
         HC_UNREACHABLE("A suitable memory type must be found");
     }
 
-    bool HeapManager::is_valid_heap(Heap heap, u32 memory_type_bits) const noexcept {
-        HC_ASSERT(heap != Heap::MaxEnum, "Heap must be valid");
+    bool HeapManager::heap_meets_requirements(Heap heap, u32 memory_type_bits) const noexcept {
         return 1U << this->heap_indexes[static_cast<Sz>(heap)] & memory_type_bits;
     }
 
@@ -297,24 +280,14 @@ namespace hc::render::device::memory {
         return res;
     }
 
-    std::expected<VkDeviceMemory, HeapResult> HeapManager::allocate_memory(VolkDeviceTable const& fn_table, VkDevice device, VkMemoryAllocateInfo const& memory_info) {
+    std::expected<VkDeviceMemory, Error> HeapManager::allocate_memory(VolkDeviceTable const& fn_table, VkDevice device, VkMemoryAllocateInfo const& memory_info) {
         VkDeviceMemory memory = VK_NULL_HANDLE;
 
-        VkResult res = fn_table.vkAllocateMemory(device, &memory_info, nullptr, &memory);
+        VkResult result = fn_table.vkAllocateMemory(device, &memory_info, nullptr, &memory);
 
-        switch (res) {
-        case VK_SUCCESS:
-            // Nothing, keep going
-            break;
-        case VK_ERROR_OUT_OF_HOST_MEMORY:
-            return std::unexpected(HeapResult::OutOfHostMemory);
-        case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-            return std::unexpected(HeapResult::OutOfDeviceMemory);
-        case VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS_KHR:
-            return std::unexpected(HeapResult::InvalidCapture);
-        case VK_ERROR_INVALID_EXTERNAL_HANDLE:
-            return std::unexpected(HeapResult::InvalidHandle);
-        default: HC_UNREACHABLE("vkAllocateMemory should not return any other VkResult values");
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to allocate memory: " << to_str(result));
+            return Error(result);
         }
 
         this->allocation_count++;

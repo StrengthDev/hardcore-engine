@@ -4,9 +4,10 @@
 
 #include <render/shader.h>
 
+#include <core/error.hpp>
 #include <util/number.hpp>
-#include <util/result.hpp>
 
+#include <expected>
 #include <vector>
 
 namespace hc::render {
@@ -25,12 +26,12 @@ namespace hc::render {
 
         Shader& operator=(Shader&&) = default;
 
-        static Result<Shader, ShaderResult> create(std::vector<u32>&& bytecode, HCShaderStage stage);
+        static std::expected<Shader, Error> create(std::vector<u32>&& bytecode, HCShaderStage stage);
 
     private:
         Shader() = default;
 
-        static ShaderResult reflect(Shader& shader);
+        std::expected<void, Error> reflect();
 
         std::vector<u32> bytecode;
         HCShaderStage stage;
@@ -45,6 +46,6 @@ namespace hc::render {
 
         std::unordered_map<std::pair<u32, u32>, DescriptorBinding, LocationHash> bindings;
 
-        friend HCShader (::hc_create_shader)(const u32* bytecode, size_t size, HCShaderStage stage);
+        friend HCResult (::hc_create_shader)(HCShader* shader, const u32* bytecode, size_t size, HCShaderStage stage);
     };
 }

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../core/result.h"
+
 #include "descriptor.h"
 
 #ifdef __cplusplus
@@ -54,7 +56,8 @@ struct HCBuffer {
     uint32_t device; //!< The ID of the device which this buffer belongs to.
 };
 
-struct HCBuffer hc_new_buffer(
+struct HCResult hc_new_buffer(
+    struct HCBuffer* buffer,
     uint32_t device,
     enum HCBufferKind kind,
     const struct HCDescriptor* descriptor,
@@ -62,7 +65,13 @@ struct HCBuffer hc_new_buffer(
     bool writable
 );
 
-struct HCBuffer hc_new_index_buffer(uint32_t device, enum HCPrimitive index_type, uint64_t count, bool writable);
+struct HCResult hc_new_index_buffer(
+    struct HCBuffer* buffer,
+    uint32_t device,
+    enum HCPrimitive index_type,
+    uint64_t count,
+    bool writable
+);
 
 void hc_destroy_buffer(struct HCBuffer* buffer);
 
@@ -85,7 +94,8 @@ struct HCDynamicBuffer {
     uint32_t device; //!< The ID of the device which this buffer belongs to.
 };
 
-struct HCDynamicBuffer hc_new_dynamic_buffer(
+struct HCResult hc_new_dynamic_buffer(
+    struct HCDynamicBuffer* buffer,
     uint32_t device,
     enum HCBufferKind kind,
     const struct HCDescriptor* descriptor,
@@ -93,7 +103,8 @@ struct HCDynamicBuffer hc_new_dynamic_buffer(
     bool writable
 );
 
-struct HCDynamicBuffer hc_new_dynamic_index_buffer(
+struct HCResult hc_new_dynamic_index_buffer(
+    struct HCDynamicBuffer* buffer,
     uint32_t device,
     enum HCPrimitive index_type,
     uint64_t count,

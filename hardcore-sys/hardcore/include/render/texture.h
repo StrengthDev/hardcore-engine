@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../core/result.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -219,7 +221,8 @@ HCTextureFormatID hc_texture_format_id_compressed(
     enum HCTextureBlockSize block_size
 );
 
-struct HCTexture hc_create_texture(
+struct HCResult hc_create_texture(
+    struct HCTexture* texture,
     uint32_t device,
     struct HCTextureDimensions dims,
     HCTextureFormatID format,

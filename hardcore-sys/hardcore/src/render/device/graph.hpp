@@ -11,12 +11,6 @@
 #include "destruction_mark.hpp"
 
 namespace hc::render::device {
-    enum class GraphResult : u8 {
-        Success = 0,
-        NotCompiled,
-        Invalid,
-    };
-
     /**
     * @brief A node's input resource.
     */
@@ -103,7 +97,7 @@ namespace hc::render::device {
         *
         * @return GraphResult::Success if the graph was successfully compiled, otherwise an appropriate error value.
         */
-        [[nodiscard]] GraphResult compile();
+        [[nodiscard]] std::expected<void, Error> compile();
 
         /**
         * @brief Check if the graph has already been compiled.
@@ -119,7 +113,7 @@ namespace hc::render::device {
         */
         void clear_commands() noexcept;
 
-        [[nodiscard]] GraphResult record() const noexcept;
+        [[nodiscard]] std::expected<void, Error> record() const noexcept;
 
         [[nodiscard]] u64 add_resource(const memory::BufferRef& ref);
         [[nodiscard]] u64 add_resource(const memory::DynamicBufferRef& ref);

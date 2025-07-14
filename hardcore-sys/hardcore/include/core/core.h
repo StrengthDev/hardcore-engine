@@ -1,10 +1,10 @@
 #pragma once
 
-// Can't use angled include here due to bindgen
-#include "../render/params.h"
-
-#include "version.h"
 #include "log.h"
+#include "result.h"
+#include "version.h"
+
+#include "../render/params.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,8 +23,7 @@ struct HCApplicationDescriptor {
  */
 struct HCInitParams {
     struct HCApplicationDescriptor app; //!< A descriptor of the currently running program/application.
-    struct HCRenderParams render_params;
-    //!< Initialisation parameters for the rendering portion of the Hardcore context.
+    struct HCRenderParams render_params; //!< Initialisation parameters for the rendering portion of the Hardcore context.
     HCLogFn log_fn; //!< The function the context should use for emitting log events.
     HCStartSpanFn start_span_fn; //!< The function the context should use for starting spans.
     HCEndSpanFn end_span_fn; //!< The function the context should use for ending spans.
@@ -37,20 +36,16 @@ struct HCInitParams {
  *
  * @param params The initialisation parameters.
  *
- * @return 0 on success, a negative code if an error occurs and a code larger than 0 on success, but with some
- * warning.
+ * @return Result value object.
  */
-int hc_init(struct HCInitParams params);
+struct HCResult hc_init(struct HCInitParams params);
 
 /**
  * @brief Terminate the library.
  *
  * Once this function is called, `hc_init()` must be called once again before other library functions.
- *
- * @return 0 on success, a negative code if an error occurs and a code larger than 0 on success, but with some
- * warning.
  */
-int hc_term();
+void hc_term();
 
 #ifdef __cplusplus
 }

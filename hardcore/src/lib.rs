@@ -135,6 +135,10 @@ pub struct ApplicationDescriptor<'a> {
 /// An error within the core **Hardcore** functionality.
 #[derive(Error, Debug)]
 pub enum CoreError {
+    /// An error has occurred withing the system crate.
+    #[error(transparent)]
+    SystemError(#[from] hardcore_sys::Error),
+
     /// Failed to join with tokio task.
     #[error(transparent)]
     TokioJoin(#[from] tokio::task::JoinError),
@@ -217,15 +221,11 @@ impl Instance {
             end_span_fn: Some(native::end_span),
         };
 
-        let res: i32 = unsafe { hardcore_sys::init(params) };
+        unsafe { hardcore_sys::init(params).into_std_result()? };
 
-        if res < 0 {
-            Err(CoreError::System { code: res })
-        } else {
-            Ok(Instance {
-                not_send_sync: PhantomData,
-            })
-        }
+        Ok(Instance {
+            not_send_sync: PhantomData,
+        })
     }
 
     /// The main loop function.
@@ -272,11 +272,7 @@ impl Instance {
 
 impl Drop for Instance {
     fn drop(&mut self) {
-        let res: i32 = unsafe { hardcore_sys::term() };
-
-        if res < 0 {
-            error!("Failed to properly terminate instance (error: {res})");
-        }
+        unsafe { hardcore_sys::term() };
     }
 }
 
@@ -307,17 +303,15 @@ fn core_run(initialize: fn(context: &mut Context)) -> Result<(), CoreError> {
     while context.running {
         let _span = info_span!("Frame", frame = context.frame).entered();
 
-        {
-            let current_frame = Instant::now();
-            let duration = current_frame - last_frame;
-            context.delta_time = duration.as_secs_f64();
-            last_frame = current_frame;
-        }
+        let current_frame = Instant::now();
+        let duration = current_frame - last_frame;
+        context.delta_time = duration.as_secs_f64();
+        last_frame = current_frame;
 
         layers.truncate(layers.len() - context.layer_pop_count);
         context.layer_pop_count = 0;
 
-        layers.extend(context.pushed_layers.drain(..));
+        layers.append(&mut context.pushed_layers);
 
         context.layer_count = layers.len();
 
@@ -339,11 +333,9 @@ fn core_run(initialize: fn(context: &mut Context)) -> Result<(), CoreError> {
             }
         }
 
-        let res: i32 = unsafe { hardcore_sys::render_tick() };
-
-        if res < 0 {
+        let result = unsafe { hardcore_sys::render_tick().into_std_result() };
+        if result.is_err() {
             context.running = false;
-            return Err(CoreError::System { code: res });
         }
 
         if layers.is_empty() {
@@ -355,10 +347,7 @@ fn core_run(initialize: fn(context: &mut Context)) -> Result<(), CoreError> {
 
     layers.clear();
 
-    let res: i32 = unsafe { hardcore_sys::render_finish() };
-    if res < 0 {
-        return Err(CoreError::System { code: res });
-    }
+    unsafe { hardcore_sys::render_finish().into_std_result()? };
 
     worker_rt.shutdown_background();
 

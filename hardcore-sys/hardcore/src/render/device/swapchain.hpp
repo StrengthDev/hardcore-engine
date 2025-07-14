@@ -1,5 +1,6 @@
 #pragma once
 
+#include <core/error.hpp>
 #include <core/glfw.hpp>
 
 #include <util/number.hpp>
@@ -8,20 +9,6 @@
 #include <queue>
 
 namespace hc::render::device {
-    enum class SwapchainResult : u8 {
-        SkipFrame,
-        FenceFailure,
-        SemaphoreFailure,
-        ImageAcquisitionFailure,
-        CreationFailure,
-        ImageViewFailure,
-        FramebufferFailure,
-        UnsupportedSurface,
-        OutOfHostMemory,
-        OutOfDeviceMemory,
-        OutOfDate,
-    };
-
     struct SurfaceInfo {
         VkSurfaceCapabilities2KHR capabilities = {};
         std::vector<VkSurfaceFormat2KHR> available_formats;
@@ -37,9 +24,16 @@ namespace hc::render::device {
         };
     };
 
+    enum class AcquisitionKind : u8 {
+        Normal,
+        OutOfDate,
+        Skip,
+    };
+
     struct ImageDetails {
-        u32 index = std::numeric_limits<u32>::max();
         VkSemaphore image_ready_semaphore = VK_NULL_HANDLE;
+        u32 index = std::numeric_limits<u32>::max();
+        AcquisitionKind acquisition = AcquisitionKind::Normal;
     };
 
     struct InnerSwapchain {
@@ -47,7 +41,7 @@ namespace hc::render::device {
         std::vector<ExternalHandle<VkImageView, VK_NULL_HANDLE>> image_views;
         std::vector<ExternalHandle<VkFramebuffer, VK_NULL_HANDLE>> framebuffers;
 
-        static std::expected<InnerSwapchain, SwapchainResult> create(
+        static std::expected<InnerSwapchain, Error> create(
             const VolkDeviceTable& fn_table,
             VkDevice device,
             const VkSwapchainCreateInfoKHR& create_info,
@@ -63,7 +57,7 @@ namespace hc::render::device {
 
         Swapchain& operator=(const Swapchain&) = delete;
 
-        [[nodiscard]] static std::expected<Swapchain, SwapchainResult> create(
+        [[nodiscard]] static std::expected<Swapchain, Error> create(
             const VolkDeviceTable& fn_table,
             VkDevice device,
             ExternalHandle<VkSurfaceKHR, VK_NULL_HANDLE>&& surface,
@@ -82,13 +76,14 @@ namespace hc::render::device {
         /**
          * @brief Recreate the swapchain according to the new window specifications.
          *
+         * @param physical_device The physical device handle.
          * @param fn_table The device function table.
          * @param device The device handle.
          * @param window The window from which the swapchain is created.
          * @return `SwapchainResult::Success` if the operation was successful, otherwise an error describing what went
          * wrong.
          */
-        std::expected<bool, SwapchainResult> recreate(
+        std::expected<bool, Error> recreate(
             VkPhysicalDevice physical_device,
             const VolkDeviceTable& fn_table,
             VkDevice device,
@@ -102,7 +97,7 @@ namespace hc::render::device {
 
         [[nodiscard]] VkRenderPassBeginInfo render_pass_info(u32 image_index);
 
-        [[nodiscard]] std::expected<ImageDetails, SwapchainResult> acquire_image(
+        [[nodiscard]] std::expected<ImageDetails, Error> acquire_image(
             const VolkDeviceTable& fn_table,
             VkDevice device,
             u8 frame_mod,

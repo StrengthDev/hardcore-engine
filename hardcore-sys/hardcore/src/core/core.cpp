@@ -9,7 +9,7 @@
 
 #include <render/renderer.hpp>
 
-int hc_init(HCInitParams params) {
+HCResult hc_init(HCInitParams params) {
 #ifdef HC_LOGGING
     if (params.log_fn) {
         hc::set_log(params.log_fn);
@@ -21,28 +21,25 @@ int hc_init(HCInitParams params) {
 #endif // HC_LOGGING
 
 #ifndef HC_HEADLESS
-    if (!hc::window::init_context()) {
-        return -1;
+    auto window_result = hc::window::init_context();
+    if (!window_result) {
+        return window_result.error();
     }
 #endif // HC_HEADLESS
 
-    if (hc::render::init(params.app, params.render_params) != hc::render::InstanceResult::Success) {
-        return -1;
+    auto renderer_result = hc::render::init(params.app, params.render_params);
+    if (!renderer_result) {
+        return renderer_result.error();
     }
 
-    return 0;
+    return {.success = true};
 }
 
-int hc_term() {
+void hc_term() {
     // TODO destroy all windows
-
-    if (hc::render::term() != hc::render::InstanceResult::Success) {
-        return -1;
-    }
+    hc::render::term();
 
 #ifndef HC_HEADLESS
     hc::window::terminate_context();
 #endif // HC_HEADLESS
-
-    return 0;
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../core/result.h"
 #include "../core/version.h"
 
 #ifdef __cplusplus
@@ -17,10 +18,9 @@ extern const uint32_t HC_VOLK_HEADER_VERSION; //!< The version of the Volk heade
 * In non-headless configurations, it can (and should) be called from a loop seperated from `hc_poll_events()`,
 * in another thread.
 *
-* @return 0 on success, a negative code if an error occurs and a code larger than 0 on success, but with some
-* warning.
+* @return Result value object.
 */
-int hc_render_tick();
+struct HCResult hc_render_tick();
 
 /**
  * @brief Clean up the renderer context.
@@ -29,10 +29,9 @@ int hc_render_tick();
  * will destroy and clean any remaining rendering resources that didn't get properly freed after being marked for
  * destruction.
  *
- * @return 0 on success, a negative code if an error occurs and a code larger than 0 on success, but with some
- * warning.
+ * @return Result value object.
  */
-int hc_render_finish();
+struct HCResult hc_render_finish();
 
 #ifdef __cplusplus
 }

@@ -58,6 +58,7 @@ static Sz count_of(HCComposition composition) {
         return 16;
     }
 
+    HC_ERROR("Invalid composition value");
     return 0;
 }
 
@@ -70,19 +71,27 @@ static Sz size_of(const HCField* fields, Sz count) {
     return total;
 }
 
-HCDescriptor hc_create_descriptor(Sz field_count) {
-    if (field_count == 0) {
-        HC_ERROR("Invalid field count");
-        return {};
+HCResult hc_create_descriptor(HCDescriptor* descriptor, Sz field_count) {
+    if (!descriptor) {
+        HC_ERROR("Null descriptor pointer");
+        return {.error = HCError_InvalidParams, .success = false};
     }
 
+    if (field_count == 0) {
+        HC_ERROR("Invalid field count");
+        return {.error = HCError_InvalidParams, .success = false};
+    }
+
+    // TODO this is kinda dumb innit? may as well allow users to make the allocation themselves
     auto* fields = static_cast<HCField*>(std::malloc(sizeof(HCField) * field_count));
-    return {.fields = fields, .field_count = fields ? field_count : 0, .alignment = HCAlignment_Unknown};
+    *descriptor = {.fields = fields, .field_count = fields ? field_count : 0, .alignment = HCAlignment_Unknown};
+    return {.success = true};
 }
 
 void hc_destroy_descriptor(HCDescriptor* descriptor) {
-    if (!descriptor)
+    if (!descriptor) {
         return;
+    }
 
     if (!descriptor->fields || !descriptor->field_count) {
         HC_WARN("Attempted to destroy invalid descriptor");

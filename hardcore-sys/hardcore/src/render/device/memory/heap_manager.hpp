@@ -1,33 +1,23 @@
 #pragma once
 
+#include <core/error.hpp>
 #include <util/number.hpp>
-#include <util/result.hpp>
 
 namespace hc::render::device::memory {
-    enum class HeapResult : u8 {
-        Success = 0, //!< Success.
-        HeapNotFound, //!< Could not find a matching heap in the device.
-        OutOfHostMemory, //!< Not enough memory to perform the allocation on the host.
-        OutOfDeviceMemory, //!< Not enough memory to perform the allocation on the device.
-        UnsupportedHeap, //!< The provided heap cannot back the specified buffer.
-        InvalidCapture, //!< Invalid opaque capture address. (VK_ERROR_INVALID_EXTERNAL_HANDLE)
-        InvalidHandle, //!< Invalid external handle. (VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS_KHR)
-        NotPreferredHeap, //!< Failed to allocate on the preferred heap.
-    };
-
     enum class Heap : u8 {
         Main = 0, //!< The index of the main, device local, heap.
         Dynamic = 1, //!< The index of the dynamic heap, used to back device local resources that the host can access directly.
         Upload = 2, //!< The index of the upload heap, dedicated to host->device transfers.
         Download = 3, //!< The index of the download heap, dedicated to device->host transfers.
-        MaxEnum, //!< Invalid heap value.
     };
+
+    u8 constexpr HEAP_COUNT = 4;
 
     class HeapManager {
     public:
         HeapManager() = default;
 
-        static Result<HeapManager, HeapResult> create(VkPhysicalDevice physical_device);
+        static std::expected<HeapManager, Error> create(VkPhysicalDevice physical_device);
 
         HeapManager(const HeapManager&) = delete;
 
@@ -42,27 +32,22 @@ namespace hc::render::device::memory {
         *
         * @param fn_table The device function table.
         * @param device The device handle.
-        * @param memory The memory handle.
-        * @param buffer The buffer handle.
         * @param size The size of the buffer (and its backing memory) in bytes.
         * @param usage The buffer usage flags.
         * @param heap The heap in which the backing memory will be allocated.
         * @return Heap::Success if the buffer was successfully allocated, otherwise an appropriate error value.
         */
-        [[nodiscard]] HeapResult alloc_buffer(
+        [[nodiscard]] std::expected<std::pair<VkDeviceMemory, VkBuffer>, Error> alloc_buffer(
             const VolkDeviceTable& fn_table,
             VkDevice device,
-            VkDeviceMemory& memory,
-            VkBuffer& buffer,
             VkDeviceSize size,
             VkBufferUsageFlags usage,
             Heap heap
         ) noexcept;
 
-        std::expected<void, HeapResult> alloc_texture_memory(
+        std::expected<VkDeviceMemory, Error> alloc_texture_memory(
             const VolkDeviceTable& fn_table,
             VkDevice device,
-            VkDeviceMemory& memory,
             VkDeviceSize size,
             Heap heap,
             u32 memory_type_bits
@@ -92,8 +77,8 @@ namespace hc::render::device::memory {
         * @return *true* if writes to the dynamic heap are automatically flushed, *false* otherwise.
         */
         [[nodiscard]] inline bool host_coherent_dynamic_heap() const noexcept {
-            return this->mem_properties.memoryTypes[this->heap_indexes[static_cast<Sz>(Heap::Dynamic)]].propertyFlags &
-                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+            return this->mem_properties.memoryTypes[this->heap_indexes[static_cast<Sz>(Heap::Dynamic)]].propertyFlags
+                & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
         }
 
         /**
@@ -102,8 +87,8 @@ namespace hc::render::device::memory {
         * @return *true* if writes to the upload heap are automatically flushed, *false* otherwise.
         */
         [[nodiscard]] inline bool host_coherent_upload_heap() const noexcept {
-            return this->mem_properties.memoryTypes[this->heap_indexes[static_cast<Sz>(Heap::Upload)]].propertyFlags &
-                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+            return this->mem_properties.memoryTypes[this->heap_indexes[static_cast<Sz>(Heap::Upload)]].propertyFlags
+                & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
         }
 
         /**
@@ -115,9 +100,9 @@ namespace hc::render::device::memory {
 
     private:
         [[nodiscard]] u32 find_memory_type(u32 type_filter, VkMemoryPropertyFlags properties);
-        [[nodiscard]] bool is_valid_heap(Heap heap, u32 memory_type_bits) const noexcept;
+        [[nodiscard]] bool heap_meets_requirements(Heap heap, u32 memory_type_bits) const noexcept;
         [[nodiscard]] std::vector<u32> valid_heaps(u32 memory_type_bits) const noexcept;
-        [[nodiscard]] std::expected<VkDeviceMemory, HeapResult> allocate_memory(
+        [[nodiscard]] std::expected<VkDeviceMemory, Error> allocate_memory(
             VolkDeviceTable const& fn_table,
             VkDevice device,
             VkMemoryAllocateInfo const& memory_info
@@ -125,8 +110,8 @@ namespace hc::render::device::memory {
 
         VkPhysicalDeviceMemoryProperties mem_properties = {};
 
-        // TODO this needs to be revised, every available heap should usable
-        std::array<u32, static_cast<Sz>(Heap::MaxEnum)> heap_indexes = {
+        // TODO this needs to be revised, every available heap should be usable
+        std::array<u32, HEAP_COUNT> heap_indexes = {
             std::numeric_limits<u32>::max(),
             std::numeric_limits<u32>::max(),
             std::numeric_limits<u32>::max(),

@@ -2,10 +2,11 @@
 
 #ifndef HC_HEADLESS
 
+#include <core/error.hpp>
 #include <core/glfw.hpp>
 
 namespace hc::window {
-    bool init_context();
+    std::expected<void, Error> init_context();
 
     void terminate_context();
 

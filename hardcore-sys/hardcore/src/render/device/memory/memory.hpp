@@ -6,8 +6,8 @@
 //#include "memory/staging_pool.hpp"
 #include "reference.hpp"
 
+#include <core/error.hpp>
 #include <util/number.hpp>
-#include <util/result.hpp>
 #include <util/bank.hpp>
 
 #include <vulkan/vulkan.h>
@@ -285,22 +285,11 @@ namespace hc::render::device::memory {
     };
     */
 
-    enum class MemoryResult : u8 {
-        Success = 0, //!< Success.
-        HeapError,
-        MapError,
-        FlushError,
-        OutOfHostMemory,
-        OutOfDeviceMemory,
-        UnsupportedFormat,
-        TextureTooLarge,
-    };
-
     class Memory {
     public:
         Memory() = default;
 
-        static Result<Memory, MemoryResult> create(
+        static std::expected<Memory, Error> create(
             VkPhysicalDevice physical_device,
             VolkDeviceTable const& fn_table,
             VkDevice device,
@@ -313,20 +302,20 @@ namespace hc::render::device::memory {
 
         Memory& operator=(Memory&&) = default;
 
-        [[nodiscard]] MemoryResult map_ranges(VolkDeviceTable const& fn_table, VkDevice device, u8 frame_mod);
+        [[nodiscard]] std::expected<void, Error> map_ranges(VolkDeviceTable const& fn_table, VkDevice device, u8 frame_mod);
 
         void unmap_ranges(VolkDeviceTable const& fn_table, VkDevice device);
 
-        [[nodiscard]] MemoryResult flush_ranges(VolkDeviceTable const& fn_table, VkDevice device, u8 frame_mod);
+        [[nodiscard]] std::expected<void, Error> flush_ranges(VolkDeviceTable const& fn_table, VkDevice device, u8 frame_mod);
 
-        [[nodiscard]] Result<BufferRef, MemoryResult> alloc(
+        [[nodiscard]] std::expected<BufferRef, Error> alloc(
             VolkDeviceTable const& fn_table,
             VkDevice device,
             VkBufferUsageFlags flags,
             VkDeviceSize size
         );
 
-        [[nodiscard]] Result<DynamicBufferRef, MemoryResult> alloc_dyn(
+        [[nodiscard]] std::expected<DynamicBufferRef, Error> alloc_dyn(
             VolkDeviceTable const& fn_table,
             VkDevice device,
             VkBufferUsageFlags flags,
@@ -334,7 +323,7 @@ namespace hc::render::device::memory {
             u8 frame_mod
         );
 
-        [[nodiscard]] std::expected<Ref, MemoryResult> alloc_texture(
+        [[nodiscard]] std::expected<Ref, Error> alloc_texture(
             const VolkDeviceTable& fn_table,
             VkDevice device,
             VkImage image

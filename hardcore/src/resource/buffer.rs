@@ -10,14 +10,15 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum BufferError {
+    /// An error has occurred withing the system crate.
+    #[error(transparent)]
+    SystemError(#[from] hardcore_sys::Error),
+
     #[error(transparent)]
     Descriptor(#[from] CDescriptorError),
 
     #[error("Invalid index type")]
     Index,
-
-    #[error("Failed to create new buffer")]
-    Initialisation,
 }
 
 pub trait Buffer {
@@ -55,14 +56,19 @@ impl<'c> CBuffer<'c> {
     where
         'c: 'd,
     {
-        let handle = unsafe {
+        let mut handle = Default::default();
+        unsafe {
             let c_desc = descriptor.c_desc()?;
-            hardcore_sys::new_buffer(device, kind, c_desc.handle(), count.into(), writable)
+            hardcore_sys::new_buffer(
+                ptr::addr_of_mut!(handle),
+                device,
+                kind,
+                c_desc.handle(),
+                count.into(),
+                writable,
+            )
+            .into_std_result()?
         };
-
-        if handle.size == 0 {
-            return Err(BufferError::Initialisation);
-        }
 
         Ok(CBuffer {
             content_kind: BufferContentKind::Layout(descriptor.clone()),
@@ -81,12 +87,17 @@ impl<'c> CBuffer<'c> {
             return Err(BufferError::Index);
         }
 
-        let handle =
-            unsafe { hardcore_sys::new_index_buffer(device, kind.into(), count.into(), writable) };
-
-        if handle.size == 0 {
-            return Err(BufferError::Initialisation);
-        }
+        let mut handle = Default::default();
+        unsafe {
+            hardcore_sys::new_index_buffer(
+                ptr::addr_of_mut!(handle),
+                device,
+                kind.into(),
+                count.into(),
+                writable,
+            )
+            .into_std_result()?
+        };
 
         Ok(CBuffer {
             content_kind: BufferContentKind::Index(kind),
@@ -162,14 +173,19 @@ impl CDynamicBuffer {
         count: NonZeroU64,
         writable: bool,
     ) -> Result<Self, BufferError> {
-        let handle = unsafe {
+        let mut handle = Default::default();
+        unsafe {
             let c_desc = descriptor.c_desc()?;
-            hardcore_sys::new_dynamic_buffer(device, kind, c_desc.handle(), count.into(), writable)
+            hardcore_sys::new_dynamic_buffer(
+                ptr::addr_of_mut!(handle),
+                device,
+                kind,
+                c_desc.handle(),
+                count.into(),
+                writable,
+            )
+            .into_std_result()?
         };
-
-        if handle.size == 0 {
-            return Err(BufferError::Initialisation);
-        }
 
         Ok(CDynamicBuffer {
             content_kind: BufferContentKind::Layout(descriptor.clone()),
@@ -187,13 +203,17 @@ impl CDynamicBuffer {
             return Err(BufferError::Index);
         }
 
-        let handle = unsafe {
-            hardcore_sys::new_dynamic_index_buffer(device, kind.into(), count.into(), writable)
+        let mut handle = Default::default();
+        unsafe {
+            hardcore_sys::new_dynamic_index_buffer(
+                ptr::addr_of_mut!(handle),
+                device,
+                kind.into(),
+                count.into(),
+                writable,
+            )
+            .into_std_result()?
         };
-
-        if handle.size == 0 {
-            return Err(BufferError::Initialisation);
-        }
 
         Ok(CDynamicBuffer {
             content_kind: BufferContentKind::Index(kind),

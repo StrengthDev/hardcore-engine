@@ -3,27 +3,18 @@
 #include "heap_manager.hpp"
 #include "allocation_pool.hpp"
 
-#include <util/result.hpp>
+#include <core/error.hpp>
 #include <util/uncopyable.hpp>
 
 #include <expected>
 #include <memory>
 
 namespace hc::render::device::memory {
-    enum class PoolResult : u8 {
-        Success = 0,
-        OutOfHostMemory,
-        OutOfDeviceMemory,
-        UnsupportedHeap,
-        MapFailure,
-        NotEnoughSpace,
-    };
-
     class BufferPool : public AllocationPool {
     public:
         BufferPool() = default;
 
-        [[nodiscard]] static Result<BufferPool, PoolResult> create(
+        [[nodiscard]] static std::expected<BufferPool, Error> create(
             const VolkDeviceTable& fn_table,
             VkDevice device,
             HeapManager& heap_manager,
@@ -47,7 +38,7 @@ namespace hc::render::device::memory {
     public:
         DynamicBufferPool() = default;
 
-        [[nodiscard]] static Result<DynamicBufferPool, PoolResult> create(
+        [[nodiscard]] static std::expected<DynamicBufferPool, Error> create(
             const VolkDeviceTable& fn_table,
             VkDevice device,
             HeapManager& heap_manager,
@@ -61,7 +52,7 @@ namespace hc::render::device::memory {
 
         DynamicBufferPool& operator=(DynamicBufferPool&&) = default;
 
-        [[nodiscard]] PoolResult map(const VolkDeviceTable& fn_table, VkDevice device, u8 frame_mod);
+        [[nodiscard]] std::expected<void, Error> map(const VolkDeviceTable& fn_table, VkDevice device, u8 frame_mod);
 
         void unmap(const VolkDeviceTable& fn_table, VkDevice device);
 
@@ -92,7 +83,7 @@ namespace hc::render::device::memory {
     public:
         TexturePool() = default;
 
-        [[nodiscard]] static std::expected<TexturePool, PoolResult> create(
+        [[nodiscard]] static std::expected<TexturePool, Error> create(
             const VolkDeviceTable& fn_table,
             VkDevice device,
             HeapManager& heap_manager,
@@ -101,7 +92,7 @@ namespace hc::render::device::memory {
         );
         void free(const VolkDeviceTable& fn_table, VkDevice device, HeapManager& heap_manager) noexcept;
 
-        std::expected<PoolRange, PoolResult> allocate(
+        std::expected<PoolRange, Error> allocate(
             const VolkDeviceTable& fn_table,
             VkDevice device,
             VkImage image,

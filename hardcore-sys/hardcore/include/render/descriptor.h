@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../core/result.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -81,10 +83,11 @@ struct HCDescriptor {
  *
  * All fields in the new descriptor are uninitialised and should be assigned correct values after creation.
  *
+ * @param descriptor The pointer into which descriptor data will be written to.
  * @param field_count The number of fields in the descriptor.
- * @return The allocated descriptor.
+ * @return The operation's result.
  */
-struct HCDescriptor hc_create_descriptor(size_t field_count);
+struct HCResult hc_create_descriptor(struct HCDescriptor* descriptor, size_t field_count);
 
 /**
  * @brief Destroys a `HCDescriptor`.

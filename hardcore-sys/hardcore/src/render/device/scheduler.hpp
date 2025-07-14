@@ -1,17 +1,10 @@
 #pragma once
 
+#include <core/error.hpp>
 #include <util/number.hpp>
 #include "util/uncopyable.hpp"
 
 namespace hc::render::device {
-    enum class SchedulerError {
-        NoGraphicsQueueFound,
-        NoComputeQueueFound,
-        NoTransferQueueFound,
-        OutOfHostMemory,
-        OutOfDeviceMemory,
-    };
-
     struct QueueSelection {
         std::vector<VkQueueFamilyProperties> family_properties;
         std::vector<u32> graphics_families;
@@ -25,7 +18,7 @@ namespace hc::render::device {
         ExternalHandle<VkFence, VK_NULL_HANDLE> fence;
         ExternalHandle<VkSemaphore, VK_NULL_HANDLE> semaphore;
 
-        static std::expected<CommandPool, SchedulerError> create(
+        static std::expected<CommandPool, Error> create(
             const VolkDeviceTable& fn_table,
             VkDevice device,
             u32 queue_family
@@ -43,11 +36,11 @@ namespace hc::render::device {
 
     class Scheduler {
     public:
-        static std::expected<QueueSelection, SchedulerError> select_queues(VkPhysicalDevice physical_device);
+        static std::expected<QueueSelection, Error> select_queues(VkPhysicalDevice physical_device);
 
         Scheduler() = default;
 
-        static std::expected<Scheduler, SchedulerError> create(
+        static std::expected<Scheduler, Error> create(
             const VolkDeviceTable& fn_table,
             VkDevice device,
             QueueSelection const& selection,
@@ -77,7 +70,7 @@ namespace hc::render::device {
 
         [[nodiscard]] Queue const& transfer_queue() const noexcept { return this->queues[this->transfer_queue_index]; }
 
-        std::expected<void, SchedulerError> reset_pools(const VolkDeviceTable& fn_table, VkDevice device, u8 frame_mod);
+        std::expected<void, Error> reset_pools(const VolkDeviceTable& fn_table, VkDevice device, u8 frame_mod);
 
     private:
         std::vector<Queue> queues;

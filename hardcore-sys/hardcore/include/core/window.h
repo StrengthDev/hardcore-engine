@@ -485,11 +485,12 @@ void hc_poll_events();
 /**
  * @brief Constructs a new `HCWindow`.
  *
+ * @param window A pointer to which the new window's data will be written to.
  * @param params The window initialisation parameters.
  *
  * @return The newly created `HCWindow`. The returned object is invalid if some error has occurred.
  */
-struct HCWindow hc_new_window(struct HCWindowParams params);
+struct HCResult hc_new_window(struct HCWindow* window, struct HCWindowParams params);
 
 /**
  * @brief Destroys a `HCWindow`.

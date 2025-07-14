@@ -6,19 +6,12 @@
 #include "device/device.hpp"
 
 #include <core/log.hpp>
-#include <util/flow.hpp>
 #include <render/renderer.h>
 #include <render/device.h>
 
 #ifndef HC_HEADLESS
 #include <core/glfw.hpp>
 #endif // HC_HEADLESS
-
-#define VK_CHECK_RETURN(vk_fn_call)     \
-{                                       \
-    VkResult res = vk_fn_call;          \
-    if (res != VK_SUCCESS) return res;  \
-}(0)
 
 namespace hc::render {
     static auto constexpr VALIDATION_LAYER_NAME = "VK_LAYER_KHRONOS_validation";
@@ -33,23 +26,32 @@ namespace hc::render {
     static std::vector<device::Device> devices;
 
 
-    VkResult layer_support(const std::vector<const char*>& layer_names, std::vector<bool>& out_found_layers) {
+    static std::expected<std::vector<bool>, Error> layer_support(const std::vector<const char*>& layer_names) {
         u32 layer_count;
-        VK_CHECK_RETURN(vkEnumerateInstanceLayerProperties(&layer_count, nullptr));
+        VkResult result = vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to query Vulkan instance layers: " << to_str(result));
+            return Error(result);
+        }
+
         std::vector<VkLayerProperties> available_layers(layer_count);
-        VK_CHECK_RETURN(vkEnumerateInstanceLayerProperties(&layer_count, available_layers.data()));
+        result = vkEnumerateInstanceLayerProperties(&layer_count, available_layers.data());
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to query Vulkan instance layers: " << to_str(result));
+            return Error(result);
+        }
 
         for (auto& available_layer : available_layers) {
             HC_DEBUG("Layer available: " << available_layer.layerName);
         }
 
+        std::vector<bool> found_layers(layer_names.size());
+        std::ranges::fill(found_layers, false);
         u32 current = 0;
         for (auto& layer_name : layer_names) {
-            out_found_layers[current] = false;
-
             for (auto& available_layer : available_layers) {
                 if (strcmp(layer_name, available_layer.layerName) == 0) {
-                    out_found_layers[current] = true;
+                    found_layers[current] = true;
                     break;
                 }
             }
@@ -57,32 +59,38 @@ namespace hc::render {
             current++;
         }
 
-        return VK_SUCCESS;
+        return found_layers;
     }
 
-    VkResult extension_support(
+    static std::expected<std::vector<bool>, Error> extension_support(
         const char* layer_name,
-        const std::vector<const char*>& extension_names,
-        std::vector<bool>& out_found_extensions
+        const std::vector<const char*>& extension_names
     ) {
         u32 extension_count;
-        VK_CHECK_RETURN(vkEnumerateInstanceExtensionProperties(layer_name, &extension_count, nullptr));
+        VkResult result = vkEnumerateInstanceExtensionProperties(layer_name, &extension_count, nullptr);
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to query Vulkan instance extensions: " << to_str(result));
+            return Error(result);
+        }
+
         std::vector<VkExtensionProperties> available_extensions(extension_count);
-        VK_CHECK_RETURN(
-            vkEnumerateInstanceExtensionProperties(layer_name, &extension_count, available_extensions.data())
-        );
+        result = vkEnumerateInstanceExtensionProperties(layer_name, &extension_count, available_extensions.data());
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to query Vulkan instance extensions: " << to_str(result));
+            return Error(result);
+        }
 
         for (auto& available_extension : available_extensions) {
             HC_DEBUG("Extension available: " << available_extension.extensionName);
         }
 
+        std::vector<bool> found_extensions(extension_names.size());
+        std::ranges::fill(found_extensions, false);
         u32 current = 0;
         for (auto& extension_name : extension_names) {
-            out_found_extensions[current] = false;
-
             for (auto& available_extension : available_extensions) {
                 if (strcmp(extension_name, available_extension.extensionName) == 0) {
-                    out_found_extensions[current] = true;
+                    found_extensions[current] = true;
                     break;
                 }
             }
@@ -90,7 +98,7 @@ namespace hc::render {
             current++;
         }
 
-        return VK_SUCCESS;
+        return found_extensions;
     }
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL default_debug_callback(
@@ -142,15 +150,15 @@ namespace hc::render {
             flags |= HC_VK_DEVICE_ADDRESS_BINDING;
         }
 
-        HCLogKind kind = HCLogKind::HCLogKind_Error;
+        HCLogKind kind = HCLogKind_Error;
         if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
-            kind = HCLogKind::HCLogKind_Error;
+            kind = HCLogKind_Error;
         } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
-            kind = HCLogKind::HCLogKind_Warn;
+            kind = HCLogKind_Warn;
         } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
-            kind = HCLogKind::HCLogKind_Info;
+            kind = HCLogKind_Info;
         } else if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
-            kind = HCLogKind::HCLogKind_Debug;
+            kind = HCLogKind_Debug;
         }
 
         user_debug_callback(kind, flags, callback_data->pMessage);
@@ -158,7 +166,10 @@ namespace hc::render {
         return VK_FALSE;
     }
 
-    VkResult create_instance(const HCApplicationDescriptor& app, const std::vector<const char*>& layers) {
+    static std::expected<void, Error> create_instance(
+        const HCApplicationDescriptor& app,
+        const std::vector<const char*>& layers
+    ) {
         HC_INFO(
             "Using Vulkan " << HC_VULKAN_API_VERSION.major << '.' << HC_VULKAN_API_VERSION.minor << '.' << HC_VULKAN_API_VERSION.patch << " API"
         );
@@ -175,22 +186,24 @@ namespace hc::render {
         app_info.engineVersion = VK_MAKE_API_VERSION(0, HC_MAJOR, HC_MINOR, HC_MAJOR);
         app_info.apiVersion = VULKAN_API_VERSION;
 
-        std::vector<bool> found_layers(layers.size());
-        std::ranges::fill(found_layers, false);
-        VK_CHECK_RETURN(layer_support(layers, found_layers));
-        bool support_success = true;
+        auto found_layers = layer_support(layers);
+        if (!found_layers) {
+            return found_layers.error();
+        }
+
+        bool layer_missing = false;
         for (u32 i = 0; i < layers.size(); i++) {
             HC_INFO("Using layer " << layers[i]);
-            if (!found_layers[i]) {
+            if (!(*found_layers)[i]) {
                 HC_ERROR("Layer " << layers[i] << " is not supported");
                 if (strcmp(layers[i], VALIDATION_LAYER_NAME) == 0) {
                     HC_ERROR("Make sure the Vulkan SDK is installed to be able to use validation layers");
                 }
-                support_success = false;
+                layer_missing = true;
             }
         }
-        if (!support_success) {
-            return VK_ERROR_INITIALIZATION_FAILED;
+        if (layer_missing) {
+            return Error(HCError_VulkanLayerNotFound);
         }
 
 #ifdef HC_HEADLESS
@@ -207,18 +220,21 @@ namespace hc::render {
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 #endif // HC_LOGGING
 
-        std::vector<bool> found_extensions(extensions.size());
-        std::ranges::fill(found_extensions, false);
-        VK_CHECK_RETURN(extension_support(nullptr, extensions, found_extensions));
+        auto found_extensions = extension_support(nullptr, extensions);
+        if (!found_extensions) {
+            return found_extensions.error();
+        }
+
+        bool extension_missing = false;
         for (u32 i = 0; i < extensions.size(); i++) {
             HC_INFO("Using extension " << extensions[i]);
-            if (!found_extensions[i]) {
+            if (!(*found_extensions)[i]) {
                 HC_ERROR("Extension " << extensions[i] << " is not supported");
-                support_success = false;
+                extension_missing = true;
             }
         }
-        if (!support_success) {
-            return VK_ERROR_INITIALIZATION_FAILED;
+        if (extension_missing) {
+            return Error(HCError_VulkanExtensionNotFound);
         }
 
         VkInstanceCreateInfo instance_info = {};
@@ -229,46 +245,55 @@ namespace hc::render {
         instance_info.enabledLayerCount = static_cast<u32>(layers.size());
         instance_info.ppEnabledLayerNames = layers.data();
 
-        return vkCreateInstance(&instance_info, nullptr, &global_instance.get());
+        VkResult result = vkCreateInstance(&instance_info, nullptr, &global_instance.get());
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to initialize Vulkan instance: " << to_str(result));
+            return Error(result);
+        }
+        return {};
     }
 
 
-    InstanceResult init_devices(const std::vector<const char*>& layers) {
+    static std::expected<void, Error> init_devices(const std::vector<const char*>& layers) {
         u32 device_count = 0;
-        VkResult res = vkEnumeratePhysicalDevices(global_instance, &device_count, nullptr);
-        if (res != VK_SUCCESS) {
-            return InstanceResult::DeviceError;
+        VkResult result = vkEnumeratePhysicalDevices(global_instance, &device_count, nullptr);
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to query physical devices: " << to_str(result));
+            return Error(result);
         }
         if (!device_count) {
-            return InstanceResult::NoDevicesFound;
+            HC_ERROR("No devices were found");
+            return Error(HCError_NoDevices);
         }
         std::vector<VkPhysicalDevice> physical_handles(device_count);
-        res = vkEnumeratePhysicalDevices(global_instance, &device_count, physical_handles.data());
-        if (res != VK_SUCCESS) {
-            return InstanceResult::DeviceError;
+        result = vkEnumeratePhysicalDevices(global_instance, &device_count, physical_handles.data());
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to query physical devices: " << to_str(result));
+            return Error(result);
         }
 
         for (auto physical_handle : physical_handles) {
-            std::optional<device::Device> device = device::Device::create(physical_handle, layers);
-            if (device) {
-                devices.push_back(std::move(*device));
+            auto device_result = device::Device::create(physical_handle, layers);
+            if (device_result) {
+                devices.push_back(*std::move(device_result));
             }
         }
 
         if (devices.empty()) {
-            return InstanceResult::NoDevicesFound;
+            HC_ERROR("Failed to initialize all devices");
+            return Error(HCError_NoDevices);
         }
 
-        return InstanceResult::Success;
+        return {};
     }
 
-    InstanceResult init(const HCApplicationDescriptor& app, const HCRenderParams& params) {
+    std::expected<void, Error> init(const HCApplicationDescriptor& app, const HCRenderParams& params) {
         max_frames_in_flight_count = params.max_frames_in_flight;
 
-        VkResult res = volkInitialize();
-        if (res != VK_SUCCESS) {
-            HC_ERROR("Failed to initialize Volk: " << to_str(res));
-            return InstanceResult::VolkError;
+        VkResult result = volkInitialize();
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to initialize Volk: " << to_str(result));
+            return Error(result);
         }
 
         HC_INFO(
@@ -282,10 +307,9 @@ namespace hc::render {
         layers.push_back(VALIDATION_LAYER_NAME);
 #endif // HC_VULKAN_VALIDATION
 
-        res = create_instance(app, layers);
-        if (res != VK_SUCCESS) {
-            HC_ERROR("Failed to initialize Vulkan instance: " << to_str(res));
-            return InstanceResult::VulkanInstanceError;
+        auto instance_result = create_instance(app, layers);
+        if (!instance_result) {
+            return instance_result.error();
         }
         volkLoadInstanceOnly(global_instance);
 
@@ -308,32 +332,24 @@ namespace hc::render {
         debug_info.pUserData = nullptr;
 
         // vkCreateDebugUtilsMessengerEXT is loaded via Volk
-        res = vkCreateDebugUtilsMessengerEXT(global_instance, &debug_info, nullptr, &debug_messenger.get());
-        if (res != VK_SUCCESS) {
-            HC_ERROR("Failed to initialize debug messenger: " << to_str(res));
-            return InstanceResult::DebugCallbackError;
+        result = vkCreateDebugUtilsMessengerEXT(global_instance, &debug_info, nullptr, &debug_messenger.get());
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to initialize debug messenger: " << to_str(result));
+            return Error(result);
         }
 #endif // HC_LOGGING
 
-        InstanceResult device_res = init_devices(layers);
-        if (device_res != InstanceResult::Success) {
-            switch (device_res) {
-            case InstanceResult::DeviceError: HC_ERROR("Failed to initialize Vulkan devices");
-                break;
-            case InstanceResult::NoDevicesFound: HC_ERROR("Did not find any devices");
-                break;
-            default: HC_ERROR("Unknown error while initialising Vulkan devices");
-            }
-
-            return device_res;
+        auto device_res = init_devices(layers);
+        if (!device_res) {
+            return device_res.error();
         }
 
         frame_mod = 0;
 
-        return InstanceResult::Success;
+        return {};
     }
 
-    InstanceResult term() {
+    void term() {
         devices.clear();
 
 #ifdef HC_LOGGING
@@ -352,8 +368,6 @@ namespace hc::render {
         volkFinalize();
 
         max_frames_in_flight_count = std::numeric_limits<u8>::max();
-
-        return InstanceResult::Success;
     }
 
     u8 max_frames_in_flight() {
@@ -372,18 +386,18 @@ namespace hc::render {
         return devices;
     }
 
-    Result<device::Device*, InstanceResult> device_at(u32 id) noexcept {
+    std::expected<device::Device*, Error> device_at(u32 id) noexcept {
         if (devices.empty()) {
-            HC_ERROR("No global instance currently initialised");
-            return Err(InstanceResult::Uninitialised);
+            HC_ERROR("No devices, the global instance may have not been initialised yet");
+            return Error(HCError_NoDevices);
         }
 
         if (devices.size() <= id) {
             HC_ERROR("Device index out of bounds");
-            return Err(InstanceResult::OutOfBounds);
+            return Error(HCError_NoSuchDevice);
         }
 
-        return Ok(&devices[id]);
+        return &devices[id];
     }
 }
 
@@ -403,20 +417,29 @@ const HCVersion HC_VULKAN_API_VERSION = bitfield_to_version(hc::render::VULKAN_A
 const HCVersion HC_VULKAN_HEADERS_VERSION = bitfield_to_version(VK_HEADER_VERSION_COMPLETE);
 const u32 HC_VOLK_HEADER_VERSION = VOLK_HEADER_VERSION;
 
-int hc_render_tick() {
+HCResult hc_render_tick() {
+    std::expected<void, hc::Error> return_result = {};
+
     u8 next_mod = hc::render::frame_mod + 1;
     next_mod = next_mod < hc::render::max_frames_in_flight_count ? next_mod : 0;
 
     for (auto& device : hc::render::devices) {
-        device.tick(hc::render::frame_mod, next_mod);
+        auto tick_result = device.tick(hc::render::frame_mod, next_mod);
+        if (!tick_result && return_result) {
+            return_result = tick_result;
+        }
     }
 
     hc::render::frame_mod = next_mod;
 
-    return 0;
+    if (!return_result) {
+        return return_result.error();
+    }
+
+    return {.success = true};
 }
 
-int hc_render_finish() {
+HCResult hc_render_finish() {
     u8 frame_count = hc::render::max_frames_in_flight_count + 1;
     std::vector<u8> frame_mods;
     frame_mods.reserve(frame_count);
@@ -432,7 +455,7 @@ int hc_render_finish() {
         device.finish(frame_mods);
     }
 
-    return 0;
+    return {.success = true};
 }
 
 u32 hc_device_count() {
@@ -440,10 +463,10 @@ u32 hc_device_count() {
 }
 
 const char* hc_device_name(u32 device) {
-    auto res = hc::render::device_at(device);
-    if (!res)
+    auto device_result = hc::render::device_at(device);
+    if (!device_result) {
         return nullptr;
-    auto device_ptr = res.ok();
+    }
 
-    return device_ptr->name();
+    return (*device_result)->name();
 }

@@ -137,13 +137,15 @@ namespace hc::render::device {
         return {output_dependencies, root_nodes};
     }
 
-    GraphResult Graph::compile() {
+    std::expected<void, Error> Graph::compile() {
         HC_INFO_SPAN("Compile device graph");
-        if (this->is_compiled())
-            return GraphResult::Success;
+        if (this->is_compiled()) {
+            return {};
+        }
 
-        if (!this->validate_graph())
-            return GraphResult::Invalid;
+        if (!this->validate_graph()) {
+            return Error(HCError_InvalidRenderGraph);
+        }
 
         auto [output_dependencies, root_nodes] = this->filter_unused_nodes();
 
@@ -200,7 +202,7 @@ namespace hc::render::device {
             push_batch.clear();
         }
 
-        return GraphResult::Success;
+        return {};
     }
 
     bool Graph::is_compiled() const noexcept {
@@ -215,19 +217,19 @@ namespace hc::render::device {
     }
 
     void Graph::clear_commands() noexcept {
-        for (auto& queue : this->commands)
+        for (auto& queue : this->commands) {
             queue.clear();
+        }
     }
 
-    GraphResult Graph::record() const noexcept {
+    std::expected<void, Error> Graph::record() const noexcept {
+        HC_ASSERT(this->is_compiled(), "Graph must be compiled before recording");
+
         HC_INFO_SPAN("Record command buffers");
-        if (!this->is_compiled()) {
-            return GraphResult::NotCompiled;
-        }
 
         // TODO do NOT forget: dedicated transfer queue for host-device transfers, otherwise use the resource owning family
 
-        return GraphResult::Success;
+        return {};
     }
 
     u64 Graph::add_resource(const memory::BufferRef& ref) {

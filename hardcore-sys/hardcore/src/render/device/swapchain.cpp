@@ -10,7 +10,7 @@
 #include <render/util.hpp>
 
 namespace hc::render::device {
-    std::expected<InnerSwapchain, SwapchainResult> InnerSwapchain::create(
+    std::expected<InnerSwapchain, Error> InnerSwapchain::create(
         const VolkDeviceTable& fn_table,
         VkDevice device,
         const VkSwapchainCreateInfoKHR& create_info,
@@ -18,25 +18,26 @@ namespace hc::render::device {
     ) {
         InnerSwapchain swapchain;
 
-        VkResult res = fn_table.vkCreateSwapchainKHR(device, &create_info, nullptr, &swapchain.handle.get());
-        if (res != VK_SUCCESS) {
-            HC_ERROR("Failed to create swapchain: " << to_str(res));
-            return std::unexpected(SwapchainResult::CreationFailure);
+        VkResult result = fn_table.vkCreateSwapchainKHR(device, &create_info, nullptr, &swapchain.handle.get());
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to create swapchain: " << to_str(result));
+            return Error(result);
         }
 
         u32 image_count = 0;
-        res = fn_table.vkGetSwapchainImagesKHR(device, swapchain.handle, &image_count, nullptr);
-        if (res != VK_SUCCESS) {
-            HC_ERROR("Failed to query swapchain images: " << to_str(res));
+        result = fn_table.vkGetSwapchainImagesKHR(device, swapchain.handle, &image_count, nullptr);
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to query swapchain images: " << to_str(result));
             swapchain.destroy(fn_table, device);
-            return std::unexpected(SwapchainResult::ImageAcquisitionFailure);
+            return Error(result);
         }
+
         std::vector<VkImage> images(image_count);
-        res = fn_table.vkGetSwapchainImagesKHR(device, swapchain.handle, &image_count, images.data());
-        if (res != VK_SUCCESS) {
-            HC_ERROR("Failed to obtain swapchain images: " << to_str(res));
+        result = fn_table.vkGetSwapchainImagesKHR(device, swapchain.handle, &image_count, images.data());
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to obtain swapchain images: " << to_str(result));
             swapchain.destroy(fn_table, device);
-            return std::unexpected(SwapchainResult::ImageAcquisitionFailure);
+            return Error(result);
         }
 
         swapchain.image_views.reserve(image_count);
@@ -64,11 +65,11 @@ namespace hc::render::device {
             };
 
             VkImageView image_view = VK_NULL_HANDLE;
-            res = fn_table.vkCreateImageView(device, &view_create_info, nullptr, &image_view);
-            if (res != VK_SUCCESS) {
-                HC_ERROR("Failed to create swapchain image view: " << to_str(res));
+            result = fn_table.vkCreateImageView(device, &view_create_info, nullptr, &image_view);
+            if (result != VK_SUCCESS) {
+                HC_ERROR("Failed to create swapchain image view: " << to_str(result));
                 swapchain.destroy(fn_table, device);
-                return std::unexpected(SwapchainResult::ImageViewFailure);
+                return Error(result);
             }
 
             swapchain.image_views.push_back(image_view);
@@ -89,11 +90,11 @@ namespace hc::render::device {
             };
 
             VkFramebuffer framebuffer = VK_NULL_HANDLE;
-            res = fn_table.vkCreateFramebuffer(device, &framebuffer_info, nullptr, &framebuffer);
-            if (res != VK_SUCCESS) {
-                HC_ERROR("Failed to create swapchain frame buffer: " << to_str(res));
+            result = fn_table.vkCreateFramebuffer(device, &framebuffer_info, nullptr, &framebuffer);
+            if (result != VK_SUCCESS) {
+                HC_ERROR("Failed to create swapchain frame buffer: " << to_str(result));
                 swapchain.destroy(fn_table, device);
-                return std::unexpected(SwapchainResult::FramebufferFailure);
+                return Error(result);
             }
 
             swapchain.framebuffers.push_back(framebuffer);
@@ -119,7 +120,7 @@ namespace hc::render::device {
         this->handle.destroy();
     }
 
-    std::expected<Swapchain, SwapchainResult> Swapchain::create(
+    std::expected<Swapchain, Error> Swapchain::create(
         const VolkDeviceTable& fn_table,
         VkDevice device,
         ExternalHandle<VkSurfaceKHR, VK_NULL_HANDLE>&& surface,
@@ -129,17 +130,17 @@ namespace hc::render::device {
         Swapchain swapchain;
 
         VkSurfaceCapabilities2KHR& surface_capabilities = surface_info.capabilities;
-        if (params.extent.width < surface_capabilities.surfaceCapabilities.minImageExtent.width
-            || params.extent.height < surface_capabilities.surfaceCapabilities.minImageExtent.height
-            || surface_capabilities.surfaceCapabilities.maxImageExtent.width < params.extent.width
-            || surface_capabilities.surfaceCapabilities.maxImageExtent.height < params.extent.height) {
-            HC_ERROR(
-                "Unsupported surface extent " << to_str(params.extent) << ", minimum is " << to_str(surface_capabilities
-                    .surfaceCapabilities.minImageExtent) << " and maximum is " << to_str(surface_capabilities.
-                    surfaceCapabilities.maxImageExtent)
-            );
-            return std::unexpected(SwapchainResult::UnsupportedSurface);
-        }
+        params.extent.width = std::clamp(
+            params.extent.width,
+            surface_capabilities.surfaceCapabilities.minImageExtent.width,
+            surface_capabilities.surfaceCapabilities.maxImageExtent.width
+        );
+
+        params.extent.height = std::clamp(
+            params.extent.height,
+            surface_capabilities.surfaceCapabilities.minImageExtent.height,
+            surface_capabilities.surfaceCapabilities.maxImageExtent.height
+        );
 
         VkPresentModeKHR present_mode = surface_info.available_present_modes[0];
         VkSurfaceFormatKHR surface_format = surface_info.available_formats[0].surfaceFormat;
@@ -215,19 +216,11 @@ namespace hc::render::device {
         };
 
         VkRenderPass render_pass = VK_NULL_HANDLE;
-        VkResult res = fn_table.vkCreateRenderPass(device, &render_pass_info, nullptr, &render_pass);
-        if (res != VK_SUCCESS) {
+        VkResult result = fn_table.vkCreateRenderPass(device, &render_pass_info, nullptr, &render_pass);
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to create swapchain render pass: " << to_str(result));
             swapchain.destroy(fn_table, device);
-
-            switch (res) {
-            case VK_ERROR_OUT_OF_HOST_MEMORY:
-                HC_ERROR("Failed to allocate render pass, out of host memory");
-                return std::unexpected(SwapchainResult::OutOfHostMemory);
-            case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-                HC_ERROR("Failed to allocate render pass, out of device memory");
-                return std::unexpected(SwapchainResult::OutOfDeviceMemory);
-            default: HC_UNREACHABLE("vkCreateCommandPool shouldn't return any other result values");
-            }
+            return Error(result);
         }
 
         swapchain.render_pass = render_pass;
@@ -255,13 +248,13 @@ namespace hc::render::device {
             .oldSwapchain = VK_NULL_HANDLE,
         };
 
-        auto inner_res = InnerSwapchain::create(fn_table, device, create_info, render_pass);
-        if (!inner_res) {
+        auto inner_result = InnerSwapchain::create(fn_table, device, create_info, render_pass);
+        if (!inner_result) {
             swapchain.destroy(fn_table, device);
-            return std::unexpected(inner_res.error());
+            return inner_result.error();
         }
 
-        swapchain.inner = *std::move(inner_res);
+        swapchain.inner = *std::move(inner_result);
 
         VkSemaphoreCreateInfo semaphore_info = {
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
@@ -272,14 +265,12 @@ namespace hc::render::device {
         swapchain.image_semaphores.reserve(max_frames_in_flight());
         for (u8 i = 0; i < max_frames_in_flight(); ++i) {
             VkSemaphore semaphore = VK_NULL_HANDLE;
-            res = fn_table.vkCreateSemaphore(device, &semaphore_info, nullptr, &semaphore);
+            result = fn_table.vkCreateSemaphore(device, &semaphore_info, nullptr, &semaphore);
 
-            if (res != VK_SUCCESS) {
-                HC_ERROR("Failed to create swapchain image semaphore");
-
+            if (result != VK_SUCCESS) {
+                HC_ERROR("Failed to create swapchain image semaphore: " << to_str(result));
                 swapchain.destroy(fn_table, device);
-
-                return std::unexpected(SwapchainResult::SemaphoreFailure);
+                return Error(result);
             }
 
             swapchain.image_semaphores.push_back(semaphore);
@@ -316,11 +307,13 @@ namespace hc::render::device {
             this->render_pass.destroy();
         }
 
-        vkDestroySurfaceKHR(vk_instance(), this->surface, nullptr);
-        this->surface.destroy();
+        if (this->surface.valid()) {
+            vkDestroySurfaceKHR(vk_instance(), this->surface, nullptr);
+            this->surface.destroy();
+        }
     }
 
-    std::expected<bool, SwapchainResult> Swapchain::recreate(
+    std::expected<bool, Error> Swapchain::recreate(
         VkPhysicalDevice physical_device,
         const VolkDeviceTable& fn_table,
         VkDevice device,
@@ -346,10 +339,10 @@ namespace hc::render::device {
             .pNext = nullptr,
             .surfaceCapabilities = {},
         };
-        VkResult res = vkGetPhysicalDeviceSurfaceCapabilities2KHR(physical_device, &surface_info, &capabilities);
-        if (res != VK_SUCCESS) {
-            HC_ERROR("Failed to query surface capabilities: " << to_str(res));
-            return std::unexpected(SwapchainResult::CreationFailure);
+        VkResult result = vkGetPhysicalDeviceSurfaceCapabilities2KHR(physical_device, &surface_info, &capabilities);
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to query surface capabilities: " << to_str(result));
+            return Error(result);
         }
 
         this->extent.width = std::clamp(
@@ -385,13 +378,12 @@ namespace hc::render::device {
             .oldSwapchain = this->inner.handle,
         };
 
-        auto inner_res = InnerSwapchain::create(fn_table, device, create_info, this->render_pass);
-        if (!inner_res) {
-            HC_ERROR("Failed to recreate swapchain");
-            return std::unexpected(SwapchainResult::CreationFailure);
+        auto inner_result = InnerSwapchain::create(fn_table, device, create_info, this->render_pass);
+        if (!inner_result) {
+            return inner_result.error();
         }
 
-        this->old_swapchains.push(std::exchange(this->inner, *std::move(inner_res)));
+        this->old_swapchains.push(std::exchange(this->inner, *std::move(inner_result)));
 
         this->images_out_of_date = false;
 
@@ -421,19 +413,19 @@ namespace hc::render::device {
         };
     }
 
-    std::expected<ImageDetails, SwapchainResult> Swapchain::acquire_image(
+    std::expected<ImageDetails, Error> Swapchain::acquire_image(
         const VolkDeviceTable& fn_table,
         VkDevice device,
         u8 frame_mod,
         u64 timeout
     ) {
         if (this->images_out_of_date) {
-            return std::unexpected(SwapchainResult::OutOfDate);
+            return ImageDetails{.acquisition = AcquisitionKind::OutOfDate};
         }
 
         u32 index = std::numeric_limits<u32>::max();
         VkSemaphore semaphore = image_semaphores[frame_mod];
-        VkResult res = fn_table.vkAcquireNextImageKHR(
+        VkResult result = fn_table.vkAcquireNextImageKHR(
             device,
             this->inner.handle,
             timeout,
@@ -442,21 +434,26 @@ namespace hc::render::device {
             &index
         );
 
-        switch (res) {
+        switch (result) {
         case VK_SUCCESS:
         case VK_SUBOPTIMAL_KHR:
-            return ImageDetails{.index = index, .image_ready_semaphore = semaphore};
+            return ImageDetails{
+                .image_ready_semaphore = semaphore,
+                .index = index,
+                .acquisition = AcquisitionKind::Normal
+            };
         case VK_ERROR_OUT_OF_DATE_KHR:
-            return std::unexpected(SwapchainResult::OutOfDate);
+            return ImageDetails{.acquisition = AcquisitionKind::OutOfDate};
         case VK_TIMEOUT:
         case VK_NOT_READY: // Returned when timeout is 0 and image is not ready
-            return std::unexpected(SwapchainResult::SkipFrame);
+            return ImageDetails{.acquisition = AcquisitionKind::Skip};
         case VK_ERROR_OUT_OF_HOST_MEMORY:
         case VK_ERROR_OUT_OF_DEVICE_MEMORY:
         case VK_ERROR_DEVICE_LOST:
         case VK_ERROR_SURFACE_LOST_KHR:
         case VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT:
-            return std::unexpected(SwapchainResult::ImageAcquisitionFailure);
+            HC_ERROR("Failed to acquire swapchain image: " << to_str(result));
+            return Error(result);
         default: HC_UNREACHABLE("No other errors should be returned by vkAcquireNextImageKHR");
         }
     }

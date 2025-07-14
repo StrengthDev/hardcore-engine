@@ -115,8 +115,9 @@ impl Descriptor {
 
 #[derive(Error, Debug)]
 pub enum CDescriptorError {
-    #[error("Failed to create native descriptor")]
-    CreationError,
+    /// An error has occurred withing the system crate.
+    #[error(transparent)]
+    SystemError(#[from] hardcore_sys::Error),
 }
 
 pub(crate) struct CDescriptor {
@@ -126,13 +127,16 @@ pub(crate) struct CDescriptor {
 impl CDescriptor {
     // TODO rename constructor type functions to new
     fn create(field_count: usize) -> Result<Self, CDescriptorError> {
-        let desc = unsafe { hardcore_sys::create_descriptor(field_count) };
+        let mut descriptor = CDescriptor {
+            inner: Default::default(),
+        };
 
-        if desc.fields.is_null() {
-            return Err(CDescriptorError::CreationError);
-        }
+        unsafe {
+            hardcore_sys::create_descriptor(ptr::addr_of_mut!(descriptor.inner), field_count)
+                .into_std_result()?
+        };
 
-        Ok(CDescriptor { inner: desc })
+        Ok(descriptor)
     }
 
     pub(crate) fn handle(&self) -> *const hardcore_sys::Descriptor {

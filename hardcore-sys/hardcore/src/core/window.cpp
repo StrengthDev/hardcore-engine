@@ -2,11 +2,13 @@
 
 #ifndef HC_HEADLESS
 
+#include "window.hpp"
+#include "error.hpp"
+#include "log.hpp"
+
 #include <core/window.h>
-#include <core/window.hpp>
-#include <core/log.hpp>
 #include <render/renderer.hpp>
-#include "render/util.hpp"
+#include <render/util.hpp>
 #include <util/number.hpp>
 
 namespace hc::window {
@@ -71,12 +73,12 @@ namespace hc::window {
         static_window.extent.height = static_cast<u32>(height);
     }
 
-    bool init_context() {
+    std::expected<void, Error> init_context() {
         if (!glfwInit()) {
             const char* description;
             glfwGetError(&description);
             HC_ERROR("Error initialising GLFW's context: " << description);
-            return false;
+            return Error(HCError_GLFWInitFailed);
         }
 
         HC_INFO("GLFW v" << HC_GLFW_VERSION.major << '.' << HC_GLFW_VERSION.minor << '.' << HC_GLFW_VERSION.patch);
@@ -90,7 +92,7 @@ namespace hc::window {
             HC_INFO("Raw mouse input unavailable");
         }
 
-        return true;
+        return {};
     }
 
     void terminate_context() {
@@ -429,14 +431,15 @@ void hc_poll_events() {
     }
     hc::window::windows_to_destroy.clear();
 
-    // Set resizing to false, in order to allow swapchains to be recreated.
     for (auto& window : hc::window::window_map | std::views::values) {
         window.resizing = false;
     }
 }
 
-HCWindow hc_new_window(HCWindowParams params) {
-    constexpr HCWindow INVALID_WINDOW = {.handle = nullptr, .id = 0};
+HCResult hc_new_window(HCWindow* window, HCWindowParams params) {
+    if (!window) {
+        return {.error = HCError_InvalidParams, .success = false};
+    }
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     if (params.pos_x == std::numeric_limits<int>::max()) {
@@ -450,13 +453,12 @@ HCWindow hc_new_window(HCWindowParams params) {
         glfwWindowHint(GLFW_POSITION_Y, params.pos_y);
     }
 
-    auto device_res = hc::render::device_at(params.device);
-    if (!device_res) {
-        return INVALID_WINDOW;
+    auto device_result = hc::render::device_at(params.device);
+    if (!device_result) {
+        return device_result.error();
     }
-    auto device_ptr = device_res.ok();
 
-    GLFWwindow* window = glfwCreateWindow(
+    GLFWwindow* window_handle = glfwCreateWindow(
         static_cast<int>(params.width),
         static_cast<int>(params.height),
         params.name,
@@ -464,18 +466,20 @@ HCWindow hc_new_window(HCWindowParams params) {
         nullptr
     );
 
-    if (!window) {
-        HC_ERROR("Failed to create window");
-        return INVALID_WINDOW;
+    if (!window_handle) {
+        const char* description;
+        glfwGetError(&description);
+        HC_ERROR("Failed to create window: " << description);
+        return {.error = HCError_GLFWWindowCreationFailure, .success = false};
     }
 
-    glfwSetInputMode(window, GLFW_LOCK_KEY_MODS, GLFW_TRUE);
+    glfwSetInputMode(window_handle, GLFW_LOCK_KEY_MODS, GLFW_TRUE);
 
     if (hc::window::raw_mouse_input_available) {
-        glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+        glfwSetInputMode(window_handle, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
     }
     glfwSetFramebufferSizeCallback(
-        window,
+        window_handle,
         [](GLFWwindow* glfw_window, int width, int height) {
             // Unique lock because a variable is being set.
             std::unique_lock lock(hc::window::window_mutex);
@@ -485,23 +489,23 @@ HCWindow hc_new_window(HCWindowParams params) {
     );
 
     int width, height;
-    glfwGetFramebufferSize(window, &width, &height);
+    glfwGetFramebufferSize(window_handle, &width, &height);
     VkExtent2D extent{static_cast<u32>(width), static_cast<u32>(height)};
 
     VkInstance instance = hc::render::vk_instance();
     ExternalHandle<VkSurfaceKHR, VK_NULL_HANDLE> surface;
-    VkResult vk_res = glfwCreateWindowSurface(instance, window, nullptr, &surface.get());
-    if (vk_res != VK_SUCCESS) {
-        HC_ERROR("Failed to create window surface: " << hc::render::to_str(vk_res));
-        glfwDestroyWindow(window);
-        return INVALID_WINDOW;
+    VkResult surface_result = glfwCreateWindowSurface(instance, window_handle, nullptr, &surface.get());
+    if (surface_result != VK_SUCCESS) {
+        HC_ERROR("Failed to create window surface: " << hc::render::to_str(surface_result));
+        glfwDestroyWindow(window_handle);
+        return hc::Error(surface_result);
     }
 
-    auto swapchain_res = device_ptr->create_swapchain(window, std::move(surface), extent);
-    if (!swapchain_res) {
+    auto swapchain_result = (*device_result)->create_swapchain(window_handle, std::move(surface), extent);
+    if (!swapchain_result) {
         HC_ERROR("Failed to create swapchain");
-        glfwDestroyWindow(window);
-        return INVALID_WINDOW;
+        glfwDestroyWindow(window_handle);
+        return swapchain_result.error();
     }
 
     // Find first available ID
@@ -525,15 +529,19 @@ HCWindow hc_new_window(HCWindowParams params) {
     static_window.id = id;
     static_window.owning_device = params.device;
     static_window.extent = extent;
-    hc::window::window_map.emplace(window, static_window);
+    hc::window::window_map.emplace(window_handle, static_window);
 
     HC_INFO("Created new window with id " << id);
 
-    return HCWindow{.handle = window, .id = id};
+    window->handle = window_handle;
+    window->id = id;
+
+    return {.success = true};
 }
 
 void hc_destroy_window(HCWindow* window) {
     if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
 
@@ -568,14 +576,15 @@ void hc_destroy_window(HCWindow* window) {
     if (!device_res) {
         HC_UNREACHABLE("Windows should always refer to a valid device");
     }
-    auto device_ptr = device_res.ok();
-    device_ptr->destroy_swapchain(handle);
+
+    (*device_res)->destroy_swapchain(handle);
 
     window->handle = nullptr;
 }
 
 void hc_set_window_cursor_mode(HCWindow* window, HCCursorMode cursor_mode) {
     if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
 
@@ -608,8 +617,8 @@ void hc_set_window_cursor_mode(HCWindow* window, HCCursorMode cursor_mode) {
 }
 
 void hc_set_window_position_callback(HCWindow* window, HCWindowPositionCallback callback) {
-    if (!window->handle) {
-        HC_WARN("Null window handle");
+    if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
 
@@ -640,8 +649,8 @@ void hc_set_window_position_callback(HCWindow* window, HCWindowPositionCallback 
 }
 
 void hc_set_window_size_callback(HCWindow* window, HCWindowSizeCallback callback) {
-    if (!window->handle) {
-        HC_WARN("Null window handle");
+    if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
 
@@ -672,8 +681,8 @@ void hc_set_window_size_callback(HCWindow* window, HCWindowSizeCallback callback
 }
 
 void hc_set_window_close_callback(HCWindow* window, HCWindowCloseCallback callback) {
-    if (!window->handle) {
-        HC_WARN("Null window handle");
+    if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
 
@@ -704,8 +713,8 @@ void hc_set_window_close_callback(HCWindow* window, HCWindowCloseCallback callba
 }
 
 void hc_set_window_refresh_callback(HCWindow* window, HCWindowRefreshCallback callback) {
-    if (!window->handle) {
-        HC_WARN("Null window handle");
+    if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
 
@@ -736,8 +745,8 @@ void hc_set_window_refresh_callback(HCWindow* window, HCWindowRefreshCallback ca
 }
 
 void hc_set_window_focus_callback(HCWindow* window, HCWindowFocusCallback callback) {
-    if (!window->handle) {
-        HC_WARN("Null window handle");
+    if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
 
@@ -768,8 +777,8 @@ void hc_set_window_focus_callback(HCWindow* window, HCWindowFocusCallback callba
 }
 
 void hc_set_window_minimize_callback(HCWindow* window, HCWindowMinimizeCallback callback) {
-    if (!window->handle) {
-        HC_WARN("Null window handle");
+    if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
 
@@ -800,8 +809,8 @@ void hc_set_window_minimize_callback(HCWindow* window, HCWindowMinimizeCallback 
 }
 
 void hc_set_window_maximize_callback(HCWindow* window, HCWindowMaximizeCallback callback) {
-    if (!window->handle) {
-        HC_WARN("Null window handle");
+    if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
 
@@ -832,8 +841,8 @@ void hc_set_window_maximize_callback(HCWindow* window, HCWindowMaximizeCallback 
 }
 
 void hc_set_window_framebuffer_callback(HCWindow* window, HCWindowFramebufferCallback callback) {
-    if (!window->handle) {
-        HC_WARN("Null window handle");
+    if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
 
@@ -875,8 +884,8 @@ void hc_set_window_framebuffer_callback(HCWindow* window, HCWindowFramebufferCal
 }
 
 void hc_set_window_scale_callback(HCWindow* window, HCWindowScaleCallback callback) {
-    if (!window->handle) {
-        HC_WARN("Null window handle");
+    if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
 
@@ -907,8 +916,8 @@ void hc_set_window_scale_callback(HCWindow* window, HCWindowScaleCallback callba
 }
 
 void hc_set_window_mouse_button_callback(HCWindow* window, HCWindowMouseButtonCallback callback) {
-    if (!window->handle) {
-        HC_WARN("Null window handle");
+    if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
 
@@ -944,8 +953,8 @@ void hc_set_window_mouse_button_callback(HCWindow* window, HCWindowMouseButtonCa
 }
 
 void hc_set_window_cursor_position_callback(HCWindow* window, HCWindowCursorPositionCallback callback) {
-    if (!window->handle) {
-        HC_WARN("Null window handle");
+    if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
     auto* handle = static_cast<GLFWwindow*>(window->handle);
@@ -975,8 +984,8 @@ void hc_set_window_cursor_position_callback(HCWindow* window, HCWindowCursorPosi
 }
 
 void hc_set_window_cursor_enter_callback(HCWindow* window, HCWindowCursorEnterCallback callback) {
-    if (!window->handle) {
-        HC_WARN("Null window handle");
+    if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
 
@@ -1007,8 +1016,8 @@ void hc_set_window_cursor_enter_callback(HCWindow* window, HCWindowCursorEnterCa
 }
 
 void hc_set_window_scroll_callback(HCWindow* window, HCWindowScrollCallback callback) {
-    if (!window->handle) {
-        HC_WARN("Null window handle");
+    if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
 
@@ -1039,8 +1048,8 @@ void hc_set_window_scroll_callback(HCWindow* window, HCWindowScrollCallback call
 }
 
 void hc_set_window_key_callback(HCWindow* window, HCWindowKeyCallback callback) {
-    if (!window->handle) {
-        HC_WARN("Null window handle");
+    if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
 
@@ -1077,8 +1086,8 @@ void hc_set_window_key_callback(HCWindow* window, HCWindowKeyCallback callback) 
 }
 
 void hc_set_window_char_callback(HCWindow* window, HCWindowCharCallback callback) {
-    if (!window->handle) {
-        HC_WARN("Null window handle");
+    if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
 
@@ -1109,8 +1118,8 @@ void hc_set_window_char_callback(HCWindow* window, HCWindowCharCallback callback
 }
 
 void hc_set_window_char_mods_callback(HCWindow* window, HCWindowCharModsCallback callback) {
-    if (!window->handle) {
-        HC_WARN("Null window handle");
+    if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
 
@@ -1141,8 +1150,8 @@ void hc_set_window_char_mods_callback(HCWindow* window, HCWindowCharModsCallback
 }
 
 void hc_set_window_drop_callback(HCWindow* window, HCWindowDropCallback callback) {
-    if (!window->handle) {
-        HC_WARN("Null window handle");
+    if (!window || !window->handle) {
+        HC_WARN("Null window pointer or window handle");
         return;
     }
 

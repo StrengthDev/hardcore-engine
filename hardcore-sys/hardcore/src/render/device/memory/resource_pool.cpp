@@ -2,41 +2,27 @@
 
 #include "resource_pool.hpp"
 
+#include <render/util.hpp>
 #include <render/vars.hpp>
 
 namespace hc::render::device::memory {
-    Result<BufferPool, PoolResult> BufferPool::create(
+    std::expected<BufferPool, Error> BufferPool::create(
         const VolkDeviceTable& fn_table,
         VkDevice device,
         HeapManager& heap_manager,
         VkDeviceSize size,
         VkBufferUsageFlags usage
     ) {
-        VkDeviceMemory memory = VK_NULL_HANDLE;
-        VkBuffer buffer = VK_NULL_HANDLE;
-
-        HeapResult res = heap_manager.alloc_buffer(fn_table, device, memory, buffer, size, usage, Heap::Main);
-
-        switch (res) {
-        case HeapResult::Success:
-            // Nothing, keep going
-            break;
-        case HeapResult::OutOfHostMemory:
-            return Err(PoolResult::OutOfHostMemory);
-        case HeapResult::OutOfDeviceMemory:
-            return Err(PoolResult::OutOfDeviceMemory);
-        case HeapResult::UnsupportedHeap:
-            return Err(PoolResult::UnsupportedHeap);
-        // These are both ignored because a specific address is never requested, and no external handle is used
-        // case HeapResult::InvalidCapture:
-        // case HeapResult::InvalidHandle:
-        default: HC_UNREACHABLE("alloc_buffer should not return any other values here");
+        auto result = heap_manager.alloc_buffer(fn_table, device, size, usage, Heap::Main);
+        if (!result) {
+            return result.error();
         }
+        auto [memory, buffer] = *result;
 
         BufferPool pool = BufferPool(memory, size);
         pool.buffer = buffer;
 
-        return Ok(std::move(pool));
+        return std::move(pool);
     }
 
     void BufferPool::free(const VolkDeviceTable& fn_table, VkDevice device, HeapManager& heap_manager) noexcept {
@@ -47,57 +33,41 @@ namespace hc::render::device::memory {
         }
     }
 
-    Result<DynamicBufferPool, PoolResult> DynamicBufferPool::create(
+    std::expected<DynamicBufferPool, Error> DynamicBufferPool::create(
         const VolkDeviceTable& fn_table,
         VkDevice device,
         HeapManager& heap_manager,
         VkDeviceSize size,
         VkBufferUsageFlags usage
     ) {
-        VkDeviceMemory memory = VK_NULL_HANDLE;
-        VkBuffer buffer = VK_NULL_HANDLE;
-
         u8 max_frames_in_flight = render::max_frames_in_flight();
-        HeapResult res = heap_manager.alloc_buffer(
+        auto result = heap_manager.alloc_buffer(
             fn_table,
             device,
-            memory,
-            buffer,
             size * max_frames_in_flight,
             usage,
             Heap::Dynamic
         );
-
-        switch (res) {
-        case HeapResult::Success:
-            // Nothing, keep going
-            break;
-        case HeapResult::OutOfHostMemory:
-            return Err(PoolResult::OutOfHostMemory);
-        case HeapResult::OutOfDeviceMemory:
-            return Err(PoolResult::OutOfDeviceMemory);
-        case HeapResult::UnsupportedHeap:
-            return Err(PoolResult::UnsupportedHeap);
-        // These are both ignored because a specific address is never requested, and no external handle is used
-        // case HeapResult::InvalidCapture:
-        // case HeapResult::InvalidHandle:
-        default: HC_UNREACHABLE("alloc_buffer should not return any other values here");
+        if (!result) {
+            return result.error();
         }
+        auto [memory, buffer] = *result;
 
         DynamicBufferPool pool = DynamicBufferPool(memory, size);
         pool.buffer = buffer;
         pool.mapped_host_ptr = std::make_unique<void*>(nullptr);
 
-        return Ok(std::move(pool));
+        return std::move(pool);
     }
 
     DynamicBufferPool::~DynamicBufferPool() {
         HC_ASSERT(this->mapped_host_ptr == nullptr, "Memory not unmapped");
     }
 
-    PoolResult DynamicBufferPool::map(const VolkDeviceTable& fn_table, VkDevice device, u8 frame_mod) {
+    std::expected<void, Error> DynamicBufferPool::map(const VolkDeviceTable& fn_table, VkDevice device, u8 frame_mod) {
         HC_ASSERT(this->mapped_host_ptr == nullptr, "Memory already mapped");
-        VkResult res = fn_table.vkMapMemory(
+
+        VkResult result = fn_table.vkMapMemory(
             device,
             this->memory,
             this->total_capacity * frame_mod,
@@ -106,17 +76,12 @@ namespace hc::render::device::memory {
             this->mapped_host_ptr.get()
         );
 
-        switch (res) {
-        case VK_SUCCESS:
-            return PoolResult::Success;
-        case VK_ERROR_OUT_OF_HOST_MEMORY:
-            return PoolResult::OutOfHostMemory;
-        case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-            return PoolResult::OutOfDeviceMemory;
-        case VK_ERROR_MEMORY_MAP_FAILED:
-            return PoolResult::MapFailure;
-        default: HC_UNREACHABLE("vkMapMemory should not return any other VkResult values");
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to map buffer: " << to_str(result));
+            return Error(result);
         }
+
+        return {};
     }
 
     void DynamicBufferPool::unmap(const VolkDeviceTable& fn_table, VkDevice device) {
@@ -125,44 +90,28 @@ namespace hc::render::device::memory {
         this->mapped_host_ptr = nullptr;
     }
 
-    std::expected<TexturePool, PoolResult> TexturePool::create(
+    std::expected<TexturePool, Error> TexturePool::create(
         const VolkDeviceTable& fn_table,
         VkDevice device,
         HeapManager& heap_manager,
         VkDeviceSize size,
         u32 memory_type_bits
     ) {
-        VkDeviceMemory memory = VK_NULL_HANDLE;
-
-        auto res = heap_manager.alloc_texture_memory(fn_table, device, memory, size, Heap::Main, memory_type_bits);
-        if (!res) {
-            switch (res.error()) {
-            case HeapResult::Success:
-                // Nothing, keep going
-                break;
-            case HeapResult::OutOfHostMemory:
-                return std::unexpected(PoolResult::OutOfHostMemory);
-            case HeapResult::OutOfDeviceMemory:
-                return std::unexpected(PoolResult::OutOfDeviceMemory);
-            case HeapResult::UnsupportedHeap:
-                return std::unexpected(PoolResult::UnsupportedHeap);
-            // These are both ignored because a specific address is never requested, and no external handle is used
-            // case HeapResult::InvalidCapture:
-            // case HeapResult::InvalidHandle:
-            default: HC_UNREACHABLE("alloc_texture_memory should not return any other values here");
-            }
+        auto result = heap_manager.alloc_texture_memory(fn_table, device, size, Heap::Main, memory_type_bits);
+        if (!result) {
+            return result.error();
         }
 
-        return TexturePool(memory, size);
+        return TexturePool(*result, size);
     }
 
     void TexturePool::free(const VolkDeviceTable& fn_table, VkDevice device, HeapManager& heap_manager) noexcept {
-        if (this->memory != VK_NULL_HANDLE) {
+        if (this->memory.valid()) {
             this->free_memory(fn_table, device, heap_manager);
         }
     }
 
-    std::expected<PoolRange, PoolResult> TexturePool::allocate(
+    std::expected<PoolRange, Error> TexturePool::allocate(
         const VolkDeviceTable& fn_table,
         VkDevice device,
         VkImage image,
@@ -171,20 +120,15 @@ namespace hc::render::device::memory {
     ) {
         auto range_res = AllocationPool::allocate(size, alignment);
         if (!range_res) {
-            return std::unexpected(PoolResult::NotEnoughSpace);
+            return Error(HCError_CouldNotFitInPool);
         }
         PoolRange range = *range_res;
 
-        VkResult res = fn_table.vkBindImageMemory(device, image, this->memory, range.offset + range.padding);
-        if (res != VK_SUCCESS) {
+        VkResult result = fn_table.vkBindImageMemory(device, image, this->memory, range.offset + range.padding);
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to bind texture memory: " << to_str(result));
             this->free_allocation(range.offset);
-            switch (res) {
-            case VK_ERROR_OUT_OF_HOST_MEMORY:
-                return std::unexpected(PoolResult::OutOfHostMemory);
-            case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-                return std::unexpected(PoolResult::OutOfDeviceMemory);
-            default: HC_UNREACHABLE("vkBindImageMemory should not return any other values here");
-            }
+            return Error(result);
         }
 
         return range;

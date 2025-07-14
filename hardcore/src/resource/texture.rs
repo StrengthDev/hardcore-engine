@@ -13,8 +13,10 @@ pub use hardcore_sys::{
 
 #[derive(Error, Debug)]
 pub enum TextureError {
-    #[error("Failed to create new texture")]
-    Initialisation,
+    /// An error has occurred withing the system crate.
+    #[error(transparent)]
+    SystemError(#[from] hardcore_sys::Error),
+
     #[error("The specified texture format does not exist")]
     FormatDoesNotExist,
 }
@@ -127,19 +129,18 @@ impl Texture {
         mip_levels: u32,
         sample_count: TextureSampleCount,
     ) -> Result<Self, TextureError> {
-        let handle = unsafe {
+        let mut handle = Default::default();
+        unsafe {
             hardcore_sys::create_texture(
+                ptr::addr_of_mut!(handle),
                 device,
                 dimensions.into(),
                 format_id.0,
                 mip_levels,
                 sample_count,
             )
+            .into_std_result()?
         };
-
-        if handle.size == 0 {
-            return Err(TextureError::Initialisation);
-        }
 
         Ok(Texture { handle })
     }

@@ -1,18 +1,9 @@
 #pragma once
 
+#include <core/error.hpp>
 #include <util/number.hpp>
 
 namespace hc::render::texture {
-    enum class TextureError {
-        OutOfHostMemory,
-        OutOfDeviceMemory,
-        UnsupportedFormat,
-        TextureTooLarge,
-        Layered3D,
-        InvalidCube,
-        SampleCounts,
-    };
-
     /**
     * @brief The inner parameters of a texture.
     */
@@ -21,14 +12,14 @@ namespace hc::render::texture {
         Sz size; //!< The amount of usable memory occupied by this texture, in bytes.
     };
 
-    std::expected<VkImage, TextureError> create_image(
+    std::expected<VkImage, Error> create_image(
         VkPhysicalDevice physical_device,
         VolkDeviceTable const& fn_table,
         VkDevice device,
         VkImageCreateInfo const& image_info
     );
 
-    std::expected<VkImage, TextureError> create_image_view(
+    std::expected<VkImage, Error> create_image_view(
         VolkDeviceTable const& fn_table,
         VkDevice device,
         VkImage image,

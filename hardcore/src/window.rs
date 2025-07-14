@@ -14,7 +14,7 @@ use hardcore_sys::{
 };
 use std::ffi::{c_int, CString, NulError};
 use std::marker::PhantomData;
-use std::ptr::addr_of_mut;
+use std::ptr;
 use thiserror::Error;
 use tracing::error;
 
@@ -23,6 +23,10 @@ pub use hardcore_sys::CursorMode;
 /// An error related to a [`Window`].
 #[derive(Error, Debug)]
 pub enum WindowError {
+    /// An error has occurred withing the system crate.
+    #[error(transparent)]
+    SystemError(#[from] hardcore_sys::Error),
+
     /// An error has occurred while forwarding a call to GLFW
     #[error(transparent)]
     GLFWCall(#[from] GLFWCallError),
@@ -193,13 +197,14 @@ impl<'c> Window<'c> {
         };
 
         let handle = unsafe {
-            let mut handle = new_window(params);
+            let mut handle = Default::default();
+            new_window(ptr::addr_of_mut!(handle), params).into_std_result()?;
 
             if handle.handle.is_null() {
                 return Err(WindowError::Initialisation);
             }
 
-            let ptr = addr_of_mut!(handle);
+            let ptr = ptr::addr_of_mut!(handle);
             set_window_position_callback(ptr, Some(callback::position));
             set_window_size_callback(ptr, Some(callback::size));
             set_window_close_callback(ptr, Some(callback::close));
@@ -226,7 +231,7 @@ impl<'c> Window<'c> {
 
     fn destroy(mut handle: hardcore_sys::Window) {
         unsafe {
-            destroy_window(addr_of_mut!(handle));
+            destroy_window(ptr::addr_of_mut!(handle));
         }
     }
 
@@ -240,7 +245,7 @@ impl<'c> Window<'c> {
     /// Set the cursor mode for this window.
     pub fn set_cursor_mode(&mut self, cursor_mode: CursorMode) {
         let call = GLFWCall::SetCursorMode {
-            window: addr_of_mut!(self.handle),
+            window: ptr::addr_of_mut!(self.handle),
             cursor_mode,
         };
         if let Err(err) = call.submit() {

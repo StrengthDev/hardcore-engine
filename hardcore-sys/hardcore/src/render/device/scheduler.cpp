@@ -8,7 +8,7 @@
 #include "util/flow.hpp"
 
 namespace hc::render::device {
-    std::expected<CommandPool, SchedulerError> CommandPool::create(
+    std::expected<CommandPool, Error> CommandPool::create(
         const VolkDeviceTable& fn_table,
         VkDevice device,
         u32 queue_family
@@ -22,17 +22,10 @@ namespace hc::render::device {
             .queueFamilyIndex = queue_family,
         };
 
-        VkResult res = fn_table.vkCreateCommandPool(device, &pool_info, nullptr, &pool.handle.get());
-        if (res != VK_SUCCESS) {
-            switch (res) {
-            case VK_ERROR_OUT_OF_HOST_MEMORY:
-                HC_ERROR("Failed to allocate command pool, out of host memory");
-                return std::unexpected(SchedulerError::OutOfHostMemory);
-            case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-                HC_ERROR("Failed to allocate command pool, out of device memory");
-                return std::unexpected(SchedulerError::OutOfDeviceMemory);
-            default: HC_UNREACHABLE("vkCreateCommandPool shouldn't return any other result values");
-            }
+        VkResult result = fn_table.vkCreateCommandPool(device, &pool_info, nullptr, &pool.handle.get());
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to create command pool: " << to_str(result));
+            return Error(result);
         }
 
         VkCommandBufferAllocateInfo command_buffer_info = {
@@ -43,19 +36,11 @@ namespace hc::render::device {
             .commandBufferCount = 1,
         };
 
-        res = fn_table.vkAllocateCommandBuffers(device, &command_buffer_info, &pool.buffer.get());
-        if (res != VK_SUCCESS) {
+        result = fn_table.vkAllocateCommandBuffers(device, &command_buffer_info, &pool.buffer.get());
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to allocate command buffer: " << to_str(result));
             pool.destroy(fn_table, device);
-
-            switch (res) {
-            case VK_ERROR_OUT_OF_HOST_MEMORY:
-                HC_ERROR("Failed to allocate command buffer, out of host memory");
-                return std::unexpected(SchedulerError::OutOfHostMemory);
-            case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-                HC_ERROR("Failed to allocate command buffer, out of device memory");
-                return std::unexpected(SchedulerError::OutOfDeviceMemory);
-            default: HC_UNREACHABLE("vkAllocateCommandBuffers shouldn't return any other result values");
-            }
+            return Error(result);
         }
 
         VkFenceCreateInfo fence_info = {
@@ -64,19 +49,11 @@ namespace hc::render::device {
             .flags = VK_FENCE_CREATE_SIGNALED_BIT,
         };
 
-        res = fn_table.vkCreateFence(device, &fence_info, nullptr, &pool.fence.get());
-        if (res != VK_SUCCESS) {
+        result = fn_table.vkCreateFence(device, &fence_info, nullptr, &pool.fence.get());
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to create command pool fence: " << to_str(result));
             pool.destroy(fn_table, device);
-
-            switch (res) {
-            case VK_ERROR_OUT_OF_HOST_MEMORY:
-                HC_ERROR("Failed to allocate fence, out of host memory");
-                return std::unexpected(SchedulerError::OutOfHostMemory);
-            case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-                HC_ERROR("Failed to allocate fence, out of device memory");
-                return std::unexpected(SchedulerError::OutOfDeviceMemory);
-            default: HC_UNREACHABLE("vkCreateFence shouldn't return any other result values");
-            }
+            return Error(result);
         }
 
         VkSemaphoreCreateInfo semaphore_info = {
@@ -85,19 +62,11 @@ namespace hc::render::device {
             .flags = 0,
         };
 
-        res = fn_table.vkCreateSemaphore(device, &semaphore_info, nullptr, &pool.semaphore.get());
-        if (res != VK_SUCCESS) {
+        result = fn_table.vkCreateSemaphore(device, &semaphore_info, nullptr, &pool.semaphore.get());
+        if (result != VK_SUCCESS) {
+            HC_ERROR("Failed to create command pool semaphore: " << to_str(result));
             pool.destroy(fn_table, device);
-
-            switch (res) {
-            case VK_ERROR_OUT_OF_HOST_MEMORY:
-                HC_ERROR("Failed to allocate fence, out of host memory");
-                return std::unexpected(SchedulerError::OutOfHostMemory);
-            case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-                HC_ERROR("Failed to allocate fence, out of device memory");
-                return std::unexpected(SchedulerError::OutOfDeviceMemory);
-            default: HC_UNREACHABLE("vkCreateFence shouldn't return any other result values");
-            }
+            return Error(result);
         }
 
         return pool;
@@ -123,7 +92,7 @@ namespace hc::render::device {
         this->handle.destroy();
     }
 
-    std::expected<QueueSelection, SchedulerError> Scheduler::select_queues(VkPhysicalDevice physical_device) {
+    std::expected<QueueSelection, Error> Scheduler::select_queues(VkPhysicalDevice physical_device) {
         QueueSelection selection;
         selection.compute_family = std::numeric_limits<u32>::max();
         selection.transfer_family = std::numeric_limits<u32>::max();
@@ -197,7 +166,7 @@ namespace hc::render::device {
 
         if (selection.graphics_families.empty()) {
             HC_ERROR("No graphics queue families found");
-            return std::unexpected(SchedulerError::NoGraphicsQueueFound);
+            return Error(HCError_UnmetQueueRequirements);
         }
 
 #ifdef HC_LOGGING
@@ -214,20 +183,20 @@ namespace hc::render::device {
             HC_DEBUG("Selected compute queue family index: " << selection.compute_family);
         } else {
             HC_WARN("No compute queue family found");
-            return std::unexpected(SchedulerError::NoComputeQueueFound);
+            return Error(HCError_UnmetQueueRequirements);
         }
 
         if (selection.transfer_family != std::numeric_limits<u32>::max()) {
             HC_DEBUG("Selected transfer queue family index: " << selection.transfer_family);
         } else {
             HC_ERROR("No transfer queue family found");
-            return std::unexpected(SchedulerError::NoTransferQueueFound);
+            return Error(HCError_UnmetQueueRequirements);
         }
 
         return selection;
     }
 
-    std::expected<Scheduler, SchedulerError> Scheduler::create(
+    std::expected<Scheduler, Error> Scheduler::create(
         const VolkDeviceTable& fn_table,
         VkDevice device,
         QueueSelection const& selection,
@@ -336,16 +305,16 @@ namespace hc::render::device {
         return std::nullopt;
     }
 
-    std::expected<void, SchedulerError> Scheduler::reset_pools(
+    std::expected<void, Error> Scheduler::reset_pools(
         const VolkDeviceTable& fn_table,
         VkDevice device,
         u8 frame_mod
     ) {
         for (auto& queue : this->queues) {
-            VkResult res = fn_table.vkResetCommandPool(device, queue.pools[frame_mod].handle, 0);
+            VkResult result = fn_table.vkResetCommandPool(device, queue.pools[frame_mod].handle, 0);
 
-            if (res != VK_SUCCESS) {
-                return std::unexpected(SchedulerError::OutOfDeviceMemory);
+            if (result != VK_SUCCESS) {
+                return Error(result);
             }
         }
 

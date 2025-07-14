@@ -75,6 +75,7 @@ fn main() {
         })
         .rustified_enum("HCLogKind") // LogKind gets passed back through an extern function, so can't be non-exhaustive
         .parse_callbacks(Box::<StripPrefixCallback>::default())
+        .derive_default(true)
         .use_core()
         .generate()
         .expect("Unable to generate bindings");

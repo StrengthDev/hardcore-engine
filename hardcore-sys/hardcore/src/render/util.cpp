@@ -620,4 +620,10 @@ namespace hc::render {
         stream << '(' << extent.width << ", " << extent.height << ')';
         return stream.str();
     }
+
+    std::string to_str(const VkExtent3D& extent) {
+        std::stringstream stream;
+        stream << '(' << extent.width << ", " << extent.height << ", " << extent.depth << ')';
+        return stream.str();
+    }
 }

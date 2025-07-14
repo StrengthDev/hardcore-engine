@@ -3,6 +3,7 @@
 #include "texture.hpp"
 
 #include "render/renderer.hpp"
+#include "render/util.hpp"
 
 #include <render/texture.h>
 
@@ -282,7 +283,7 @@ namespace hc::render {
     };
 
     namespace texture {
-        std::expected<VkImage, TextureError> create_image(
+        std::expected<VkImage, Error> create_image(
             VkPhysicalDevice physical_device,
             VolkDeviceTable const& fn_table,
             VkDevice device,
@@ -293,9 +294,21 @@ namespace hc::render {
             HC_ASSERT(0 < image_info.extent.depth, "Texture depth must be greater than 0");
             HC_ASSERT(0 < image_info.arrayLayers, "Texture must have at least one layer");
             HC_ASSERT(0 < image_info.mipLevels, "Texture must have at least one mip level");
+            HC_ASSERT(
+                !(image_info.imageType == VK_IMAGE_TYPE_3D && image_info.arrayLayers != 1),
+                "3D textures must have exactly 1 layer"
+            );
+            HC_ASSERT(
+                !(image_info.flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT && image_info.arrayLayers < 6),
+                "Cube compatible textures must have at least 6 layers"
+            );
+            HC_ASSERT(
+                std::has_single_bit(std::bit_cast<u32>(image_info.samples)),
+                "Texture must have exactly 1 sample count bit set"
+            );
 
             VkImageFormatProperties format_properties = {};
-            VkResult res = vkGetPhysicalDeviceImageFormatProperties(
+            VkResult result = vkGetPhysicalDeviceImageFormatProperties(
                 physical_device,
                 image_info.format,
                 image_info.imageType,
@@ -304,60 +317,35 @@ namespace hc::render {
                 image_info.flags,
                 &format_properties
             );
-            if (res != VK_SUCCESS) {
-                HC_ERROR("Failed to retrieve device limits for image format");
-                switch (res) {
-                case VK_ERROR_OUT_OF_HOST_MEMORY:
-                    return std::unexpected(TextureError::OutOfHostMemory);
-                case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-                    return std::unexpected(TextureError::OutOfDeviceMemory);
-                case VK_ERROR_FORMAT_NOT_SUPPORTED:
-                    return std::unexpected(TextureError::UnsupportedFormat);
-                default: HC_UNREACHABLE(
-                        "vkGetPhysicalDeviceImageFormatProperties should not return any other error values"
-                    );
-                }
+            if (result != VK_SUCCESS) {
+                HC_ERROR("Failed to retrieve device limits for image format: " << to_str(result));
+                return Error(result);
             }
 
             if (format_properties.maxExtent.width < image_info.extent.width
                 || format_properties.maxExtent.height < image_info.extent.height
                 || format_properties.maxExtent.depth < image_info.extent.depth) {
                 HC_ERROR(
-                    "Texture dimensions are too large, max extent is (" << format_properties.maxExtent.width << ", " <<
-                    format_properties.maxExtent.height << ", " << format_properties.maxExtent.depth << ')'
+                    "Texture dimensions are too large, max extent for " << to_str(image_info.format) << " is "
+                    << to_str(format_properties.maxExtent)
                 );
-                return std::unexpected(TextureError::TextureTooLarge);
+                return Error(HCError_TextureParamsNotSupported);
             }
 
             if (format_properties.maxMipLevels < image_info.mipLevels) {
                 HC_ERROR(
-                    "Texture has too many mip levels, max mip level count for the used format is "
+                    "Texture has too many mip levels, max mip level count for " << to_str(image_info.format) << " is "
                     << format_properties.maxMipLevels
                 );
-                return std::unexpected(TextureError::TextureTooLarge);
+                return Error(HCError_TextureParamsNotSupported);
             }
 
             if (format_properties.maxArrayLayers < image_info.arrayLayers) {
                 HC_ERROR(
-                    "Texture array has too many layers, max layer count for the used format is "
+                    "Texture array has too many layers, max layer count for " << to_str(image_info.format) << " is "
                     << format_properties.maxArrayLayers
                 );
-                return std::unexpected(TextureError::TextureTooLarge);
-            }
-
-            if (image_info.imageType == VK_IMAGE_TYPE_3D && image_info.arrayLayers != 1) {
-                HC_ERROR("3D texture arrays are not supported, layer count must be 1 for 3D textures");
-                return std::unexpected(TextureError::Layered3D);
-            }
-
-            if (image_info.flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT && image_info.arrayLayers < 6) {
-                HC_ERROR("Cube compatible textures must have at least 6 layers");
-                return std::unexpected(TextureError::InvalidCube);
-            }
-
-            if (!std::has_single_bit(std::bit_cast<u32>(image_info.samples))) {
-                HC_ERROR("Texture must exactly 1 sample count bit set");
-                return std::unexpected(TextureError::SampleCounts);
+                return Error(HCError_TextureParamsNotSupported);
             }
 
             if (!(format_properties.sampleCounts & image_info.samples)) {
@@ -370,31 +358,28 @@ namespace hc::render {
                     }
                 }
                 HC_ERROR(
-                    "Texture has an unsupported sample count for the used format, supported sample counts are: "
-                    << available_sample_counts.str()
+                    "Texture has an unsupported sample count for " << to_str(image_info.format)
+                    << ", supported sample counts are: " << available_sample_counts.str()
                 );
-                return std::unexpected(TextureError::SampleCounts);
+                return Error(HCError_TextureParamsNotSupported);
             }
 
             VkImage image;
-            res = fn_table.vkCreateImage(device, &image_info, nullptr, &image);
-            if (res != VK_SUCCESS) {
-                HC_ERROR("Failed to create image");
-                switch (res) {
-                case VK_ERROR_OUT_OF_HOST_MEMORY:
-                    return std::unexpected(TextureError::OutOfHostMemory);
-                case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-                    return std::unexpected(TextureError::OutOfDeviceMemory);
-                // case VK_ERROR_COMPRESSION_EXHAUSTED_EXT:
-                // case VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS_KHR:
-                default: HC_UNREACHABLE("vkCreateImage should not return any other error values");
-                }
+            result = fn_table.vkCreateImage(device, &image_info, nullptr, &image);
+            if (result != VK_SUCCESS) {
+                HC_ERROR("Failed to create image: " << to_str(result));
+                return Error(result);
             }
 
             return image;
         }
 
-        std::expected<VkImage, TextureError> create_image_view(VolkDeviceTable const& fn_table, VkDevice device, VkImage image, VkImageCreateInfo image_info) {
+        std::expected<VkImage, Error> create_image_view(
+            VolkDeviceTable const& fn_table,
+            VkDevice device,
+            VkImage image,
+            VkImageCreateInfo image_info
+        ) {
             // TODO
             VkImageView image_view;
 
@@ -446,20 +431,13 @@ namespace hc::render {
             default: HC_UNREACHABLE("Invalid image type");
             }
 
-            VkResult res = fn_table.vkCreateImageView(device, &view_info, nullptr, &image_view);
-            if (res != VK_SUCCESS) {
+            VkResult result = fn_table.vkCreateImageView(device, &view_info, nullptr, &image_view);
+            if (result != VK_SUCCESS) {
                 HC_ERROR("Failed to create image view");
-                switch (res) {
-                case VK_ERROR_OUT_OF_HOST_MEMORY:
-                    return std::unexpected(TextureError::OutOfHostMemory);
-                case VK_ERROR_OUT_OF_DEVICE_MEMORY:
-                    return std::unexpected(TextureError::OutOfDeviceMemory);
-                // case VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS_KHR:
-                default: HC_UNREACHABLE("vkCreateImageView should not return any other error values");
-                }
+                return Error(result);
             }
 
-            return std::unexpected(TextureError::OutOfHostMemory);
+            return Error(HCError_OutOfDeviceMemory);
         }
     }
 }
@@ -489,13 +467,19 @@ HCTextureFormatID hc_texture_format_id_compressed(
     return std::bit_cast<HCTextureFormatID>(format->second);
 }
 
-struct HCTexture hc_create_texture(
+HCResult hc_create_texture(
+    HCTexture* texture,
     u32 device,
     HCTextureDimensions dims,
     HCTextureFormatID format,
     u32 mip_levels,
     HCTextureSampleCount sample_count
 ) {
+    if (!texture) {
+        HC_ERROR("Null texture pointer");
+        return {.error = HCError_InvalidParams, .success = false};
+    }
+
     VkImageCreateInfo image_info = {};
     image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     image_info.pNext = nullptr;
@@ -505,12 +489,12 @@ struct HCTexture hc_create_texture(
     case HCTextureType_Texture1D:
         if (dims.dims.dims1D.width < 1) {
             HC_ERROR("Texture width must be greater than 0");
-            return hc::render::INVALID_TEXTURE;
+            return {.error = HCError_InvalidParams, .success = false};
         }
 
         if (dims.dims.dims1D.layers < 1) {
             HC_ERROR("Texture must have at least 1 layer");
-            return hc::render::INVALID_TEXTURE;
+            return {.error = HCError_InvalidParams, .success = false};
         }
         image_info.imageType = VK_IMAGE_TYPE_1D;
         image_info.extent = {dims.dims.dims1D.width, 1, 1};
@@ -519,17 +503,17 @@ struct HCTexture hc_create_texture(
     case HCTextureType_Texture2D:
         if (dims.dims.dims2D.width < 1) {
             HC_ERROR("Texture width must be greater than 0");
-            return hc::render::INVALID_TEXTURE;
+            return {.error = HCError_InvalidParams, .success = false};
         }
 
         if (dims.dims.dims2D.height < 1) {
             HC_ERROR("Texture height must be greater than 0");
-            return hc::render::INVALID_TEXTURE;
+            return {.error = HCError_InvalidParams, .success = false};
         }
 
         if (dims.dims.dims2D.layers < 1) {
             HC_ERROR("Texture must have at least 1 layer");
-            return hc::render::INVALID_TEXTURE;
+            return {.error = HCError_InvalidParams, .success = false};
         }
 
         image_info.imageType = VK_IMAGE_TYPE_2D;
@@ -539,17 +523,17 @@ struct HCTexture hc_create_texture(
     case HCTextureType_Texture3D:
         if (dims.dims.dims3D.width < 1) {
             HC_ERROR("Texture width must be greater than 0");
-            return hc::render::INVALID_TEXTURE;
+            return {.error = HCError_InvalidParams, .success = false};
         }
 
         if (dims.dims.dims3D.height < 1) {
             HC_ERROR("Texture height must be greater than 0");
-            return hc::render::INVALID_TEXTURE;
+            return {.error = HCError_InvalidParams, .success = false};
         }
 
         if (dims.dims.dims3D.depth < 1) {
             HC_ERROR("Texture depth must be greater than 0");
-            return hc::render::INVALID_TEXTURE;
+            return {.error = HCError_InvalidParams, .success = false};
         }
 
         image_info.imageType = VK_IMAGE_TYPE_3D;
@@ -558,14 +542,14 @@ struct HCTexture hc_create_texture(
         break;
     default:
         HC_ERROR("Invalid texture type");
-        return hc::render::INVALID_TEXTURE;
+        return {.error = HCError_InvalidParams, .success = false};
     }
 
     image_info.format = std::bit_cast<VkFormat>(format);
 
     if (mip_levels < 1) {
         HC_ERROR("Texture must have at least one mip level");
-        return hc::render::INVALID_TEXTURE;
+        return {.error = HCError_InvalidParams, .success = false};
     }
 
     image_info.mipLevels = mip_levels;
@@ -576,7 +560,7 @@ struct HCTexture hc_create_texture(
             "Multiple samples are only supported for 2D textures with a single mip level, and are incompatible with "
             "cube textures"
         );
-        return hc::render::INVALID_TEXTURE;
+        return {.error = HCError_InvalidParams, .success = false};
     }
 
     switch (sample_count) {
@@ -603,7 +587,7 @@ struct HCTexture hc_create_texture(
         break;
     default:
         HC_ERROR("Invalid sample count");
-        return hc::render::INVALID_TEXTURE;
+        return {.error = HCError_InvalidParams, .success = false};
     }
 
     image_info.tiling = VK_IMAGE_TILING_OPTIMAL;
@@ -613,23 +597,27 @@ struct HCTexture hc_create_texture(
     image_info.pQueueFamilyIndices = nullptr;
     image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-    auto device_res = hc::render::device_at(device);
-    if (!device_res) {
-        return hc::render::INVALID_TEXTURE;
+    auto device_result = hc::render::device_at(device);
+    if (!device_result) {
+        return device_result.error();
     }
-    auto device_ptr = device_res.ok();
 
-    auto texture_res = device_ptr->create_texture(image_info);
-    if (!texture_res) {
-        return hc::render::INVALID_TEXTURE;
+    auto texture_result = (*device_result)->create_texture(image_info);
+    if (!texture_result) {
+        return texture_result.error();
     }
-    auto params = *texture_res;
+    auto params = *texture_result;
 
-    return {params.id, params.size, device};
+    texture->id = params.id;
+    texture->size = params.size;
+    texture->device = device;
+
+    return {.success = true};
 }
 
 void hc_destroy_texture(HCTexture* texture) {
     if (!texture) {
+        HC_WARN("Null texture pointer");
         return;
     }
 
@@ -643,8 +631,7 @@ void hc_destroy_texture(HCTexture* texture) {
     if (!device_res) {
         return;
     }
-    auto device_ptr = device_res.ok();
 
-    device_ptr->destroy_texture(texture->id);
+    (*device_res)->destroy_texture(texture->id);
     *texture = hc::render::INVALID_TEXTURE;
 }

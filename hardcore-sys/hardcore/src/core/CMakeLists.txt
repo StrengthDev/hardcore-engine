@@ -1,7 +1,8 @@
 
 target_sources(${PROJECT_NAME}
-    PRIVATE
+        PRIVATE
         core.cpp
+        error.cpp
         log.cpp
         window.cpp
 )

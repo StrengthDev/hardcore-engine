@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/core.h"
+#include "core/result.h"
 #include "core/version.h"
 #include "core/window.h"
 #include "render/renderer.h"

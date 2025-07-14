@@ -3,30 +3,18 @@
 #include "device/device.hpp"
 
 #include <core/core.h>
+#include <core/error.hpp>
 #include <util/number.hpp>
 #include <render/renderer.h>
 
 namespace hc::render {
-    enum class InstanceResult : u32 {
-        Success = 0,
-        VolkError,
-        VulkanInstanceError,
-        DebugCallbackError,
-        DeviceError,
-        NoDevicesFound,
-        SurfaceFailure,
-        Uninitialised,
-        OutOfBounds,
-        Unimplemented,
-    };
+    [[nodiscard]] std::expected<void, Error> init(const HCApplicationDescriptor& app, const HCRenderParams& params);
 
-    InstanceResult init(const HCApplicationDescriptor& app, const HCRenderParams& params);
+    void term();
 
-    InstanceResult term();
+    [[nodiscard]] VkInstance vk_instance();
 
-    VkInstance vk_instance();
+    [[nodiscard]] std::vector<device::Device>& device_list() noexcept;
 
-    std::vector<device::Device>& device_list() noexcept;
-
-    Result<device::Device*, InstanceResult> device_at(u32 id) noexcept;
+    [[nodiscard]] std::expected<device::Device*, Error> device_at(u32 id) noexcept;
 }
