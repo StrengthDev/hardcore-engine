@@ -9,29 +9,19 @@ extern "C" {
 #include <stdint.h>
 
 /**
- * @brief The basic data type of a descriptor's field.
+ * @brief Primitive data types.
  */
 enum HCPrimitive {
-    HCPrimitive_U8, //!< An unsigned 8-bit integer.
-    HCPrimitive_U16, //!< An unsigned 16-bit integer.
-    HCPrimitive_U32, //!< An unsigned 32-bit integer.
-    HCPrimitive_U64, //!< An unsigned 64-bit integer.
-    HCPrimitive_I8, //!< An 8-bit integer.
-    HCPrimitive_I16, //!< A 16-bit integer.
-    HCPrimitive_I32, //!< A 32-bit integer.
-    HCPrimitive_I64, //!< A 64-bit integer.
-    HCPrimitive_F32, //!< A 32-bit floating point number.
-    HCPrimitive_F64, //!< A 64-bit floating point number.
-    HCPrimitive_B32, //!< A 32-bit boolean value.
+    HCPrimitive_Integer, //!< A signed integer value.
+    HCPrimitive_Unsigned, //!< An unsigned value.
+    HCPrimitive_Boolean, //!< A boolean value.
+    HCPrimitive_Float, //!< A floating-point value.
 };
 
 /**
- * @brief The composition of a descriptor's field.
+ * @brief Data type compositions.
  *
- * ### Note on matrices
- *
- * The matrix layout used here matches the one used in GLSL, that is, a MatNxM matrix has N columns and M rows,
- * which is backwards from convention in mathematics.
+ * Matrices are described in a row-major layout (rows x columns).
  */
 enum HCComposition {
     HCComposition_Scalar, //!< A singular value.

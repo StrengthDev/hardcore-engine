@@ -50,7 +50,7 @@ HCResult hc_new_buffer(
 
     auto buffer_result = (*device_result)->new_buffer(
         kind,
-        hc::render::resource::Descriptor(*descriptor),
+        hc::render::Descriptor(*descriptor),
         count,
         writable
     );
@@ -73,10 +73,10 @@ HCResult hc_new_index_buffer(HCBuffer* buffer, u32 device, HCPrimitive index_typ
         return {.error = HCError_InvalidParams, .success = false};
     }
 
-    if (index_type != HCPrimitive_U8 && index_type != HCPrimitive_U16 && index_type != HCPrimitive_U32) {
-        HC_ERROR("Invalid index type");
-        return {.error = HCError_InvalidParams, .success = false};
-    }
+    // if (index_type != HCPrimitive_U8 && index_type != HCPrimitive_U16 && index_type != HCPrimitive_U32) {
+    //     HC_ERROR("Invalid index type");
+    //     return {.error = HCError_InvalidParams, .success = false};
+    // } TODO
 
     if (!count) {
         HC_ERROR("Invalid element count");
@@ -164,7 +164,7 @@ HCResult hc_new_dynamic_buffer(
 
     auto buffer_result = (*device_result)->new_dynamic_buffer(
         kind,
-        hc::render::resource::Descriptor(*descriptor),
+        hc::render::Descriptor(*descriptor),
         count,
         writable,
         frame_mod
@@ -196,10 +196,10 @@ HCResult hc_new_dynamic_index_buffer(
         return {.error = HCError_InvalidParams, .success = false};
     }
 
-    if (index_type != HCPrimitive_U8 && index_type != HCPrimitive_U16 && index_type != HCPrimitive_U32) {
-        HC_ERROR("Invalid index type");
-        return {.error = HCError_InvalidParams, .success = false};
-    }
+    // if (index_type != HCPrimitive_U8 && index_type != HCPrimitive_U16 && index_type != HCPrimitive_U32) {
+    //     HC_ERROR("Invalid index type");
+    //     return {.error = HCError_InvalidParams, .success = false};
+    // } TODO
 
     if (!count) {
         HC_ERROR("Invalid element count");

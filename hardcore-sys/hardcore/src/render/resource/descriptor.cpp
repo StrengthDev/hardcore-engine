@@ -6,24 +6,24 @@
 #include <render/descriptor.h>
 #include <util/number.hpp>
 
-static Sz size_of(HCPrimitive primitive) {
-    switch (primitive) {
-    case HCPrimitive_U8:
-    case HCPrimitive_I8:
-        return 1;
-    case HCPrimitive_U16:
-    case HCPrimitive_I16:
-        return 2;
-    case HCPrimitive_U32:
-    case HCPrimitive_I32:
-    case HCPrimitive_F32:
-    case HCPrimitive_B32:
-        return 4;
-    case HCPrimitive_U64:
-    case HCPrimitive_I64:
-    case HCPrimitive_F64:
-        return 8;
-    }
+static Sz size_of(HCPrimitive) {
+    // switch (primitive) {
+    // case HCPrimitive_U8:
+    // case HCPrimitive_I8:
+    //     return 1;
+    // case HCPrimitive_U16:
+    // case HCPrimitive_I16:
+    //     return 2;
+    // case HCPrimitive_U32:
+    // case HCPrimitive_I32:
+    // case HCPrimitive_F32:
+    // case HCPrimitive_B32:
+    //     return 4;
+    // case HCPrimitive_U64:
+    // case HCPrimitive_I64:
+    // case HCPrimitive_F64:
+    //     return 8;
+    // }
 
     return 0;
 }
@@ -115,7 +115,7 @@ Sz hc_descriptor_size(const HCDescriptor* descriptor) {
     return size_of(descriptor->fields, descriptor->field_count);
 }
 
-namespace hc::render::resource {
+namespace hc::render {
     Sz size_of(HCPrimitive primitive) {
         return ::size_of(primitive);
     }

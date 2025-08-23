@@ -70,12 +70,12 @@ impl<'c> Layer<'c> for FractalLayer<'c> {
 
         if self.action_signal {
             if self.obj.is_none() {
-                let desc = hardcore::descriptor![float];
-                let _ = self.obj.insert(
-                    context.devices[0]
-                        .create_vertex_buffer(self, &desc, NonZeroU64::new(1000).unwrap())
-                        .expect("Failed to allocate vertex buffer"),
-                );
+                // let desc = hardcore::descriptor![float];
+                // let _ = self.obj.insert(
+                //     context.devices[0]
+                //         .create_vertex_buffer(self, &desc, NonZeroU64::new(1000).unwrap())
+                //         .expect("Failed to allocate vertex buffer"),
+                // );
             } else {
                 self.obj.take();
             }

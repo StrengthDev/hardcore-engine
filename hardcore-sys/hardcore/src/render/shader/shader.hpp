@@ -1,6 +1,6 @@
 #pragma once
 
-#include "descriptor_binding.hpp"
+#include "../resource/descriptor.hpp"
 
 #include <render/shader.h>
 
@@ -11,11 +11,6 @@
 #include <vector>
 
 namespace hc::render {
-    enum class ShaderResult : u8 {
-        Success = 0,
-        FailedReflection,
-    };
-
     class Shader {
     public:
         Shader(const Shader&) = delete;
@@ -26,6 +21,7 @@ namespace hc::render {
 
         Shader& operator=(Shader&&) = default;
 
+        [[nodiscard]]
         static std::expected<Shader, Error> create(std::vector<u32>&& bytecode, HCShaderStage stage);
 
     private:

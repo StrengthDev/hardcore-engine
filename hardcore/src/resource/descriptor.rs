@@ -18,17 +18,18 @@ impl seal::Seal for Primitive {}
 
 impl PrimitiveExt for Primitive {
     fn size(&self) -> usize {
-        match self {
-            Primitive::U8 | Primitive::I8 => 1,
-            Primitive::U16 | Primitive::I16 => 2,
-            Primitive::U32 | Primitive::I32 | Primitive::F32 | Primitive::B32 => 4,
-            Primitive::U64 | Primitive::I64 | Primitive::F64 => 8,
-            _ => 0,
-        }
+        // match self {
+        //     Primitive::U8 | Primitive::I8 => 1,
+        //     Primitive::U16 | Primitive::I16 => 2,
+        //     Primitive::U32 | Primitive::I32 | Primitive::F32 | Primitive::B32 => 4,
+        //     Primitive::U64 | Primitive::I64 | Primitive::F64 => 8,
+        //     _ => 0,
+        // }
+        0
     }
 
     fn is_valid_index(&self) -> bool {
-        matches!(self, Primitive::U8 | Primitive::U16 | Primitive::U32)
+        *self == Primitive::Unsigned
     }
 }
 

@@ -143,6 +143,10 @@ pub enum CoreError {
     #[error(transparent)]
     TokioJoin(#[from] tokio::task::JoinError),
 
+    /// Failed to send event.
+    #[error(transparent)]
+    TokioSend(#[from] tokio::sync::mpsc::error::SendError<Event>),
+
     /// Failed to create tokio runtime.
     #[error(transparent)]
     IO(#[from] std::io::Error),
@@ -366,10 +370,7 @@ fn core_run(initialize: fn(context: &mut Context)) -> Result<(), CoreError> {
 pub(crate) fn emit_event(event: Event) -> Result<(), CoreError> {
     let guard = EVENT_TX.read();
     if let Some(tx) = guard.as_ref() {
-        tx.send(event).map_err(|e| {
-            error!("Failed to send on event channel ({e})");
-            CoreError::Uninitialised
-        })?;
+        tx.send(event)?;
         Ok(())
     } else {
         Err(CoreError::Uninitialised)

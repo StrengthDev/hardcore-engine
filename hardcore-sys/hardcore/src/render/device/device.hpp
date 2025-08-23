@@ -47,7 +47,7 @@ namespace hc::render::device {
 
         [[nodiscard]] std::expected<buffer::Params, Error> new_buffer(
             HCBufferKind kind,
-            resource::Descriptor&& descriptor,
+            Descriptor&& descriptor,
             u64 count,
             bool writable
         );
@@ -60,7 +60,7 @@ namespace hc::render::device {
 
         [[nodiscard]] std::expected<buffer::DynamicParams, Error> new_dynamic_buffer(
             HCBufferKind kind,
-            resource::Descriptor&& descriptor,
+            Descriptor&& descriptor,
             u64 count,
             bool writable,
             u8 frame_mod

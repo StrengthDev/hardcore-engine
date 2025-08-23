@@ -330,7 +330,7 @@ namespace hc::render::device {
 
     std::expected<buffer::Params, Error> Device::new_buffer(
         HCBufferKind kind,
-        resource::Descriptor&& descriptor,
+        Descriptor&& descriptor,
         u64 count,
         bool writable
     ) {
@@ -377,7 +377,7 @@ namespace hc::render::device {
         if (writable)
             flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 
-        auto alloc_result = this->memory.alloc(this->fn_table, this->handle, flags, resource::size_of(index_type));
+        auto alloc_result = this->memory.alloc(this->fn_table, this->handle, flags, size_of(index_type));
         if (!alloc_result) {
             return alloc_result.error();
         }
@@ -393,7 +393,7 @@ namespace hc::render::device {
 
     std::expected<buffer::DynamicParams, Error> Device::new_dynamic_buffer(
         HCBufferKind kind,
-        resource::Descriptor&& descriptor,
+        Descriptor&& descriptor,
         u64 count,
         bool writable,
         u8 frame_mod
@@ -459,7 +459,7 @@ namespace hc::render::device {
             this->fn_table,
             this->handle,
             flags,
-            resource::size_of(index_type),
+            size_of(index_type),
             frame_mod
         );
         if (!alloc_result) {

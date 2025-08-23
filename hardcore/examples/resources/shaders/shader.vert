@@ -2,7 +2,7 @@
 
 layout (location = 0) in vec3 inPosition;
 
-layout (std140, set = 0, binding = 0) uniform param_struct
+layout (set = 0, binding = 0) uniform param_struct
 {
     vec4 space; //offset x/y, scale, aspect_ratio
     int test0;

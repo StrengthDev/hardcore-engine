@@ -151,7 +151,8 @@ namespace hc::render::device {
             }
 
             HC_TRACE(
-                "Queue family " << family << " properties: Count: " << selection.family_properties[family].queueCount << "\tFlags: "
+                "Queue family " << family << " properties: Count: " << std::setw(3)
+                << selection.family_properties[family].queueCount << " Flags: "
                 << (selection.family_properties[family].queueFlags & VK_QUEUE_GRAPHICS_BIT ? "GRAPHICS | " : "")
                 << (selection.family_properties[family].queueFlags & VK_QUEUE_COMPUTE_BIT ? "COMPUTE | " : "")
                 << (selection.family_properties[family].queueFlags & VK_QUEUE_TRANSFER_BIT ? "TRANSFER | " : "")
