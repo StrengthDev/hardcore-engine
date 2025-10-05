@@ -2,7 +2,7 @@
 
 use std::fmt::{Debug, Formatter};
 
-pub use hardcore_sys::{ButtonAction, MouseButton, KeyboardKey};
+pub use hardcore_sys::{ButtonAction, KeyboardKey, MouseButton};
 
 /// The modifiers of a button input.
 #[derive(Eq, PartialEq, Copy, Clone)]
@@ -18,7 +18,7 @@ impl Modifiers {
     }
 
     fn check_flag(&self, flag: i32) -> bool {
-        (self.flags & flag).is_positive()
+        (self.flags & flag) != 0
     }
 
     /// Return true if one or more Shift keys were held down.

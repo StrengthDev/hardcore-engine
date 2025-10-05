@@ -4,12 +4,6 @@ use std::rc::Rc;
 
 /// Global context information to be passed to a layer during execution.
 pub struct Context<'l> {
-    pub(super) running: bool,
-
-    pub(super) pushed_layers: Vec<Box<dyn Layer<'l> + 'l>>,
-
-    pub(super) layer_pop_count: usize,
-
     /// The current number of layers in the global context.
     pub layer_count: usize,
 
@@ -26,20 +20,29 @@ pub struct Context<'l> {
 
     /// The list of devices available for use.
     pub devices: Rc<Vec<Device>>,
+
+    pub(super) running: bool,
+
+    pub(super) pushed_layers: Vec<Box<dyn Layer<'l> + 'l>>,
+
+    pub(super) layer_pop_count: usize,
 }
 
 impl<'l> Context<'l> {
-    pub(super) fn create(device_count: u32) -> Self {
-        let devices: Vec<_> = (0..device_count).map(Device::new).collect();
+    pub(super) fn create(device_count: u32, io_caller: crate::io::Caller) -> Self {
+        let devices: Vec<_> = (0..device_count)
+            .map(move |id| Device::new(id, io_caller.clone()))
+            .collect();
+
         Self {
-            running: false,
-            pushed_layers: vec![],
-            layer_pop_count: 0,
             layer_count: 0,
             current_layer_idx: 0,
             frame: 0,
             delta_time: 0.0,
             devices: Rc::new(devices),
+            running: false,
+            pushed_layers: vec![],
+            layer_pop_count: 0,
         }
     }
 

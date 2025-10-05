@@ -4,11 +4,12 @@ use std::num::NonZeroU64;
 
 pub struct Device {
     id: u32,
+    io_caller: crate::io::Caller,
 }
 
 impl Device {
-    pub(crate) fn new(id: u32) -> Self {
-        Self { id }
+    pub(crate) fn new(id: u32, io_caller: crate::io::Caller) -> Self {
+        Self { id, io_caller }
     }
 
     pub fn count() -> u32 {
@@ -27,25 +28,33 @@ impl Device {
         c_str.to_str().unwrap_or("UNREADABLE_DEVICE_NAME")
     }
     /// Instantiate a new window.
-    pub fn create_window<'c>(
+    pub fn create_window<'l>(
         &self,
-        #[allow(unused_variables)] layer: &dyn Layer<'c>,
+        #[allow(unused_variables)] layer: &dyn Layer<'l>,
         width: u32,
         height: u32,
         pos_x: Option<i32>,
         pos_y: Option<i32>,
         name: &str,
-    ) -> Result<crate::window::Window<'c>, crate::window::WindowError> {
-        crate::window::Window::create(self.id, width, height, pos_x, pos_y, name)
+    ) -> Result<crate::io::window::Window<'l>, crate::io::window::WindowError> {
+        crate::io::window::Window::create(
+            self.io_caller.clone(),
+            self.id,
+            width,
+            height,
+            pos_x,
+            pos_y,
+            name,
+        )
     }
 
-    pub fn create_vertex_buffer<'c>(
+    pub fn create_vertex_buffer<'l>(
         &self,
-        #[allow(unused_variables)] layer: &dyn Layer<'c>,
+        #[allow(unused_variables)] layer: &dyn Layer<'l>,
         descriptor: &crate::resource::descriptor::Descriptor,
         count: NonZeroU64,
-    ) -> Result<crate::resource::VertexBuffer<'c, false>, crate::resource::buffer::BufferError>
+    ) -> Result<crate::resource::VertexBuffer<'l, false>, crate::resource::buffer::BufferError>
     {
-        crate::resource::VertexBuffer::<'c, false>::create(self.id, descriptor, count)
+        crate::resource::VertexBuffer::<'l, false>::create(self.id, descriptor, count)
     }
 }

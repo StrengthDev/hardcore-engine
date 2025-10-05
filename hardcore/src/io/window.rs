@@ -2,7 +2,6 @@
 
 // TODO add example
 
-use crate::{Version, GLFW_CALL_TX};
 use hardcore_sys::{
     destroy_window, new_window, set_window_char_callback, set_window_char_mods_callback,
     set_window_close_callback, set_window_cursor_enter_callback,
@@ -18,6 +17,7 @@ use std::ptr;
 use thiserror::Error;
 use tracing::error;
 
+use crate::io::{Call, CallError};
 pub use hardcore_sys::CursorMode;
 
 /// An error related to a [`Window`].
@@ -27,9 +27,9 @@ pub enum WindowError {
     #[error(transparent)]
     SystemError(#[from] hardcore_sys::Error),
 
-    /// An error has occurred while forwarding a call to GLFW
+    /// An error has occurred while forwarding a call to the main thread
     #[error(transparent)]
-    GLFWCall(#[from] GLFWCallError),
+    Call(#[from] CallError),
 
     /// Failed to initialise window, this may indicate that the context has not been initialised yet.
     #[error("failed to create a new window")]
@@ -38,25 +38,10 @@ pub enum WindowError {
     /// Could turn provided string slice into a valid [`CString`].
     #[error("could turn provided string slice into a valid C string")]
     InvalidName(#[from] NulError),
-}
 
-#[derive(Error, Debug)]
-pub enum GLFWCallError {
-    /// The engine context has not been initialised yet.
-    #[error("the engine context has not been initialised yet")]
-    Context,
-
-    /// Failed to send call data to main thread.
-    #[error("failed to send call data to main thread")]
-    SendToMain,
-
-    /// Failed to receive call results from main thread.
-    #[error("failed to receive call results from main thread")]
-    ReceiveFromMain,
-
-    /// Failed to send call results to the thread that submitted the call.
-    #[error("failed to send call results to the thread that submitted the call")]
-    SendToCaller,
+    /// Failed to receive call execution result.
+    #[error("failed to receive call execution result")]
+    ReceiveResult,
 }
 
 // TODO add function parameter that is used to select the surface format
@@ -69,18 +54,7 @@ pub(super) struct WindowParams {
     name: String,
 }
 
-/// Get the [GLFW] version that was compiled.
-///
-/// [GLFW]: https://www.glfw.org/
-pub fn glfw_version() -> Version {
-    Version {
-        major: unsafe { hardcore_sys::GLFW_VERSION.major },
-        minor: unsafe { hardcore_sys::GLFW_VERSION.minor },
-        patch: unsafe { hardcore_sys::GLFW_VERSION.patch },
-    }
-}
-
-pub(super) enum GLFWCall {
+pub(super) enum WindowCall {
     CreateWindow {
         result_channel: tokio::sync::oneshot::Sender<Result<hardcore_sys::Window, WindowError>>,
         params: WindowParams,
@@ -95,35 +69,25 @@ pub(super) enum GLFWCall {
     },
 }
 
-impl GLFWCall {
-    fn submit(self) -> Result<(), GLFWCallError> {
-        let guard = GLFW_CALL_TX.read();
-        let Some(call_channel) = guard.as_ref() else {
-            return Err(GLFWCallError::Context);
-        };
-        call_channel
-            .send(self)
-            .map_err(move |_| GLFWCallError::SendToMain)
-    }
-
-    pub(super) fn execute(self) -> Result<(), GLFWCallError> {
+impl WindowCall {
+    pub(super) fn execute(self) -> Result<(), CallError> {
         match self {
-            GLFWCall::CreateWindow {
+            WindowCall::CreateWindow {
                 result_channel,
                 params,
             } => result_channel
                 .send(Window::create_inner(params))
-                .map_err(move |_| GLFWCallError::SendToCaller)?,
-            GLFWCall::DestroyWindow {
+                .map_err(move |_| CallError::Execute)?,
+            WindowCall::DestroyWindow {
                 result_channel,
                 window,
             } => {
                 Window::destroy(window);
                 result_channel
                     .send(Ok(()))
-                    .map_err(move |_| GLFWCallError::SendToCaller)?
+                    .map_err(move |_| CallError::Execute)?
             }
-            GLFWCall::SetCursorMode {
+            WindowCall::SetCursorMode {
                 window,
                 cursor_mode,
             } => unsafe { hardcore_sys::set_window_cursor_mode(window, cursor_mode) },
@@ -133,16 +97,18 @@ impl GLFWCall {
     }
 }
 
-unsafe impl Send for GLFWCall {}
+unsafe impl Send for WindowCall {}
 
 /// A high-level abstraction over an *OS* window.
 pub struct Window<'c> {
     handle: hardcore_sys::Window,
+    io_caller: crate::io::Caller,
     lifetime: PhantomData<&'c hardcore_sys::Window>,
 }
 
 impl<'c> Window<'c> {
-    pub(super) fn create(
+    pub(crate) fn create(
+        io_caller: crate::io::Caller,
         device: u32,
         width: u32,
         height: u32,
@@ -151,7 +117,7 @@ impl<'c> Window<'c> {
         name: &str,
     ) -> Result<Self, WindowError> {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        let call = GLFWCall::CreateWindow {
+        let call = WindowCall::CreateWindow {
             result_channel: tx,
             params: WindowParams {
                 device,
@@ -163,19 +129,20 @@ impl<'c> Window<'c> {
             },
         };
 
-        call.submit()?;
+        io_caller.submit(Call::Window(call))?;
 
         let inner = rx
             .blocking_recv()
-            .map_err(move |_| GLFWCallError::ReceiveFromMain)??;
+            .map_err(move |_| WindowError::ReceiveResult)??;
 
         Ok(Window {
             handle: inner,
+            io_caller,
             lifetime: PhantomData,
         })
     }
 
-    pub(super) fn create_inner(
+    fn create_inner(
         WindowParams {
             device,
             width,
@@ -243,26 +210,25 @@ impl<'c> Window<'c> {
     }
 
     /// Set the cursor mode for this window.
-    pub fn set_cursor_mode(&mut self, cursor_mode: CursorMode) {
-        let call = GLFWCall::SetCursorMode {
+    pub fn set_cursor_mode(&mut self, cursor_mode: CursorMode) -> Result<(), WindowError> {
+        let call = WindowCall::SetCursorMode {
             window: ptr::addr_of_mut!(self.handle),
             cursor_mode,
         };
-        if let Err(err) = call.submit() {
-            error!("Failed to submit set window cursor mode call: {err:?}")
-        }
+
+        Ok(self.io_caller.submit(Call::Window(call))?)
     }
 }
 
 impl<'c> Drop for Window<'c> {
     fn drop(&mut self) {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        let call = GLFWCall::DestroyWindow {
+        let call = WindowCall::DestroyWindow {
             result_channel: tx,
             window: self.handle,
         };
 
-        if let Err(err) = call.submit() {
+        if let Err(err) = self.io_caller.submit(Call::Window(call)) {
             error!("Failed to submit window destruction call: {err:?}")
         }
 
@@ -275,7 +241,7 @@ impl<'c> Drop for Window<'c> {
 mod callback {
     use crate::emit_event;
     use crate::event::{Event, WindowEvent};
-    use crate::input::{ButtonAction, KeyboardKey, Modifiers, MouseButton};
+    use crate::io::input::{ButtonAction, KeyboardKey, Modifiers, MouseButton};
     use std::ffi::{c_char, c_int, c_uint, CStr};
     use std::path::PathBuf;
     use tracing::error;

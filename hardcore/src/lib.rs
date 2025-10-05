@@ -50,7 +50,6 @@ use crate::event::Event;
 use crate::layer::Layer;
 use crate::native::vulkan_debug_callback;
 use crate::sync::{Mutex, RwLock};
-use crate::window::GLFWCall;
 use context::Context;
 use hardcore_sys::InitParams;
 use thiserror::Error;
@@ -62,34 +61,33 @@ use tracing::{error, info, info_span};
 pub mod context;
 mod device;
 pub mod event;
-pub mod input;
+pub mod io;
 pub mod layer;
 mod native;
 pub mod render;
 pub mod resource;
 pub mod shader;
 mod sync;
-pub mod window;
+
+macro_rules! get_version {
+    ($env_var:literal) => {
+        if let Ok(value) = u32::from_str_radix(env!($env_var), 10) {
+            value
+        } else {
+            0
+        }
+    };
+}
 
 /// Hardcore's version.
 pub static VERSION: Version = Version {
-    major: const_unwrap(u32::from_str_radix(env!("CARGO_PKG_VERSION_MAJOR"), 10), 0),
-    minor: const_unwrap(u32::from_str_radix(env!("CARGO_PKG_VERSION_MINOR"), 10), 0),
-    patch: const_unwrap(u32::from_str_radix(env!("CARGO_PKG_VERSION_PATCH"), 10), 0),
+    major: get_version!("CARGO_PKG_VERSION_MAJOR"),
+    minor: get_version!("CARGO_PKG_VERSION_MINOR"),
+    patch: get_version!("CARGO_PKG_VERSION_PATCH"),
 };
-
-const fn const_unwrap(result: Result<u32, std::num::ParseIntError>, default: u32) -> u32 {
-    if let Ok(value) = result {
-        value
-    } else {
-        default
-    }
-}
 
 static EVENT_TX: RwLock<Option<UnboundedSender<Event>>> = RwLock::new(None);
 static EVENT_RX: Mutex<Option<UnboundedReceiver<Event>>> = Mutex::new(None);
-static GLFW_CALL_TX: RwLock<Option<UnboundedSender<GLFWCall>>> = RwLock::new(None);
-static GLFW_CALL_RX: Mutex<Option<UnboundedReceiver<GLFWCall>>> = Mutex::new(None);
 
 thread_local! {static THREAD_KIND: Cell<ThreadKind> = const { Cell::new(ThreadKind::Uninitialised) }}
 
@@ -185,7 +183,7 @@ impl Instance {
     pub fn create(app: ApplicationDescriptor) -> Result<Instance, CoreError> {
         std::thread::current()
             .name()
-            .map_or(true, move |name| name == "main")
+            .is_none_or(move |name| name == "main")
             .then_some(())
             .ok_or(CoreError::NotMain)?;
 
@@ -196,10 +194,6 @@ impl Instance {
         let (tx, rx) = unbounded_channel();
         let _ = EVENT_TX.write().insert(tx);
         let _ = EVENT_RX.lock().insert(rx);
-
-        let (tx, rx) = unbounded_channel();
-        let _ = GLFW_CALL_TX.write().insert(tx);
-        let _ = GLFW_CALL_RX.lock().insert(rx);
 
         let c_name = std::ffi::CString::new(app.name)?;
 
@@ -240,10 +234,7 @@ impl Instance {
             return Err(CoreError::Uninitialised);
         }
 
-        let mut glfw_call_rx = {
-            let mut event_lock = GLFW_CALL_RX.lock();
-            event_lock.take().ok_or(CoreError::Uninitialised)?
-        };
+        let (io_caller, mut io_executor) = io::create_context();
 
         info!("Starting main loop");
 
@@ -254,14 +245,10 @@ impl Instance {
             .enable_all()
             .build()?;
 
-        let core_thread = core_rt.spawn_blocking(move || core_run(initialize));
+        let core_thread = core_rt.spawn_blocking(move || core_run(io_caller, initialize));
 
         while !core_thread.is_finished() {
-            while let Ok(call) = glfw_call_rx.try_recv() {
-                if call.execute().is_err() {
-                    error!("Failed to send GLFW call results to calling thread");
-                }
-            }
+            io_executor.flush_execute();
 
             unsafe { hardcore_sys::poll_events() }
         }
@@ -281,7 +268,7 @@ impl Drop for Instance {
 }
 
 /// Loop for application and rendering logic.
-fn core_run(initialize: fn(context: &mut Context)) -> Result<(), CoreError> {
+fn core_run(io_caller: io::Caller, initialize: fn(context: &mut Context)) -> Result<(), CoreError> {
     info!("Starting application and rendering logic loop");
 
     let mut event_rx = {
@@ -289,7 +276,7 @@ fn core_run(initialize: fn(context: &mut Context)) -> Result<(), CoreError> {
         event_lock.take().ok_or(CoreError::Uninitialised)?
     };
 
-    let mut context = Context::create(Device::count());
+    let mut context = Context::create(Device::count(), io_caller);
     let mut layers: Vec<Box<dyn Layer>> = vec![];
 
     initialize(&mut context);

@@ -1,16 +1,15 @@
-use std::num::NonZeroU64;
 use tracing::{debug, trace};
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
 use hardcore::context::Context;
 use hardcore::event::{Event, WindowEvent};
-use hardcore::input::{ButtonAction, MouseButton};
+use hardcore::io::input::{ButtonAction, MouseButton};
+use hardcore::io::window::{CursorMode, Window};
 use hardcore::layer::Layer;
 use hardcore::render::vulkan_api_version;
 use hardcore::resource::VertexBuffer;
 use hardcore::shader::Shader;
-use hardcore::window::{CursorMode, Window};
 use hardcore::{ApplicationDescriptor, Instance, Version};
 
 use hardcore_sys::ShaderStage;
@@ -129,7 +128,9 @@ impl<'c> Layer<'c> for FractalLayer<'c> {
                 };
 
                 if let Some(window) = &mut self._window {
-                    window.set_cursor_mode(cursor_mode)
+                    window
+                        .set_cursor_mode(cursor_mode)
+                        .expect("Failed to set cursor mode")
                 }
             }
             Event::Window {
@@ -168,6 +169,7 @@ fn main() {
         },
     })
     .expect("Failed to initialise library");
+
     instance
         .run(move |context| {
             let layer = FractalLayer::new(context);

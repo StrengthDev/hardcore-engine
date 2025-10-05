@@ -1,6 +1,6 @@
 use crate::Version;
 
-/// Get the [Vulkan] API version that is used.
+/// The [Vulkan] API version that is used.
 ///
 /// [Vulkan]: https://www.vulkan.org/
 pub fn vulkan_api_version() -> Version {
@@ -11,7 +11,7 @@ pub fn vulkan_api_version() -> Version {
     }
 }
 
-/// Get the [Vulkan headers][vk_headers] version that was compiled.
+/// The [Vulkan headers][vk_headers] version that was compiled.
 ///
 /// [vk_headers]: https://github.com/KhronosGroup/Vulkan-Headers
 pub fn vulkan_header_version() -> Version {
@@ -22,7 +22,7 @@ pub fn vulkan_header_version() -> Version {
     }
 }
 
-/// Get the [Volk] header version that was compiled.
+/// The [Volk] header version that was compiled.
 ///
 /// [Volk]: https://github.com/zeux/volk
 pub fn volk_header_version() -> u32 {
