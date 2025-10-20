@@ -15,16 +15,20 @@
 //! it will probably make layer management easier and ties well with the way events are handle by
 //! layers in the stack (layers at the top get to try handling events first).
 
-use crate::context::Context;
+use crate::allocator::Allocator;
 use crate::event::Event;
+use crate::state::State;
 
 /// An abstract application layer, used to represent some component of the application.
-pub trait Layer<'c> {
+pub trait Layer<'s>: Allocator<'s> {
+    /// User defined data type passed to every layer in the [`tick`][Layer::tick] function.
+    type SharedData;
+
     /// Update this layer for the current frame.
     ///
     /// This function is called once per frame, with the timing depending on this layer's position
     /// in the stack, bottom layers get updated first while top layers get updated last.
-    fn tick(&mut self, context: &mut Context<'c>);
+    fn tick(&mut self, state: &mut State<'s, Self::SharedData>, shared_data: &mut Self::SharedData);
 
     /// Try to handle a system event.
     ///
@@ -32,5 +36,5 @@ pub trait Layer<'c> {
     ///
     /// **`true`** if the layer has handled the event, **`false`** otherwise. If the event was
     /// handled, then it won't get propagated further down the layer stack.
-    fn handle_event(&mut self, context: &mut Context<'c>, event: &Event) -> bool;
+    fn handle_event(&mut self, event: &Event) -> bool;
 }

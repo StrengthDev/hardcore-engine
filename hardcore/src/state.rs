@@ -1,9 +1,11 @@
 use crate::device::Device;
 use crate::layer::Layer;
+
 use std::rc::Rc;
+use tokio::time::Instant;
 
 /// Global context information to be passed to a layer during execution.
-pub struct Context<'l> {
+pub struct State<'s, SharedData> {
     /// The current number of layers in the global context.
     pub layer_count: usize,
 
@@ -15,6 +17,8 @@ pub struct Context<'l> {
     /// Frame count begins when the [main loop][crate::run] starts, and is reset when it ends.
     pub frame: usize,
 
+    last_frame: Instant,
+
     /// How long it took to process the previous frame, in seconds.
     pub delta_time: f64,
 
@@ -23,12 +27,12 @@ pub struct Context<'l> {
 
     pub(super) running: bool,
 
-    pub(super) pushed_layers: Vec<Box<dyn Layer<'l> + 'l>>,
+    pub(super) pushed_layers: Vec<Box<dyn Layer<'s, SharedData = SharedData> + 's>>,
 
     pub(super) layer_pop_count: usize,
 }
 
-impl<'l> Context<'l> {
+impl<'s, SharedData> State<'s, SharedData> {
     pub(super) fn create(device_count: u32, io_caller: crate::io::Caller) -> Self {
         let devices: Vec<_> = (0..device_count)
             .map(move |id| Device::new(id, io_caller.clone()))
@@ -38,11 +42,37 @@ impl<'l> Context<'l> {
             layer_count: 0,
             current_layer_idx: 0,
             frame: 0,
+            last_frame: Instant::now(),
             delta_time: 0.0,
             devices: Rc::new(devices),
             running: false,
             pushed_layers: vec![],
             layer_pop_count: 0,
+        }
+    }
+
+    pub(super) fn tick(&mut self) {
+        let current_frame = Instant::now();
+        let duration = current_frame - self.last_frame;
+        self.delta_time = duration.as_secs_f64();
+        self.last_frame = current_frame;
+
+        self.frame += 1;
+    }
+
+    pub(super) fn update_layers(
+        &mut self,
+        layers: &mut Vec<Box<dyn Layer<'s, SharedData = SharedData> + 's>>,
+    ) {
+        layers.truncate(layers.len() - self.layer_pop_count);
+        self.layer_pop_count = 0;
+
+        layers.append(&mut self.pushed_layers);
+
+        self.layer_count = layers.len();
+
+        if layers.is_empty() {
+            self.running = false;
         }
     }
 
@@ -55,7 +85,7 @@ impl<'l> Context<'l> {
     ///
     /// # Parameters
     /// * `layer` - The layer to be pushed.
-    pub fn push_layer(&mut self, layer: impl Layer<'l> + 'l) {
+    pub fn push_layer(&mut self, layer: impl Layer<'s, SharedData = SharedData> + 's) {
         self.pushed_layers.push(Box::new(layer));
     }
 

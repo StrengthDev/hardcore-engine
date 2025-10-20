@@ -1,15 +1,16 @@
-use core::num::NonZeroU32;
-use hardcore_sys::{
-    TextureDimensions1D, TextureDimensions2D, TextureDimensions3D, TextureDimensionsX,
-    TextureFormatID, TextureType,
-};
-use std::ptr;
-use thiserror::Error;
+use crate::dependent_handle::DependentHandle;
 
 pub use hardcore_sys::{
     TextureBlockSize, TextureComponentFormat, TextureCompression, TextureNumericFormat,
     TextureSampleCount,
 };
+
+use core::num::NonZeroU32;
+use hardcore_sys::{
+    TextureDimensions1D, TextureDimensions2D, TextureDimensions3D, TextureDimensionsX,
+    TextureFormatID, TextureType,
+};
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum TextureError {
@@ -117,11 +118,11 @@ impl TextureFormat {
     }
 }
 
-pub struct Texture {
-    handle: hardcore_sys::Texture,
+pub struct Texture<'s> {
+    handle: DependentHandle<'s, hardcore_sys::Texture>,
 }
 
-impl Texture {
+impl<'s> Texture<'s> {
     pub fn create(
         device: u32,
         dimensions: TextureDimensions,
@@ -132,7 +133,7 @@ impl Texture {
         let mut handle = Default::default();
         unsafe {
             hardcore_sys::create_texture(
-                ptr::addr_of_mut!(handle),
+                &raw mut handle,
                 device,
                 dimensions.into(),
                 format_id.0,
@@ -142,12 +143,14 @@ impl Texture {
             .into_std_result()?
         };
 
-        Ok(Texture { handle })
+        Ok(Texture {
+            handle: handle.into(),
+        })
     }
 }
 
-impl Drop for Texture {
+impl<'s> Drop for Texture<'s> {
     fn drop(&mut self) {
-        unsafe { hardcore_sys::destroy_texture(ptr::addr_of_mut!(self.handle)) }
+        unsafe { hardcore_sys::destroy_texture(self.handle.mut_ptr()) }
     }
 }

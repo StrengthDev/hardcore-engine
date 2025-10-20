@@ -40,51 +40,36 @@
 
 #![warn(missing_docs)]
 
-use std::cell::Cell;
-use std::fmt::{Display, Formatter};
-use std::marker::PhantomData;
-use std::sync::atomic::{AtomicUsize, Ordering};
+pub use device::Device;
+use event::Event;
+use layer::Layer;
+pub use meta::{Version, VERSION};
+use native::vulkan_debug_callback;
+use state::State;
+use sync::{Mutex, RwLock};
 
-use crate::device::Device;
-use crate::event::Event;
-use crate::layer::Layer;
-use crate::native::vulkan_debug_callback;
-use crate::sync::{Mutex, RwLock};
-use context::Context;
 use hardcore_sys::InitParams;
+
+use std::cell::Cell;
+use std::marker::PhantomData;
+use std::rc::Rc;
 use thiserror::Error;
 use tokio::runtime::Builder;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
-use tokio::time::Instant;
 use tracing::{error, info, info_span};
 
-pub mod context;
-mod device;
+pub mod allocator;
+mod dependent_handle;
+pub mod device;
 pub mod event;
 pub mod io;
 pub mod layer;
+pub mod meta;
 mod native;
-pub mod render;
 pub mod resource;
 pub mod shader;
+pub mod state;
 mod sync;
-
-macro_rules! get_version {
-    ($env_var:literal) => {
-        if let Ok(value) = u32::from_str_radix(env!($env_var), 10) {
-            value
-        } else {
-            0
-        }
-    };
-}
-
-/// Hardcore's version.
-pub static VERSION: Version = Version {
-    major: get_version!("CARGO_PKG_VERSION_MAJOR"),
-    minor: get_version!("CARGO_PKG_VERSION_MINOR"),
-    patch: get_version!("CARGO_PKG_VERSION_PATCH"),
-};
 
 static EVENT_TX: RwLock<Option<UnboundedSender<Event>>> = RwLock::new(None);
 static EVENT_RX: Mutex<Option<UnboundedReceiver<Event>>> = Mutex::new(None);
@@ -98,26 +83,8 @@ enum ThreadKind {
     // Audio,
     // Physics,
     // Networking,
-    Worker,
-}
-
-/// A version value.
-#[derive(Clone, Debug)]
-pub struct Version {
-    /// The major version.
-    pub major: u32,
-
-    /// The minor version.
-    pub minor: u32,
-
-    /// The patch version.
-    pub patch: u32,
-}
-
-impl Display for Version {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(format!("v{}.{}.{}", self.major, self.minor, self.patch).as_str())
-    }
+    // Worker,
+    // Loader,
 }
 
 /// A descriptor used to identify an application by its name and version.
@@ -169,11 +136,18 @@ pub enum CoreError {
     InvalidString(#[from] std::ffi::NulError),
 }
 
+pub struct Initializer {
+    /// Dummy member to keep this from being constructed by users.
+    _pvt: (),
+}
+
+impl<'a> allocator::Allocator<'a> for Initializer {}
+
 pub struct Instance {
     /// Dummy member.
     ///
     /// Used to make Instance not [`Send`] and not [`Sync`].
-    not_send_sync: PhantomData<*const ()>,
+    _not_send_sync: PhantomData<*const ()>,
 }
 
 impl Instance {
@@ -222,14 +196,27 @@ impl Instance {
         unsafe { hardcore_sys::init(params).into_std_result()? };
 
         Ok(Instance {
-            not_send_sync: PhantomData,
+            _not_send_sync: PhantomData,
         })
     }
 
     /// The main loop function.
     ///
     /// This function **MUST** be called in the *main* thread in a non-async environment.
-    pub fn run(&self, initialize: fn(context: &mut Context)) -> Result<(), CoreError> {
+    pub fn run<'s, InitializeFn, SharedData>(
+        &self,
+        initialize: InitializeFn,
+    ) -> Result<(), CoreError>
+    where
+        InitializeFn: FnOnce(
+                &'s Initializer,
+                &Rc<Vec<Device>>,
+            ) -> (
+                Vec<Box<dyn Layer<'s, SharedData = SharedData> + 's>>,
+                SharedData,
+            ) + Send
+            + 'static,
+    {
         if EVENT_TX.read().is_none() {
             return Err(CoreError::Uninitialised);
         }
@@ -267,8 +254,22 @@ impl Drop for Instance {
     }
 }
 
+static LAYER_INITIALIZER: Initializer = Initializer { _pvt: () };
+
 /// Loop for application and rendering logic.
-fn core_run(io_caller: io::Caller, initialize: fn(context: &mut Context)) -> Result<(), CoreError> {
+fn core_run<'s, InitializeFn, SharedData>(
+    io_caller: io::Caller,
+    initialize: InitializeFn,
+) -> Result<(), CoreError>
+where
+    InitializeFn: FnOnce(
+            &'s Initializer,
+            &Rc<Vec<Device>>,
+        ) -> (
+            Vec<Box<dyn Layer<'s, SharedData = SharedData> + 's>>,
+            SharedData,
+        ) + Send,
+{
     info!("Starting application and rendering logic loop");
 
     let mut event_rx = {
@@ -276,71 +277,45 @@ fn core_run(io_caller: io::Caller, initialize: fn(context: &mut Context)) -> Res
         event_lock.take().ok_or(CoreError::Uninitialised)?
     };
 
-    let mut context = Context::create(Device::count(), io_caller);
-    let mut layers: Vec<Box<dyn Layer>> = vec![];
+    let mut state = State::create(Device::count(), io_caller);
 
-    initialize(&mut context);
+    let (mut layers, mut shared_data) = initialize(&LAYER_INITIALIZER, &state.devices);
 
-    let worker_count: AtomicUsize = AtomicUsize::new(0);
-    let worker_rt = Builder::new_multi_thread()
-        .thread_name_fn(move || format!("worker-{}", worker_count.fetch_add(1, Ordering::SeqCst)))
-        .on_thread_start(|| THREAD_KIND.set(ThreadKind::Worker))
-        .worker_threads(10) // TODO
-        .enable_all()
-        .build()?;
-
-    context.running = true;
-    let mut last_frame = Instant::now();
-    while context.running {
-        let _span = info_span!("Frame", frame = context.frame).entered();
-
-        let current_frame = Instant::now();
-        let duration = current_frame - last_frame;
-        context.delta_time = duration.as_secs_f64();
-        last_frame = current_frame;
-
-        layers.truncate(layers.len() - context.layer_pop_count);
-        context.layer_pop_count = 0;
-
-        layers.append(&mut context.pushed_layers);
-
-        context.layer_count = layers.len();
+    state.running = true;
+    while state.running {
+        let _span = info_span!("Frame", frame = state.frame).entered();
 
         while let Ok(event) = event_rx.try_recv() {
             for layer in layers.iter_mut().rev() {
-                if layer.handle_event(&mut context, &event) {
+                if layer.handle_event(&event) {
                     break;
                 }
             }
         }
 
-        context.current_layer_idx = 0;
+        state.current_layer_idx = 0;
         let layer_count = layers.len();
         for layer in layers.iter_mut() {
-            layer.tick(&mut context);
-            context.current_layer_idx += 1;
-            if layer_count <= context.current_layer_idx + context.layer_pop_count {
+            layer.tick(&mut state, &mut shared_data);
+            state.current_layer_idx += 1;
+            if layer_count <= state.current_layer_idx + state.layer_pop_count {
                 break;
             }
         }
 
-        let result = unsafe { hardcore_sys::render_tick().into_std_result() };
-        if result.is_err() {
-            context.running = false;
+        if unsafe { hardcore_sys::render_tick().into_std_result() }.is_err() {
+            state.running = false;
+            break;
         }
 
-        if layers.is_empty() {
-            context.running = false;
-        }
-
-        context.frame += 1;
+        state.tick();
+        state.update_layers(&mut layers);
     }
 
     layers.clear();
+    drop(shared_data);
 
     unsafe { hardcore_sys::render_finish().into_std_result()? };
-
-    worker_rt.shutdown_background();
 
     let mut event_lock = EVENT_RX.lock();
     let _ = event_lock.insert(event_rx);

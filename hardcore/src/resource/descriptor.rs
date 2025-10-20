@@ -1,5 +1,4 @@
 use hardcore_sys::Field;
-use std::ptr;
 use thiserror::Error;
 
 pub use hardcore_sys::{Composition, Primitive};
@@ -133,15 +132,15 @@ impl CDescriptor {
         };
 
         unsafe {
-            hardcore_sys::create_descriptor(ptr::addr_of_mut!(descriptor.inner), field_count)
+            hardcore_sys::create_descriptor(&raw mut descriptor.inner, field_count)
                 .into_std_result()?
         };
 
         Ok(descriptor)
     }
 
-    pub(crate) fn handle(&self) -> *const hardcore_sys::Descriptor {
-        ptr::addr_of!(self.inner)
+    pub(crate) fn ptr(&self) -> *const hardcore_sys::Descriptor {
+        &raw const self.inner
     }
 
     fn as_slice(&self) -> &[Field] {
@@ -169,7 +168,7 @@ impl CDescriptor {
 impl Drop for CDescriptor {
     fn drop(&mut self) {
         unsafe {
-            hardcore_sys::destroy_descriptor(ptr::addr_of_mut!(self.inner));
+            hardcore_sys::destroy_descriptor(&raw mut self.inner);
         }
     }
 }

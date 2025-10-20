@@ -1,25 +1,25 @@
-use crate::context::Context;
 use crate::resource::buffer::{
     Buffer, BufferError, CBuffer, CDynamicBuffer, DynamicBuffer, LayoutBuffer, MappedSlice,
     ShaderWritableBuffer, VertexBufferLike,
 };
 use crate::resource::descriptor::Descriptor;
+
 use std::num::NonZeroU64;
 
-pub struct VertexBuffer<'c, const WRITABLE: bool> {
-    inner: CBuffer<'c>,
+pub struct VertexBuffer<'s, const WRITABLE: bool> {
+    inner: CBuffer<'s>,
 }
 
-impl<'c, const WRITABLE: bool> VertexBuffer<'c, WRITABLE> {
+impl<'s, const WRITABLE: bool> VertexBuffer<'s, WRITABLE> {
     pub(crate) fn create<'d>(
         device: u32,
         descriptor: &'d Descriptor,
         count: NonZeroU64,
-    ) -> Result<VertexBuffer<'c, WRITABLE>, BufferError>
+    ) -> Result<VertexBuffer<'s, WRITABLE>, BufferError>
     where
-        'c: 'd,
+        's: 'd,
     {
-        Ok(VertexBuffer::<'c, WRITABLE> {
+        Ok(VertexBuffer::<'s, WRITABLE> {
             inner: CBuffer::create(
                 device,
                 hardcore_sys::BufferKind::Vertex,
@@ -31,27 +31,27 @@ impl<'c, const WRITABLE: bool> VertexBuffer<'c, WRITABLE> {
     }
 }
 
-impl<'c, const WRITABLE: bool> Buffer for VertexBuffer<'c, WRITABLE> {
+impl<'s, const WRITABLE: bool> Buffer<'s> for VertexBuffer<'s, WRITABLE> {
     fn id(&self) -> u64 {
         self.inner.id()
     }
 }
 
-impl<'c, const WRITABLE: bool> LayoutBuffer for VertexBuffer<'c, WRITABLE> {
+impl<'s, const WRITABLE: bool> LayoutBuffer<'s> for VertexBuffer<'s, WRITABLE> {
     fn layout(&self) -> &Descriptor {
         self.inner.layout()
     }
 }
 
-impl<'c, const WRITABLE: bool> VertexBufferLike for VertexBuffer<'c, WRITABLE> {}
+impl<'s, const WRITABLE: bool> VertexBufferLike<'s> for VertexBuffer<'s, WRITABLE> {}
 
-impl<'c> ShaderWritableBuffer for VertexBuffer<'c, true> {}
+impl<'s> ShaderWritableBuffer<'s> for VertexBuffer<'s, true> {}
 
-pub struct DynamicVertexBuffer {
-    inner: CDynamicBuffer,
+pub struct DynamicVertexBuffer<'s> {
+    inner: CDynamicBuffer<'s>,
 }
 
-impl DynamicVertexBuffer {
+impl<'s> DynamicVertexBuffer<'s> {
     pub(crate) fn create(
         device: u32,
         descriptor: &Descriptor,
@@ -69,22 +69,22 @@ impl DynamicVertexBuffer {
     }
 }
 
-impl Buffer for DynamicVertexBuffer {
+impl<'s> Buffer<'s> for DynamicVertexBuffer<'s> {
     fn id(&self) -> u64 {
         self.inner.id()
     }
 }
 
-impl DynamicBuffer for DynamicVertexBuffer {
-    fn as_slice<'a>(&self, context: &'a Context) -> Result<MappedSlice<'a, u8>, BufferError> {
-        self.inner.as_slice(context)
+impl<'s> DynamicBuffer<'s> for DynamicVertexBuffer<'s> {
+    fn as_slice<'a>(&self) -> Result<MappedSlice<'s, u8>, BufferError> {
+        self.inner.as_slice()
     }
 }
 
-impl LayoutBuffer for DynamicVertexBuffer {
+impl<'s> LayoutBuffer<'s> for DynamicVertexBuffer<'s> {
     fn layout(&self) -> &Descriptor {
         self.inner.layout()
     }
 }
 
-impl VertexBufferLike for DynamicVertexBuffer {}
+impl<'s> VertexBufferLike<'s> for DynamicVertexBuffer<'s> {}

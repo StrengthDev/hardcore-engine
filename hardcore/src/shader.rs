@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::Path;
-use std::ptr;
 use thiserror::Error;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, BufReader};
@@ -136,7 +135,7 @@ impl Shader {
 
         unsafe {
             hardcore_sys::create_shader(
-                ptr::addr_of_mut!(inner),
+                &raw mut inner,
                 bytecode.as_ptr(),
                 bytecode.len(),
                 stage.into(),
@@ -180,13 +179,13 @@ impl Shader {
 
 impl Drop for Shader {
     fn drop(&mut self) {
-        unsafe { hardcore_sys::destroy_shader(ptr::addr_of_mut!(self.inner)) }
+        unsafe { hardcore_sys::destroy_shader(&raw mut self.inner) }
     }
 }
 
 #[cfg(feature = "shader-compilation")]
 mod compilation {
-    use crate::render::vulkan_api_version;
+    use crate::meta::vulkan_api_version;
     use crate::shader::{Shader, ShaderError, ShaderStage};
     use crate::Version;
     use std::path::Path;

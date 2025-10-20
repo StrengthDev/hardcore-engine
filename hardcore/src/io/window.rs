@@ -2,6 +2,10 @@
 
 // TODO add example
 
+use crate::dependent_handle::DependentHandle;
+use crate::io::{Call, CallError};
+
+pub use hardcore_sys::CursorMode;
 use hardcore_sys::{
     destroy_window, new_window, set_window_char_callback, set_window_char_mods_callback,
     set_window_close_callback, set_window_cursor_enter_callback,
@@ -11,14 +15,10 @@ use hardcore_sys::{
     set_window_refresh_callback, set_window_scale_callback, set_window_scroll_callback,
     set_window_size_callback,
 };
+
 use std::ffi::{c_int, CString, NulError};
-use std::marker::PhantomData;
-use std::ptr;
 use thiserror::Error;
 use tracing::error;
-
-use crate::io::{Call, CallError};
-pub use hardcore_sys::CursorMode;
 
 /// An error related to a [`Window`].
 #[derive(Error, Debug)]
@@ -100,13 +100,12 @@ impl WindowCall {
 unsafe impl Send for WindowCall {}
 
 /// A high-level abstraction over an *OS* window.
-pub struct Window<'c> {
-    handle: hardcore_sys::Window,
+pub struct Window<'s> {
+    handle: DependentHandle<'s, hardcore_sys::Window>,
     io_caller: crate::io::Caller,
-    lifetime: PhantomData<&'c hardcore_sys::Window>,
 }
 
-impl<'c> Window<'c> {
+impl<'s> Window<'s> {
     pub(crate) fn create(
         io_caller: crate::io::Caller,
         device: u32,
@@ -136,9 +135,8 @@ impl<'c> Window<'c> {
             .map_err(move |_| WindowError::ReceiveResult)??;
 
         Ok(Window {
-            handle: inner,
+            handle: inner.into(),
             io_caller,
-            lifetime: PhantomData,
         })
     }
 
@@ -165,13 +163,13 @@ impl<'c> Window<'c> {
 
         let handle = unsafe {
             let mut handle = Default::default();
-            new_window(ptr::addr_of_mut!(handle), params).into_std_result()?;
+            new_window(&raw mut handle, params).into_std_result()?;
 
             if handle.handle.is_null() {
                 return Err(WindowError::Initialisation);
             }
 
-            let ptr = ptr::addr_of_mut!(handle);
+            let ptr = &raw mut handle;
             set_window_position_callback(ptr, Some(callback::position));
             set_window_size_callback(ptr, Some(callback::size));
             set_window_close_callback(ptr, Some(callback::close));
@@ -198,7 +196,7 @@ impl<'c> Window<'c> {
 
     fn destroy(mut handle: hardcore_sys::Window) {
         unsafe {
-            destroy_window(ptr::addr_of_mut!(handle));
+            destroy_window(&raw mut handle);
         }
     }
 
@@ -206,13 +204,13 @@ impl<'c> Window<'c> {
     ///
     /// This can be useful to identify which window an event comes from.
     pub fn id(&self) -> usize {
-        self.handle.id
+        self.handle.inner.id
     }
 
     /// Set the cursor mode for this window.
     pub fn set_cursor_mode(&mut self, cursor_mode: CursorMode) -> Result<(), WindowError> {
         let call = WindowCall::SetCursorMode {
-            window: ptr::addr_of_mut!(self.handle),
+            window: self.handle.mut_ptr(),
             cursor_mode,
         };
 
@@ -220,12 +218,12 @@ impl<'c> Window<'c> {
     }
 }
 
-impl<'c> Drop for Window<'c> {
+impl<'s> Drop for Window<'s> {
     fn drop(&mut self) {
         let (tx, rx) = tokio::sync::oneshot::channel();
         let call = WindowCall::DestroyWindow {
             result_channel: tx,
-            window: self.handle,
+            window: self.handle.inner,
         };
 
         if let Err(err) = self.io_caller.submit(Call::Window(call)) {

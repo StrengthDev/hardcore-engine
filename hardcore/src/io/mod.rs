@@ -1,23 +1,12 @@
-use crate::Version;
+use window::WindowCall;
+
 use thiserror::Error;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tracing::error;
-use window::WindowCall;
 
 pub mod event;
 pub mod input;
 pub mod window;
-
-/// The [GLFW] version that was compiled.
-///
-/// [GLFW]: https://www.glfw.org/
-pub fn glfw_version() -> Version {
-    Version {
-        major: unsafe { hardcore_sys::GLFW_VERSION.major },
-        minor: unsafe { hardcore_sys::GLFW_VERSION.minor },
-        patch: unsafe { hardcore_sys::GLFW_VERSION.patch },
-    }
-}
 
 // Because all GLFW functions must be called from the main thread, but layers are processed on
 // another thread, we use a mechanism where functions that result in GLFW calls are packed and sent

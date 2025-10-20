@@ -2,32 +2,53 @@ use tracing::{debug, trace};
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::EnvFilter;
 
-use hardcore::context::Context;
+use hardcore::allocator::Allocator;
 use hardcore::event::{Event, WindowEvent};
 use hardcore::io::input::{ButtonAction, MouseButton};
 use hardcore::io::window::{CursorMode, Window};
 use hardcore::layer::Layer;
-use hardcore::render::vulkan_api_version;
+use hardcore::meta::{glfw_version, vulkan_api_version};
 use hardcore::resource::VertexBuffer;
 use hardcore::shader::Shader;
-use hardcore::{ApplicationDescriptor, Instance, Version};
-
+use hardcore::state::State;
+use hardcore::{ApplicationDescriptor, Device, Initializer, Instance, Version};
 use hardcore_sys::ShaderStage;
 
-struct FractalLayer<'c> {
-    _window: Option<Window<'c>>,
-    obj: Option<VertexBuffer<'c, false>>,
+struct SharedData<'s> {
+    window: Window<'s>,
+}
+
+impl<'s> SharedData<'s> {
+    fn new(initializer: &'s Initializer, devices: &[Device]) -> Self {
+        Self {
+            window: initializer
+                .create_window(
+                    &devices[0],
+                    1920,
+                    1080,
+                    None,
+                    None,
+                    "Hardcore sample - Fractal",
+                )
+                .expect("Failed to create window"),
+        }
+    }
+}
+
+struct FractalLayer<'s> {
+    obj: Option<VertexBuffer<'s, false>>,
     print_signal: bool,
     action_signal: bool,
     vert_shader: Shader,
     frag_shader: Shader,
     cursor_mode: bool,
+    cursor_mode_dirty: bool,
+    should_exit: bool,
 }
 
-impl<'c> FractalLayer<'c> {
-    fn new(context: &mut Context<'c>) -> Self {
-        let mut s = Self {
-            _window: None,
+impl<'s> FractalLayer<'s> {
+    fn new(initializer: &'s Initializer, devices: &[Device]) -> Self {
+        Self {
             obj: None,
             print_signal: false,
             action_signal: false,
@@ -44,25 +65,31 @@ impl<'c> FractalLayer<'c> {
             )
             .expect("Failed to create shader"),
             cursor_mode: false,
-        };
-
-        // TODO think of how something like a LayerID can be passed in the constructor so window doesnt have to be an optional
-        s._window = Some(
-            context.devices[0]
-                .create_window(&s, 1920, 1080, None, None, "Hardcore sample - Fractal")
-                .expect("Failed to create window"),
-        );
-
-        s
+            cursor_mode_dirty: false,
+            should_exit: false,
+        }
     }
 }
 
-impl<'c> Layer<'c> for FractalLayer<'c> {
-    fn tick(&mut self, context: &mut Context<'c>) {
+impl<'s> Allocator<'s> for FractalLayer<'s> {}
+
+impl<'s> Layer<'s> for FractalLayer<'s> {
+    type SharedData = SharedData<'s>;
+
+    fn tick(
+        &mut self,
+        state: &mut State<'s, Self::SharedData>,
+        shared_data: &mut Self::SharedData,
+    ) {
+        if self.should_exit {
+            state.exit()
+        }
+
         if self.print_signal {
             self.print_signal = false;
             debug!("Vulkan {}", vulkan_api_version());
-            for (i, device) in context.devices.iter().enumerate() {
+            debug!("GLFW {}", glfw_version());
+            for (i, device) in state.devices.iter().enumerate() {
                 debug!("Device {i} name: {}", device.name())
             }
         }
@@ -82,13 +109,28 @@ impl<'c> Layer<'c> for FractalLayer<'c> {
             self.action_signal = false;
         }
 
+        if self.cursor_mode_dirty {
+            self.cursor_mode_dirty = false;
+            self.cursor_mode = !self.cursor_mode;
+            let cursor_mode = if self.cursor_mode {
+                CursorMode::Disabled
+            } else {
+                CursorMode::Normal
+            };
+
+            shared_data
+                .window
+                .set_cursor_mode(cursor_mode)
+                .expect("Failed to set cursor mode")
+        }
+
         // if let Some(x) = &self.obj {
         //     x.clone();
         // }
         // nothing
     }
 
-    fn handle_event(&mut self, context: &mut Context<'c>, event: &Event) -> bool {
+    fn handle_event(&mut self, event: &Event) -> bool {
         trace!("Event: {event:?}");
         match event {
             Event::Window {
@@ -120,24 +162,13 @@ impl<'c> Layer<'c> for FractalLayer<'c> {
                     },
                 ..
             } => {
-                self.cursor_mode = !self.cursor_mode;
-                let cursor_mode = if self.cursor_mode {
-                    CursorMode::Disabled
-                } else {
-                    CursorMode::Normal
-                };
-
-                if let Some(window) = &mut self._window {
-                    window
-                        .set_cursor_mode(cursor_mode)
-                        .expect("Failed to set cursor mode")
-                }
+                self.cursor_mode_dirty = true;
             }
             Event::Window {
                 event: WindowEvent::Close,
                 ..
             } => {
-                context.exit();
+                self.should_exit = true;
             }
             _ => { /* nothing */ }
         }
@@ -171,9 +202,10 @@ fn main() {
     .expect("Failed to initialise library");
 
     instance
-        .run(move |context| {
-            let layer = FractalLayer::new(context);
-            context.push_layer(layer);
+        .run(move |initializer, devices| {
+            let shared_data = SharedData::new(initializer, devices);
+            let layer = FractalLayer::new(initializer, devices);
+            (vec![Box::new(layer)], shared_data)
         })
         .expect("Failed to run main loop");
 }

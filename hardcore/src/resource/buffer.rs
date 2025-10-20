@@ -1,7 +1,9 @@
-use crate::context::Context;
 use crate::resource::descriptor::{CDescriptorError, Descriptor, PrimitiveExt};
+
 use hardcore_sys;
 use hardcore_sys::Primitive;
+
+use crate::dependent_handle::DependentHandle;
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
 use std::ops::{Deref, DerefMut};
@@ -21,7 +23,7 @@ pub enum BufferError {
     Index,
 }
 
-pub trait Buffer {
+pub trait Buffer<'s> {
     fn id(&self) -> u64;
 }
 
@@ -39,13 +41,12 @@ impl BufferContentKind {
     }
 }
 
-pub(crate) struct CBuffer<'c> {
+pub(crate) struct CBuffer<'s> {
     content_kind: BufferContentKind,
-    handle: hardcore_sys::Buffer,
-    context: PhantomData<&'c hardcore_sys::Buffer>,
+    handle: DependentHandle<'s, hardcore_sys::Buffer>,
 }
 
-impl<'c> CBuffer<'c> {
+impl<'s> CBuffer<'s> {
     pub(crate) fn create<'d>(
         device: u32,
         kind: hardcore_sys::BufferKind,
@@ -54,16 +55,16 @@ impl<'c> CBuffer<'c> {
         writable: bool,
     ) -> Result<Self, BufferError>
     where
-        'c: 'd,
+        's: 'd,
     {
         let mut handle = Default::default();
         unsafe {
             let c_desc = descriptor.c_desc()?;
             hardcore_sys::new_buffer(
-                ptr::addr_of_mut!(handle),
+                &raw mut handle,
                 device,
                 kind,
-                c_desc.handle(),
+                c_desc.ptr(),
                 count.into(),
                 writable,
             )
@@ -72,8 +73,7 @@ impl<'c> CBuffer<'c> {
 
         Ok(CBuffer {
             content_kind: BufferContentKind::Layout(descriptor.clone()),
-            handle,
-            context: PhantomData,
+            handle: handle.into(),
         })
     }
 
@@ -90,7 +90,7 @@ impl<'c> CBuffer<'c> {
         let mut handle = Default::default();
         unsafe {
             hardcore_sys::new_index_buffer(
-                ptr::addr_of_mut!(handle),
+                &raw mut handle,
                 device,
                 kind.into(),
                 count.into(),
@@ -101,13 +101,12 @@ impl<'c> CBuffer<'c> {
 
         Ok(CBuffer {
             content_kind: BufferContentKind::Index(kind),
-            handle,
-            context: PhantomData,
+            handle: handle.into(),
         })
     }
 
     pub(crate) fn id(&self) -> u64 {
-        self.handle.id
+        self.handle.inner.id
     }
 
     pub(crate) fn layout(&self) -> &Descriptor {
@@ -129,9 +128,9 @@ impl<'c> CBuffer<'c> {
     }
 }
 
-impl<'c> Drop for CBuffer<'c> {
+impl<'s> Drop for CBuffer<'s> {
     fn drop(&mut self) {
-        unsafe { hardcore_sys::destroy_buffer(ptr::addr_of_mut!(self.handle)) }
+        unsafe { hardcore_sys::destroy_buffer(self.handle.mut_ptr()) }
     }
 }
 
@@ -156,16 +155,16 @@ impl<'a, T> DerefMut for MappedSlice<'a, T> {
 
 unsafe impl<'a, T> Send for MappedSlice<'a, T> {}
 
-pub trait DynamicBuffer: Buffer {
-    fn as_slice<'a>(&self, context: &'a Context) -> Result<MappedSlice<'a, u8>, BufferError>;
+pub trait DynamicBuffer<'s>: Buffer<'s> {
+    fn as_slice(&self) -> Result<MappedSlice<'s, u8>, BufferError>;
 }
 
-pub(crate) struct CDynamicBuffer {
+pub(crate) struct CDynamicBuffer<'s> {
     content_kind: BufferContentKind,
-    handle: hardcore_sys::DynamicBuffer,
+    handle: DependentHandle<'s, hardcore_sys::DynamicBuffer>,
 }
 
-impl CDynamicBuffer {
+impl<'s> CDynamicBuffer<'s> {
     pub(crate) fn create(
         device: u32,
         kind: hardcore_sys::BufferKind,
@@ -177,10 +176,10 @@ impl CDynamicBuffer {
         unsafe {
             let c_desc = descriptor.c_desc()?;
             hardcore_sys::new_dynamic_buffer(
-                ptr::addr_of_mut!(handle),
+                &raw mut handle,
                 device,
                 kind,
-                c_desc.handle(),
+                c_desc.ptr(),
                 count.into(),
                 writable,
             )
@@ -189,7 +188,7 @@ impl CDynamicBuffer {
 
         Ok(CDynamicBuffer {
             content_kind: BufferContentKind::Layout(descriptor.clone()),
-            handle,
+            handle: handle.into(),
         })
     }
 
@@ -206,7 +205,7 @@ impl CDynamicBuffer {
         let mut handle = Default::default();
         unsafe {
             hardcore_sys::new_dynamic_index_buffer(
-                ptr::addr_of_mut!(handle),
+                &raw mut handle,
                 device,
                 kind.into(),
                 count.into(),
@@ -217,12 +216,12 @@ impl CDynamicBuffer {
 
         Ok(CDynamicBuffer {
             content_kind: BufferContentKind::Index(kind),
-            handle,
+            handle: handle.into(),
         })
     }
 
     pub(crate) fn id(&self) -> u64 {
-        self.handle.id
+        self.handle.inner.id
     }
 
     pub(crate) fn layout(&self) -> &Descriptor {
@@ -244,11 +243,17 @@ impl CDynamicBuffer {
     }
 
     fn host_ptr(&self) -> Result<*mut u8, BufferError> {
-        let ptr = unsafe { self.handle.data.read().byte_add(self.handle.data_offset) };
+        let ptr = unsafe {
+            self.handle
+                .inner
+                .data
+                .read()
+                .byte_add(self.handle.inner.data_offset)
+        };
         Ok(ptr.cast())
     }
 
-    pub(crate) fn as_slice<'a>(&self, _: &'a Context) -> Result<MappedSlice<'a, u8>, BufferError> {
+    pub(crate) fn as_slice(&self) -> Result<MappedSlice<'s, u8>, BufferError> {
         Ok(MappedSlice {
             ptr: ptr::slice_from_raw_parts_mut(self.host_ptr()?, self.content_kind.size()),
             phantom_data: PhantomData,
@@ -256,30 +261,30 @@ impl CDynamicBuffer {
     }
 }
 
-impl Drop for CDynamicBuffer {
+impl<'s> Drop for CDynamicBuffer<'s> {
     fn drop(&mut self) {
-        unsafe { hardcore_sys::destroy_dynamic_buffer(ptr::addr_of_mut!(self.handle)) }
+        unsafe { hardcore_sys::destroy_dynamic_buffer(self.handle.mut_ptr()) }
     }
 }
 
-unsafe impl Send for CDynamicBuffer {}
+unsafe impl<'s> Send for CDynamicBuffer<'s> {}
 
-pub trait ShaderReadableBuffer: Buffer {}
+pub trait ShaderReadableBuffer<'s>: Buffer<'s> {}
 
-pub trait ShaderWritableBuffer: ShaderReadableBuffer {}
+pub trait ShaderWritableBuffer<'s>: ShaderReadableBuffer<'s> {}
 
-impl<T> ShaderReadableBuffer for T where T: ShaderWritableBuffer {}
+impl<'s, T> ShaderReadableBuffer<'s> for T where T: ShaderWritableBuffer<'s> {}
 
-pub trait LayoutBuffer: Buffer {
+pub trait LayoutBuffer<'s>: Buffer<'s> {
     fn layout(&self) -> &Descriptor;
 }
 
-pub trait VertexBufferLike: LayoutBuffer {}
+pub trait VertexBufferLike<'s>: LayoutBuffer<'s> {}
 
-pub trait IndexBufferLike: Buffer {
+pub trait IndexBufferLike<'s>: Buffer<'s> {
     fn index_kind(&self) -> &Primitive;
 }
 
-pub trait UniformBufferLike: LayoutBuffer + ShaderReadableBuffer {}
+pub trait UniformBufferLike<'s>: LayoutBuffer<'s> + ShaderReadableBuffer<'s> {}
 
-pub trait StorageBufferLike: LayoutBuffer + ShaderWritableBuffer {}
+pub trait StorageBufferLike<'s>: LayoutBuffer<'s> + ShaderWritableBuffer<'s> {}
