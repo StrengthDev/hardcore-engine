@@ -15,12 +15,11 @@
 //! it will probably make layer management easier and ties well with the way events are handle by
 //! layers in the stack (layers at the top get to try handling events first).
 
-use crate::allocator::Allocator;
 use crate::event::Event;
 use crate::state::State;
 
 /// An abstract application layer, used to represent some component of the application.
-pub trait Layer<'s>: Allocator<'s> {
+pub trait Layer<'s> {
     /// User defined data type passed to every layer in the [`tick`][Layer::tick] function.
     type SharedData;
 
@@ -38,3 +37,7 @@ pub trait Layer<'s>: Allocator<'s> {
     /// handled, then it won't get propagated further down the layer stack.
     fn handle_event(&mut self, event: &Event) -> bool;
 }
+
+impl<'s, T> crate::allocator::seal::Seal for T where T: Layer<'s> {}
+
+impl<'s, T> crate::allocator::Allocator<'s> for T where T: Layer<'s> {}

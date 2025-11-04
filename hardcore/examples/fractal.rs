@@ -71,8 +71,6 @@ impl<'s> FractalLayer<'s> {
     }
 }
 
-impl<'s> Allocator<'s> for FractalLayer<'s> {}
-
 impl<'s> Layer<'s> for FractalLayer<'s> {
     type SharedData = SharedData<'s>;
 

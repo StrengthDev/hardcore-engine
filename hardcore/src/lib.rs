@@ -141,6 +141,8 @@ pub struct Initializer {
     _pvt: (),
 }
 
+impl<'a> allocator::seal::Seal for Initializer {}
+
 impl<'a> allocator::Allocator<'a> for Initializer {}
 
 pub struct Instance {
