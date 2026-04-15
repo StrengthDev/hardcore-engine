@@ -1,14 +1,14 @@
 #pragma once
 
+#include "swapchain_instance.hpp"
+
 #include <core/error.hpp>
 #include <core/glfw.hpp>
 
 #include <util/number.hpp>
 #include <util/uncopyable.hpp>
 
-#include <queue>
-
-namespace hc::render::device {
+namespace hc::render::device::swapchain {
     struct SurfaceInfo {
         VkSurfaceCapabilities2KHR capabilities = {};
         std::vector<VkSurfaceFormat2KHR> available_formats;
@@ -36,21 +36,6 @@ namespace hc::render::device {
         AcquisitionKind acquisition = AcquisitionKind::Normal;
     };
 
-    struct InnerSwapchain {
-        ExternalHandle<VkSwapchainKHR, VK_NULL_HANDLE> handle;
-        std::vector<ExternalHandle<VkImageView, VK_NULL_HANDLE>> image_views;
-        std::vector<ExternalHandle<VkFramebuffer, VK_NULL_HANDLE>> framebuffers;
-
-        static std::expected<InnerSwapchain, Error> create(
-            const VolkDeviceTable& fn_table,
-            VkDevice device,
-            const VkSwapchainCreateInfoKHR& create_info,
-            VkRenderPass render_pass
-        );
-
-        void destroy(const VolkDeviceTable& fn_table, VkDevice device);
-    };
-
     class Swapchain {
     public:
         Swapchain(const Swapchain&) = delete;
@@ -65,25 +50,13 @@ namespace hc::render::device {
             SwapchainParams&& params
         );
 
-        ~Swapchain();
-
         Swapchain(Swapchain&& other) noexcept = default;
 
         Swapchain& operator=(Swapchain&& other) noexcept = default;
 
         void destroy(const VolkDeviceTable& fn_table, VkDevice device);
 
-        /**
-         * @brief Recreate the swapchain according to the new window specifications.
-         *
-         * @param physical_device The physical device handle.
-         * @param fn_table The device function table.
-         * @param device The device handle.
-         * @param window The window from which the swapchain is created.
-         * @return `SwapchainResult::Success` if the operation was successful, otherwise an error describing what went
-         * wrong.
-         */
-        std::expected<bool, Error> recreate(
+        [[nodiscard]] std::expected<std::optional<SwapchainInstance>, Error> recreate(
             VkPhysicalDevice physical_device,
             const VolkDeviceTable& fn_table,
             VkDevice device,
@@ -91,9 +64,7 @@ namespace hc::render::device {
             bool out_of_date
         );
 
-        void destroy_old(const VolkDeviceTable& fn_table, VkDevice device);
-
-        [[nodiscard]] VkSwapchainKHR handle() const noexcept { return this->inner.handle; }
+        [[nodiscard]] VkSwapchainKHR handle() const noexcept { return this->current_instance.handle(); }
 
         [[nodiscard]] VkRenderPassBeginInfo render_pass_info(u32 image_index);
 
@@ -112,7 +83,7 @@ namespace hc::render::device {
         // Hide default constructor, swapchains should be created using the factory function `Swapchain::create`.
         Swapchain() = default;
 
-        InnerSwapchain inner; //!< The properties of a device's queue families.
+        SwapchainInstance current_instance;
 
         /**
          * @brief The surface of the window from which the swapchain is created.
@@ -148,12 +119,6 @@ namespace hc::render::device {
          * Size matches the maximum number of frames in flight.
          */
         std::vector<ExternalHandle<VkSemaphore, VK_NULL_HANDLE>> image_semaphores;
-
-        // Old inner swapchains must not be destroyed while their resources are still in use.
-        /**
-         * @brief A queue containing old inner swapchains, in order of deprecation.
-         */
-        std::queue<InnerSwapchain> old_swapchains;
 
         bool images_out_of_date = false;
     };

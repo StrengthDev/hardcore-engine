@@ -26,15 +26,13 @@ public:
     * @param value The value to assign to this uncopyable variable.
     */
 
-    Uncopyable(const T& value) : value(value) { ; }
+    Uncopyable(const T& value) : value(value) {}
 
     Uncopyable(const Uncopyable&) = delete;
 
     Uncopyable& operator=(const Uncopyable&) = delete;
 
-    Uncopyable(Uncopyable&& other) noexcept
-        : value(std::exchange(other.value, DEFAULT)) {
-    }
+    Uncopyable(Uncopyable&& other) noexcept : value(std::exchange(other.value, DEFAULT)) {}
 
     Uncopyable& operator=(Uncopyable&& other) noexcept {
         this->value = std::exchange(other.value, DEFAULT);
@@ -78,7 +76,7 @@ public:
     *
     * @param value The value to assign to this external handle.
     */
-    ExternalHandle(const T& value) : value(value) { ; }
+    ExternalHandle(const T& value) : value(value) {}
 
     ~ExternalHandle() {
         HC_ASSERT(this->value == DEFAULT, "Inner value must be externally cleaned up");
@@ -88,9 +86,7 @@ public:
 
     ExternalHandle& operator=(const ExternalHandle&) = delete;
 
-    ExternalHandle(ExternalHandle&& other) noexcept
-        : value(std::exchange(other.value, DEFAULT)) {
-    }
+    ExternalHandle(ExternalHandle&& other) noexcept : value(std::exchange(other.value, DEFAULT)) {}
 
     ExternalHandle& operator=(ExternalHandle&& other) noexcept {
         HC_ASSERT(this->value == DEFAULT, "Inner value cannot be overwritten if already assigned");

@@ -5,7 +5,6 @@
 #include "../util.hpp"
 
 #include <core/log.hpp>
-#include <core/window.hpp>
 #include <render/renderer.hpp>
 #include <render/vars.hpp>
 #include <util/flow.hpp>
@@ -152,10 +151,10 @@ namespace hc::render::device {
         };
 
         VkDevice handle;
-        VkResult device_result = vkCreateDevice(physical_handle, &create_info, nullptr, &handle);
-        if (device_result != VK_SUCCESS) {
-            HC_ERROR("Failed to create Vulkan logical device: " << to_str(device_result));
-            return Error(device_result);
+        VkResult vk_result = vkCreateDevice(physical_handle, &create_info, nullptr, &handle);
+        if (vk_result != VK_SUCCESS) {
+            HC_ERROR("Failed to create Vulkan logical device: " << to_str(vk_result));
+            return Error(vk_result);
         }
 
         volkLoadDeviceTable(&device.fn_table, handle);
@@ -173,6 +172,22 @@ namespace hc::render::device {
         }
         device.memory = *std::move(memory_result);
 
+        VkPipelineCacheCreateInfo cache_info = {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .initialDataSize = 0,
+            .pInitialData = nullptr
+        };
+
+        vk_result = device.fn_table.vkCreatePipelineCache(handle, &cache_info, nullptr, &device.pipeline_cache.get());
+        if (vk_result != VK_SUCCESS) {
+            HC_ERROR("Failed to create pipeline cache: " << to_str(vk_result));
+            device.memory.destroy(device.fn_table, handle);
+            device.fn_table.vkDestroyDevice(handle, nullptr);
+            return Error(vk_result);
+        }
+
         device.graph = Graph::create(
             device.scheduler.graphics_queues()[0].get().family,
             device.scheduler.compute_queue().family,
@@ -181,13 +196,17 @@ namespace hc::render::device {
 
         device.physical_handle = physical_handle;
         device.handle = handle;
-        device.cleanup_queues = std::vector<std::vector<DestructionMark>>(max_frames_in_flight());
 
         return device;
     }
 
     Device::~Device() {
-        if (this->handle != VK_NULL_HANDLE) {
+        if (this->handle.valid()) {
+            this->graph.destroy(this->fn_table, this->handle);
+
+            this->fn_table.vkDestroyPipelineCache(this->handle, this->pipeline_cache, nullptr);
+            this->pipeline_cache.destroy();
+
             this->memory.destroy(this->fn_table, this->handle);
             this->scheduler.destroy(this->fn_table, this->handle);
             this->fn_table.vkDestroyDevice(this->handle, nullptr);
@@ -197,7 +216,7 @@ namespace hc::render::device {
     }
 
     std::expected<void, Error> Device::tick(u8 frame_mod, u8 next_frame_mod) {
-        this->cleanup(frame_mod);
+        this->cleaner.tick(this->fn_table, this->handle, this->memory);
 
         this->memory.unmap_ranges(this->fn_table, this->handle);
         auto memory_result = this->memory.flush_ranges(this->fn_table, this->handle, frame_mod);
@@ -225,14 +244,12 @@ namespace hc::render::device {
         return {};
     }
 
-    void Device::finish(std::vector<u8> const& frame_mods) {
+    void Device::finish() {
         this->memory.unmap_ranges(this->fn_table, this->handle);
 
         this->fn_table.vkDeviceWaitIdle(this->handle);
 
-        for (u8 frame_mod : frame_mods) {
-            this->cleanup(frame_mod);
-        }
+        this->cleaner.clear(this->fn_table, this->handle, this->memory);
     }
 
     const char* Device::name() const noexcept {
@@ -273,13 +290,13 @@ namespace hc::render::device {
             return present_modes_result.error();
         }
 
-        SurfaceInfo surface_info = {
+        swapchain::SurfaceInfo surface_info = {
             .capabilities = *capabilities_result,
             .available_formats = *std::move(formats_result),
             .available_present_modes = *std::move(present_modes_result),
         };
 
-        SwapchainParams params = {
+        swapchain::SwapchainParams params = {
             .extent = extent,
             .preferred_present_mode = VK_PRESENT_MODE_MAILBOX_KHR,
             .preferred_format = {
@@ -288,7 +305,7 @@ namespace hc::render::device {
             },
         };
 
-        auto swapchain_result = Swapchain::create(
+        auto swapchain_result = swapchain::Swapchain::create(
             this->fn_table,
             this->handle,
             std::move(surface),
@@ -321,14 +338,10 @@ namespace hc::render::device {
 
         auto node = this->swapchains.extract(window);
 
-        WindowDestructionMark mark = {
-            .window = window,
-            .swapchain = std::move(node.mapped()),
-        };
-        this->cleanup_submissions.emplace_back(std::move(mark));
+        this->cleaner.yield_window(window, std::move(node.mapped()));
     }
 
-    std::expected<buffer::Params, Error> Device::new_buffer(
+    std::expected<buffer::BufferData, Error> Device::new_buffer(
         HCBufferKind kind,
         Descriptor&& descriptor,
         u64 count,
@@ -356,42 +369,42 @@ namespace hc::render::device {
         if (writable)
             flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 
-        auto alloc_result = this->memory.alloc(this->fn_table, this->handle, flags, descriptor.size() * count);
+        auto alloc_result = this->memory.alloc_buffer(this->fn_table, this->handle, flags, descriptor.size() * count);
         if (!alloc_result) {
             return alloc_result.error();
         }
         auto ref = *std::move(alloc_result);
 
-        buffer::Params params = {
-            .id = this->graph.add_resource(ref),
+        buffer::BufferData params = {
+            .id = this->graph.add_resource(buffer::Buffer(ref)),
             .size = ref.size
         };
 
         return params;
     }
 
-    std::expected<buffer::Params, Error> Device::new_index_buffer(HCPrimitive index_type, u64 count, bool writable) {
+    std::expected<buffer::BufferData, Error> Device::new_index_buffer(HCPrimitive index_type, u64 count, bool writable) {
         HC_ASSERT(count, "Must have something to allocate");
 
         VkBufferUsageFlags flags = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
         if (writable)
             flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 
-        auto alloc_result = this->memory.alloc(this->fn_table, this->handle, flags, size_of(index_type));
+        auto alloc_result = this->memory.alloc_buffer(this->fn_table, this->handle, flags, size_of(index_type));
         if (!alloc_result) {
             return alloc_result.error();
         }
         auto ref = *std::move(alloc_result);
 
-        buffer::Params params = {
-            .id = this->graph.add_resource(ref),
+        buffer::BufferData params = {
+            .id = this->graph.add_resource(buffer::Buffer(ref)),
             .size = ref.size
         };
 
         return params;
     }
 
-    std::expected<buffer::DynamicParams, Error> Device::new_dynamic_buffer(
+    std::expected<buffer::DynamicBufferData, Error> Device::new_dynamic_buffer(
         HCBufferKind kind,
         Descriptor&& descriptor,
         u64 count,
@@ -421,7 +434,7 @@ namespace hc::render::device {
             flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
         }
 
-        auto alloc_result = this->memory.alloc_dyn(
+        auto alloc_result = this->memory.alloc_buffer_dyn(
             this->fn_table,
             this->handle,
             flags,
@@ -432,17 +445,17 @@ namespace hc::render::device {
             return alloc_result.error();
         }
         auto ref = *std::move(alloc_result);
-        buffer::DynamicParams params = {
-            .id = this->graph.add_resource(ref),
+        buffer::DynamicBufferData data = {
+            .id = this->graph.add_resource(buffer::DynamicBuffer(ref)),
             .size = ref.size,
-            .data = ref.host_ptr,
-            .data_offset = ref.offset + ref.padding,
+            .map_ptr = ref.host_ptr,
+            .map_offset = ref.offset + ref.padding,
         };
 
-        return params;
+        return data;
     }
 
-    std::expected<buffer::DynamicParams, Error> Device::new_dynamic_index_buffer(
+    std::expected<buffer::DynamicBufferData, Error> Device::new_dynamic_index_buffer(
         HCPrimitive index_type,
         u64 count,
         bool writable,
@@ -455,7 +468,7 @@ namespace hc::render::device {
             flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
         }
 
-        auto alloc_result = this->memory.alloc_dyn(
+        auto alloc_result = this->memory.alloc_buffer_dyn(
             this->fn_table,
             this->handle,
             flags,
@@ -466,21 +479,27 @@ namespace hc::render::device {
             return alloc_result.error();
         }
         auto ref = *std::move(alloc_result);
-        buffer::DynamicParams params = {
-            .id = this->graph.add_resource(ref),
+        buffer::DynamicBufferData data = {
+            .id = this->graph.add_resource(buffer::DynamicBuffer(ref)),
             .size = ref.size,
-            .data = ref.host_ptr,
-            .data_offset = ref.offset + ref.padding,
+            .map_ptr = ref.host_ptr,
+            .map_offset = ref.offset + ref.padding,
         };
 
-        return params;
+        return data;
     }
 
     void Device::destroy_buffer(u64 id) {
-        this->cleanup_submissions.emplace_back(this->graph.remove_resource(id));
+        // todo check if buffer exists
+        this->cleaner.yield_buffer(this->graph.remove_resource_b(id));
     }
 
-    std::expected<texture::Params, Error> Device::create_texture(VkImageCreateInfo const& image_info) {
+    void Device::destroy_dynamic_buffer(u64 id) {
+        // todo check if buffer exists
+        this->cleaner.yield_dynamic_buffer(this->graph.remove_resource_bd(id));
+    }
+
+    std::expected<texture::TextureData, Error> Device::create_texture(VkImageCreateInfo const& image_info) {
         auto texture_result = texture::create_image(this->physical_handle, this->fn_table, this->handle, image_info);
         if (!texture_result) {
             return texture_result.error();
@@ -493,46 +512,27 @@ namespace hc::render::device {
         }
         memory::Ref ref = *ref_result;
 
-        texture::Params params = {};
-        params.size = ref.size;
-        params.id = this->graph.add_texture(ref, image, image_info);
+        texture::TextureData data = {
+            .id = this->graph.add_texture(texture::Texture(ref, image, image_info)),
+            .size = ref.size,
+        };
 
-        return params;
+        return data;
     }
 
     void Device::destroy_texture(u64 id) {
-        this->cleanup_submissions.emplace_back(this->graph.remove_texture(id));
+        this->cleaner.yield_texture(this->graph.remove_texture(id));
     }
 
-    void Device::cleanup(u8 frame_mod) {
-        auto& cleanup_queue = this->cleanup_queues[frame_mod];
-        for (auto& mark : cleanup_queue) {
-            std::visit(
-                DestructionMarkHandler{
-                    [this](WindowDestructionMark& window_mark) {
-                        window_mark.swapchain.destroy(this->fn_table, this->handle);
-                        window::destroy(window_mark.window);
-                    },
-                    [this](OldSwapchainDestructionMark const& swapchain_mark) {
-                        HC_ASSERT(
-                            this->swapchains.contains(swapchain_mark.window),
-                            "A swapchain matching the mark's window should exist"
-                        );
-                        this->swapchains.at(swapchain_mark.window).destroy_old(this->fn_table, this->handle);
-                    },
-                    [this](ResourceDestructionMark const& resource_mark) {
-                        this->memory.free(resource_mark);
-                    },
-                    [this](TextureDestructionMark const& texture_mark) {
-                        this->fn_table.vkDestroyImage(this->handle, texture_mark.image, nullptr);
-                        this->memory.free(texture_mark);
-                    },
-                },
-                mark
-            );
-        }
-        cleanup_queue.clear();
-        std::swap(cleanup_queue, this->cleanup_submissions);
+    std::expected<u64, Error> Device::create_render_pass(
+        std::span<HCSubpass const> const& subpasses,
+        UserPredicate<Sz>&& predicate
+    ) {
+        return this->graph.create_render_pass(this->fn_table, this->handle, subpasses, std::move(predicate));
+    }
+
+    void Device::destroy_render_pass(u64 id) {
+        this->graph.destroy_render_pass(this->fn_table, this->handle, id);
     }
 
     std::expected<void, Error> Device::present(u8 frame_mod) {
@@ -592,7 +592,7 @@ namespace hc::render::device {
 
                 if (recreation_result) {
                     if (*recreation_result) {
-                        this->cleanup_submissions.emplace_back(OldSwapchainDestructionMark{window});
+                        this->cleaner.yield_swapchain(**std::move(recreation_result));
                     } else {
                         continue;
                     }
@@ -607,7 +607,7 @@ namespace hc::render::device {
             }
             auto [image_ready_semaphore, index, acquisition] = *image_details;
 
-            if (acquisition != AcquisitionKind::Normal) {
+            if (acquisition != swapchain::AcquisitionKind::Normal) {
                 continue;
             }
 
@@ -712,7 +712,7 @@ namespace hc::render::device {
                     );
 
                     if (recreation_result && *recreation_result) {
-                        this->cleanup_submissions.emplace_back(OldSwapchainDestructionMark{window});
+                        this->cleaner.yield_swapchain(**std::move(recreation_result));
                     }
                 } else {
                     HC_ERROR("Failed to present swapchain image: " << to_str(presentation_result));

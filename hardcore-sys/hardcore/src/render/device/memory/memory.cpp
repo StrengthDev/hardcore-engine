@@ -805,7 +805,7 @@ namespace hc::render::device::memory {
         return base * (static_cast<VkDeviceSize>(1) << static_cast<VkDeviceSize>(exp));
     }
 
-    std::expected<BufferRef, Error> Memory::alloc(
+    std::expected<BufferRef, Error> Memory::alloc_buffer(
         VolkDeviceTable const& fn_table,
         VkDevice device,
         VkBufferUsageFlags flags,
@@ -859,7 +859,7 @@ namespace hc::render::device::memory {
         };
     }
 
-    std::expected<DynamicBufferRef, Error> Memory::alloc_dyn(
+    std::expected<DynamicBufferRef, Error> Memory::alloc_buffer_dyn(
         VolkDeviceTable const& fn_table,
         VkDevice device,
         VkBufferUsageFlags flags,
@@ -992,22 +992,27 @@ namespace hc::render::device::memory {
         };
     }
 
-    void Memory::free(ResourceDestructionMark const& mark) {
-        if (mark.dynamic) {
-            HC_ASSERT(this->dynamic_buffer_pools.contains(mark.usage), "Pool list matching the flags must exist");
-            HC_TRACE("Freeing in dynamic pool " << mark.pool << ':' << mark.usage << " at offset " << mark.offset);
-            this->dynamic_buffer_pools[mark.usage][mark.pool].free_allocation(mark.offset);
-        } else {
-            HC_ASSERT(this->buffer_pools.contains(mark.usage), "Pool list matching the flags must exist");
-            HC_TRACE("Freeing in pool " << mark.pool << ':' << mark.usage << " at offset " << mark.offset);
-            this->buffer_pools[mark.usage][mark.pool].free_allocation(mark.offset);
-        }
+    void Memory::free_buffer(BufferRef const& ref) {
+        HC_ASSERT(this->dynamic_buffer_pools.contains(ref.flags), "Pool list matching the flags must exist");
+
+        HC_TRACE("Freeing in dynamic pool " << ref.pool << ':' << ref.flags << " at offset " << ref.offset);
+
+        this->dynamic_buffer_pools[ref.flags][ref.pool].free_allocation(ref.offset);
     }
 
-    void Memory::free(TextureDestructionMark const& mark) {
-        HC_ASSERT(this->texture_pools.contains(mark.memory_type_bits), "Pool list matching the flags must exist");
-        HC_TRACE("Freeing in texture pool " << mark.pool << ':' << mark.memory_type_bits << " at offset " << mark.offset);
-        this->texture_pools[mark.memory_type_bits][mark.pool].free_allocation(mark.offset);
+    void Memory::free_dynamic_buffer(DynamicBufferRef const& ref) {
+        HC_ASSERT(this->buffer_pools.contains(ref.flags), "Pool list matching the flags must exist");
+
+        HC_TRACE("Freeing in pool " << ref.pool << ':' << ref.flags << " at offset " << ref.offset);
+        this->buffer_pools[ref.flags][ref.pool].free_allocation(ref.offset);
+    }
+
+    void Memory::free_texture(Ref const& ref) {
+        HC_ASSERT(this->texture_pools.contains(ref.flags), "Pool list matching the flags must exist");
+
+        HC_TRACE("Freeing in texture pool " << ref.pool << ':' << ref.flags << " at offset " << ref.offset);
+
+        this->texture_pools[ref.flags][ref.pool].free_allocation(ref.offset);
     }
 
     VkDeviceSize Memory::alignment_of(VkBufferUsageFlags flags) const noexcept {

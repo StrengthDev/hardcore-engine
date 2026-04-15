@@ -2,8 +2,9 @@
 
 // TODO add example
 
-use crate::dependent_handle::DependentHandle;
-use crate::io::{Call, CallError};
+use crate::Error;
+use crate::handle::Handle;
+use crate::io::{Call};
 
 pub use hardcore_sys::CursorMode;
 use hardcore_sys::{
@@ -17,32 +18,7 @@ use hardcore_sys::{
 };
 
 use std::ffi::{c_int, CString, NulError};
-use thiserror::Error;
 use tracing::error;
-
-/// An error related to a [`Window`].
-#[derive(Error, Debug)]
-pub enum WindowError {
-    /// An error has occurred withing the system crate.
-    #[error(transparent)]
-    SystemError(#[from] hardcore_sys::Error),
-
-    /// An error has occurred while forwarding a call to the main thread
-    #[error(transparent)]
-    Call(#[from] CallError),
-
-    /// Failed to initialise window, this may indicate that the context has not been initialised yet.
-    #[error("failed to create a new window")]
-    Initialisation,
-
-    /// Could turn provided string slice into a valid [`CString`].
-    #[error("could turn provided string slice into a valid C string")]
-    InvalidName(#[from] NulError),
-
-    /// Failed to receive call execution result.
-    #[error("failed to receive call execution result")]
-    ReceiveResult,
-}
 
 // TODO add function parameter that is used to select the surface format
 pub(super) struct WindowParams {
@@ -56,11 +32,11 @@ pub(super) struct WindowParams {
 
 pub(super) enum WindowCall {
     CreateWindow {
-        result_channel: tokio::sync::oneshot::Sender<Result<hardcore_sys::Window, WindowError>>,
+        result_channel: tokio::sync::oneshot::Sender<Result<hardcore_sys::Window, Error>>,
         params: WindowParams,
     },
     DestroyWindow {
-        result_channel: tokio::sync::oneshot::Sender<Result<(), WindowError>>,
+        result_channel: tokio::sync::oneshot::Sender<Result<(), Error>>,
         window: hardcore_sys::Window,
     },
     SetCursorMode {
@@ -70,14 +46,14 @@ pub(super) enum WindowCall {
 }
 
 impl WindowCall {
-    pub(super) fn execute(self) -> Result<(), CallError> {
+    pub(super) fn execute(self) -> Result<(), Error> {
         match self {
             WindowCall::CreateWindow {
                 result_channel,
                 params,
             } => result_channel
-                .send(Window::create_inner(params))
-                .map_err(move |_| CallError::Execute)?,
+                .send(Window::new_inner(params))
+                .map_err(move |_| Error::Execute)?,
             WindowCall::DestroyWindow {
                 result_channel,
                 window,
@@ -85,7 +61,7 @@ impl WindowCall {
                 Window::destroy(window);
                 result_channel
                     .send(Ok(()))
-                    .map_err(move |_| CallError::Execute)?
+                    .map_err(move |_| Error::Execute)?
             }
             WindowCall::SetCursorMode {
                 window,
@@ -101,12 +77,12 @@ unsafe impl Send for WindowCall {}
 
 /// A high-level abstraction over an *OS* window.
 pub struct Window<'s> {
-    handle: DependentHandle<'s, hardcore_sys::Window>,
+    handle: Handle<'s, hardcore_sys::Window>,
     io_caller: crate::io::Caller,
 }
 
 impl<'s> Window<'s> {
-    pub(crate) fn create(
+    pub(crate) fn new(
         io_caller: crate::io::Caller,
         device: u32,
         width: u32,
@@ -114,7 +90,7 @@ impl<'s> Window<'s> {
         pos_x: Option<i32>,
         pos_y: Option<i32>,
         name: &str,
-    ) -> Result<Self, WindowError> {
+    ) -> Result<Self, Error> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         let call = WindowCall::CreateWindow {
             result_channel: tx,
@@ -132,7 +108,7 @@ impl<'s> Window<'s> {
 
         let inner = rx
             .blocking_recv()
-            .map_err(move |_| WindowError::ReceiveResult)??;
+            .map_err(move |_| Error::ReceiveResult)??;
 
         Ok(Window {
             handle: inner.into(),
@@ -140,7 +116,7 @@ impl<'s> Window<'s> {
         })
     }
 
-    fn create_inner(
+    fn new_inner(
         WindowParams {
             device,
             width,
@@ -149,7 +125,7 @@ impl<'s> Window<'s> {
             pos_y,
             name,
         }: WindowParams,
-    ) -> Result<hardcore_sys::Window, WindowError> {
+    ) -> Result<hardcore_sys::Window, Error> {
         let c_name = CString::new(name)?;
 
         let params = hardcore_sys::WindowParams {
@@ -165,10 +141,6 @@ impl<'s> Window<'s> {
             let mut handle = Default::default();
             new_window(&raw mut handle, params).into_std_result()?;
 
-            if handle.handle.is_null() {
-                return Err(WindowError::Initialisation);
-            }
-
             let ptr = &raw mut handle;
             set_window_position_callback(ptr, Some(callback::position));
             set_window_size_callback(ptr, Some(callback::size));
@@ -176,7 +148,7 @@ impl<'s> Window<'s> {
             set_window_refresh_callback(ptr, Some(callback::refresh));
             set_window_focus_callback(ptr, Some(callback::focus));
             set_window_minimize_callback(ptr, Some(callback::minimize));
-            set_window_maximize_callback(ptr, Some(callback::maximized));
+            set_window_maximize_callback(ptr, Some(callback::maximize));
             set_window_framebuffer_callback(ptr, Some(callback::framebuffer));
             set_window_scale_callback(ptr, Some(callback::scale));
             set_window_mouse_button_callback(ptr, Some(callback::mouse_button));
@@ -208,7 +180,7 @@ impl<'s> Window<'s> {
     }
 
     /// Set the cursor mode for this window.
-    pub fn set_cursor_mode(&mut self, cursor_mode: CursorMode) -> Result<(), WindowError> {
+    pub fn set_cursor_mode(&mut self, cursor_mode: CursorMode) -> Result<(), Error> {
         let call = WindowCall::SetCursorMode {
             window: self.handle.mut_ptr(),
             cursor_mode,
@@ -298,7 +270,7 @@ mod callback {
         }
     }
 
-    pub(super) unsafe extern "C" fn maximized(id: usize, maximized: bool) {
+    pub(super) unsafe extern "C" fn maximize(id: usize, maximized: bool) {
         if let Err(e) = emit_event(Event::Window {
             id,
             event: WindowEvent::Maximized(maximized),
@@ -328,18 +300,17 @@ mod callback {
         }
     }
 
-    #[allow(improper_ctypes_definitions)] // Doesn't matter here
     pub(super) unsafe extern "C" fn mouse_button(
         id: usize,
-        button: hardcore_sys::MouseButton,
-        action: hardcore_sys::ButtonAction,
+        button: MouseButton,
+        action: ButtonAction,
         mods: c_int,
     ) {
         if let Err(e) = emit_event(Event::Window {
             id,
             event: WindowEvent::MouseButton {
-                button: MouseButton::from(button),
-                action: ButtonAction::from(action),
+                button,
+                action,
                 mods: Modifiers::from(mods),
             },
         }) {
@@ -374,20 +345,19 @@ mod callback {
         }
     }
 
-    #[allow(improper_ctypes_definitions)] // Doesn't matter here
     pub(super) unsafe extern "C" fn key(
         id: usize,
-        key: hardcore_sys::KeyboardKey,
+        key: KeyboardKey,
         scan_code: i32,
-        action: hardcore_sys::ButtonAction,
+        action: ButtonAction,
         mods: c_int,
     ) {
         if let Err(e) = emit_event(Event::Window {
             id,
             event: WindowEvent::Key {
-                key: KeyboardKey::from(key),
+                key,
                 scan_code,
-                action: ButtonAction::from(action),
+                action,
                 mods: Modifiers::from(mods),
             },
         }) {

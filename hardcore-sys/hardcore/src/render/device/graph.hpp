@@ -1,30 +1,49 @@
 #pragma once
 
-#include <unordered_map>
-#include <optional>
-
-#include <render/renderer.h>
 #include <render/device/memory/reference.hpp>
+#include "render/render_pass/render_pass_bank.hpp"
+#include "render/resource/buffer.hpp"
+#include "render/resource/texture.hpp"
+
+#include <render/ops/common.h>
+#include <render/ops/render_pass.h>
+
 #include <util/number.hpp>
 #include <util/bank.hpp>
+#include <util/user_predicate.hpp>
 
-#include "destruction_mark.hpp"
+#include <span>
+#include <ranges>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace hc::render::device {
-    /**
-    * @brief A node's input resource.
-    */
-    struct InputResource {
-        u64 id = std::numeric_limits<u64>::max(); //!< The ID of the resource in the graph.
-        std::optional<u64> origin; //!< The key of the graph node which wrote to this resource, if any did.
+    class Graph;
+
+    class GraphCompilation {
+    public:
+        [[nodiscard]]
+        static std::expected<GraphCompilation, Error> create(Graph const& graph) noexcept;
+
+        void record_commands();
+
+    private:
+        GraphCompilation() = default;
     };
 
-    /**
-    * @brief A node's output resource.
-    */
-    struct OutputResource {
-        u64 id = std::numeric_limits<u64>::max(); //!< The ID of the resource in the graph.
-        std::vector<u64> dependents; //!< The list of nodes depending on this resource.
+    struct Command {
+        u64 id;
+    };
+
+    struct RenderPass {};
+
+    enum class ResourceType: u8 {
+        Texture,
+    };
+
+    struct ResourceRef {
+        u64 id = std::numeric_limits<u64>::max();
+        ResourceType type;
     };
 
     enum class NodeType : u8 {
@@ -33,15 +52,12 @@ namespace hc::render::device {
         RayTracing,
     };
 
-    /**
-    * @brief A node in a graph.
-    *
-    * This represents a call or dispatch of a device operation, such as a compute pipeline call.
-    */
     struct Node {
-        NodeType type; //!< The type of operation this node represents.
-        std::vector<InputResource> inputs; //!< The list of resource inputs for this node.
-        std::vector<OutputResource> outputs; //!< The list of resource outputs for this node.
+        NodeType type;
+        std::vector<ResourceRef> inputs;
+        std::vector<ResourceRef> outputs;
+        std::vector<u64> dependencies;
+        std::vector<u64> dependents;
     };
 
     /**
@@ -60,17 +76,6 @@ namespace hc::render::device {
         } memory; //!< Data used for cleanup.
     };
 
-    struct Texture {
-        VkImage image;
-        VkImageCreateInfo image_info;
-
-        struct Memory {
-            u64 pool; //!< The id of the memory pool this resource is allocated in. (Excludes alignment padding)
-            VkDeviceSize offset; //!< The offset of this resource inside its respective memory pool.
-            u32 flags; //!< The usage flags of this resource.
-        } memory; //!< Data used for cleanup.
-    };
-
     /**
     * @brief An acyclic computational graph.
     */
@@ -79,6 +84,8 @@ namespace hc::render::device {
         Graph() = default;
 
         static Graph create(u32 graphics_queue_family, u32 compute_queue_family, u32 transfer_queue_family);
+
+        void destroy(VolkDeviceTable const& fn_table, VkDevice device);
 
         Graph(Graph&& other) noexcept = default;
 
@@ -115,59 +122,75 @@ namespace hc::render::device {
 
         [[nodiscard]] std::expected<void, Error> record() const noexcept;
 
-        [[nodiscard]] u64 add_resource(const memory::BufferRef& ref);
-        [[nodiscard]] u64 add_resource(const memory::DynamicBufferRef& ref);
+        [[nodiscard]] u64 add_resource(buffer::Buffer&& buffer);
+        [[nodiscard]] u64 add_resource(buffer::DynamicBuffer&& buffer);
 
-        [[nodiscard]] ResourceDestructionMark remove_resource(u64 id);
+        [[nodiscard]] buffer::Buffer remove_resource_b(u64 id);
+        [[nodiscard]] buffer::DynamicBuffer remove_resource_bd(u64 id);
 
-        [[nodiscard]] u64 add_texture(const memory::Ref& ref, VkImage image, VkImageCreateInfo const& info);
+        [[nodiscard]] u64 add_texture(texture::Texture&& texture);
 
-        [[nodiscard]] TextureDestructionMark remove_texture(u64 id);
+        [[nodiscard]] texture::Texture remove_texture(u64 id);
+
+        [[nodiscard]]
+        std::expected<u64, Error> create_render_pass(
+            VolkDeviceTable const& fn_table,
+            VkDevice device,
+            std::span<HCSubpass const> const& subpasses,
+            UserPredicate<Sz>&& predicate
+        );
+
+        void destroy_render_pass(VolkDeviceTable const& fn_table, VkDevice device, u64 id);
 
     private:
         Graph(u8 graphics_idx, u8 compute_idx, u8 transfer_idx, Sz command_queues);
 
-        /**
-        * @brief Verify if the graph is malformed.
-        *
-        * @return *true* if the graph structure is correct, *false* otherwise.
-        */
-        [[nodiscard]] bool validate_graph() const noexcept;
+        [[nodiscard]]
+        std::expected<u64, Error> insert_node(
+            std::vector<ResourceRef>&& inputs,
+            std::vector<ResourceRef>&& outputs,
+            std::vector<u64>&& dependencies
+        );
 
-        /**
-        * @brief Filter unused nodes in the graph.
-        *
-        * A node is considered unused if it does not contribute in any way to any output of the graph.
-        *
-        * @return A pair containing the set of used nodes, and a list of relevant root nodes (also included within
-        * the used nodes, it is also guaranteed that there are no duplicate root nodes in the list).
-        */
-        [[nodiscard]] std::pair<std::unordered_set<u64>, std::vector<u64>> filter_unused_nodes() const noexcept;
+        void remove_node(u64 id);
 
-        // It is assumed the nodes in the graph never form a cycle
+        template<std::ranges::range R>
+        void remove_nodes(R&& ids) requires std::same_as<std::ranges::range_value_t<R>, u64> {
+            for (u64 const id : ids) {
+                this->remove_node(id);
+            }
+        }
 
-        Bank<Node> nodes; //!< The collection of nodes that compose the graph.
-        Bank<Resource> resources; //!< The collection of graph resources, used by nodes.
-        Bank<Texture> textures;
+        void prune_node(u64 prune_id);
+
+        [[nodiscard]]
+        u64 insert_resource(buffer::Buffer&& resource);
+
+        void remove_resource(u64 id);
+
+        [[nodiscard]]
+        std::expected<std::optional<u64>, Error> get_dependency_node(HCDependency const& dependency) const noexcept;
+
+        Bank<Node> nodes;
+        std::unordered_set<u64> pruned_node_ids;
+        bool dirty = true;
+
+        Bank<buffer::Buffer> resources;
+        Bank<buffer::DynamicBuffer> dynamic_resources;
+        Bank<texture::Texture> textures;
+
+        struct RenderPassGraphData {
+            std::vector<u64> nodes;
+            UserPredicate<Sz> predicate;
+        };
+
+        RenderPassBank render_passes;
+        std::unordered_map<u64, RenderPassGraphData> render_pass_datas;
 
         u8 graphics_idx = std::numeric_limits<u8>::max(); //!< The index of the graphics command list in `commands`.
         u8 compute_idx = std::numeric_limits<u8>::max(); //!< The index of the compute command list in `commands`.
         u8 transfer_idx = std::numeric_limits<u8>::max(); //!< The index of the transfer command list in `commands`.
 
         std::vector<std::vector<void*>> commands; //!< A compiled list of commands.
-
-        /**
-        * @brief Custom hash function for the output type.
-        */
-        struct OutputHash {
-            std::size_t operator()(const std::pair<u64, u64>& output) const noexcept;
-        };
-
-        /**
-        * @brief The set of graph resources which are output by the graph.
-        *
-        * Each item is a pair of ID's, the first being the resource ID and the second the last node that writes to it.
-        */
-        std::unordered_set<std::pair<u64, u64>, OutputHash> outputs;
     };
 }

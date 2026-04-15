@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../core/result.h"
+#include "../../core/result.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,10 +12,10 @@ extern "C" {
  * @brief Primitive data types.
  */
 enum HCPrimitive {
+    HCPrimitive_Float, //!< A floating-point value.
     HCPrimitive_Integer, //!< A signed integer value.
     HCPrimitive_Unsigned, //!< An unsigned value.
     HCPrimitive_Boolean, //!< A boolean value.
-    HCPrimitive_Float, //!< A floating-point value.
 };
 
 /**

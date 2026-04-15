@@ -36,6 +36,14 @@ enum HCError {
     HCError_UnmetQueueRequirements, //!< Hardware does not support required queue capabilities.
     HCError_InvalidRenderGraph, //!< Attempted to use the render graph while it is in an invalid state.
     HCError_ShaderReflectionFailed, //!< Failed to perform shader resource reflection.
+    HCError_DescriptorMismatch, //!< Two or more descriptors did not match.
+    HCError_VulkanUnknown, //!< Unknown Vulkan error, could be invalid input or an implementation failure.
+    HCError_ValidationFailed, //!< Command failed due to invalid usage.
+    HCError_Fragmentation, //!< Could not create descriptor pool due to fragmentation.
+    HCError_InvalidShader, //!< Invalid shader.
+    HCError_NoSuchResource, //!< The provided resource input does not exist.
+    HCError_NoSuchNode, //!< The provided execution graph node does not exist.
+    HCError_PrunedNode, //!< The provided execution graph node has deleted dependencies.
 };
 
 /**

@@ -33,7 +33,7 @@ pub struct State<'s, SharedData> {
 }
 
 impl<'s, SharedData> State<'s, SharedData> {
-    pub(super) fn create(device_count: u32, io_caller: crate::io::Caller) -> Self {
+    pub(super) fn new(device_count: u32, io_caller: crate::io::Caller) -> Self {
         let devices: Vec<_> = (0..device_count)
             .map(move |id| Device::new(id, io_caller.clone()))
             .collect();

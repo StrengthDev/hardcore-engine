@@ -37,6 +37,14 @@ impl core::fmt::Display for Error {
             Error::UnmetQueueRequirements => write!(f, "Hardware does not support required queue capabilities."),
             Error::InvalidRenderGraph => write!(f, "Attempted to use the render graph while it is in an invalid state."),
             Error::ShaderReflectionFailed => write!(f, "Failed to perform shader resource reflection."),
+            Error::DescriptorMismatch => write!(f, "Two or more descriptors did not match."),
+            Error::VulkanUnknown => write!(f, "Unknown Vulkan error, could be invalid input or an implementation failure."),
+            Error::ValidationFailed => write!(f, "Command failed due to invalid usage."),
+            Error::Fragmentation => write!(f, "Could not create descriptor pool due to fragmentation."),
+            Error::InvalidShader => write!(f, "Invalid shader."),
+            Error::NoSuchResource => write!(f, "The provided resource input does not exist."),
+            Error::NoSuchNode => write!(f, "The provided execution graph node does not exist."),
+            Error::PrunedNode => write!(f, "The provided execution graph node has deleted dependencies."),
         }
     }
 }
@@ -69,5 +77,5 @@ impl MouseButton {
     pub const RIGHT: MouseButton = MouseButton::Button2;
 
     /// The middle mouse button, an alias for mouse button 3.
-    pub const MIDDLE: MouseButton = MouseButton::Button2;
+    pub const MIDDLE: MouseButton = MouseButton::Button3;
 }

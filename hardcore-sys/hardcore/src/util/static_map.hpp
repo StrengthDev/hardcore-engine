@@ -20,7 +20,7 @@ namespace hc {
         requires ((std::is_integral_v<T> || std::is_enum_v<T>) && FIRST <= LAST)
     class BasicKey {
     public:
-        static Sz constexpr count = static_cast<Sz>(LAST - FIRST + 1);
+        static Sz constexpr count = static_cast<Sz>(static_cast<i64>(LAST) - static_cast<i64>(FIRST) + 1);
 
         constexpr BasicKey(T value) noexcept
             : value(value) {
@@ -28,7 +28,7 @@ namespace hc {
 
         std::optional<Sz> constexpr to_index() const noexcept {
             if (this->value >= FIRST && this->value <= LAST) {
-                return this->value - FIRST;
+                return static_cast<Sz>(static_cast<i64>(this->value) - static_cast<i64>(FIRST));
             }
 
             return std::nullopt;

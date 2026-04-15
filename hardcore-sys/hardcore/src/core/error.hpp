@@ -2,6 +2,8 @@
 
 #include <core/result.h>
 
+#include <vulkan/vulkan.h>
+
 #include <expected>
 
 namespace hc {

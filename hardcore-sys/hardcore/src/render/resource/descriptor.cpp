@@ -2,8 +2,9 @@
 
 #include "descriptor.hpp"
 
+#include <render/resource/descriptor.h>
+
 #include <core/log.hpp>
-#include <render/descriptor.h>
 #include <util/number.hpp>
 
 static Sz size_of(HCPrimitive) {
@@ -71,6 +72,42 @@ static Sz size_of(const HCField* fields, Sz count) {
     return total;
 }
 
+namespace hc::render {
+    StructDescriptor::StructDescriptor(StructDescriptor const& other) {
+        this->members.reserve(other.members.size());
+
+        for (auto const& member : other.members) {
+            members.push_back(std::make_unique<MemberDescriptor>(*member));
+        }
+    }
+
+    bool StructDescriptor::operator==(const StructDescriptor& other) const noexcept {
+        if (this->members.size() != other.members.size()) {
+            return false;
+        }
+
+        for (auto const& [this_member, other_member] : std::views::zip(this->members, other.members)) {
+            if (*this_member != *other_member) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    Sz size_of(HCPrimitive primitive) {
+        return ::size_of(primitive);
+    }
+
+    Descriptor::Descriptor(const HCDescriptor& descriptor)
+        : fields(descriptor.fields, descriptor.fields + descriptor.field_count) {
+    }
+
+    Sz Descriptor::size() const noexcept {
+        return size_of(this->fields.data(), this->fields.size());
+    }
+}
+
 HCResult hc_create_descriptor(HCDescriptor* descriptor, Sz field_count) {
     if (!descriptor) {
         HC_ERROR("Null descriptor pointer");
@@ -113,18 +150,4 @@ Sz hc_descriptor_size(const HCDescriptor* descriptor) {
     }
 
     return size_of(descriptor->fields, descriptor->field_count);
-}
-
-namespace hc::render {
-    Sz size_of(HCPrimitive primitive) {
-        return ::size_of(primitive);
-    }
-
-    Descriptor::Descriptor(const HCDescriptor& descriptor)
-        : fields(descriptor.fields, descriptor.fields + descriptor.field_count) {
-    }
-
-    Sz Descriptor::size() const noexcept {
-        return size_of(this->fields.data(), this->fields.size());
-    }
 }

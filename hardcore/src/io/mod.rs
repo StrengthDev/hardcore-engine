@@ -1,6 +1,6 @@
 use window::WindowCall;
 
-use thiserror::Error;
+use crate::Error;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tracing::error;
 
@@ -12,24 +12,12 @@ pub mod window;
 // another thread, we use a mechanism where functions that result in GLFW calls are packed and sent
 // to the main thread for execution.
 
-/// An error related to a remote GLFW function call.
-#[derive(Error, Debug)]
-pub enum CallError {
-    /// Failed to submit call.
-    #[error("failed to submit call")]
-    Send,
-
-    /// Failed to execute call.
-    #[error("failed to execute call")]
-    Execute,
-}
-
 enum Call {
     Window(WindowCall),
 }
 
 impl Call {
-    fn execute(self) -> Result<(), CallError> {
+    fn execute(self) -> Result<(), Error> {
         match self {
             Call::Window(call) => call.execute()?,
         }
@@ -45,8 +33,8 @@ pub(super) struct Caller {
 
 impl Caller {
     /// Submit a call for execution in another thread.
-    fn submit(&self, call: Call) -> Result<(), CallError> {
-        self.tx.send(call).map_err(move |_| CallError::Send)
+    fn submit(&self, call: Call) -> Result<(), Error> {
+        self.tx.send(call).map_err(move |_| Error::Send)
     }
 }
 
@@ -65,7 +53,7 @@ impl Executor {
     }
 }
 
-pub(super) fn create_context() -> (Caller, Executor) {
+pub(super) fn new_context() -> (Caller, Executor) {
     let (tx, rx) = unbounded_channel();
 
     (Caller { tx }, Executor { rx })

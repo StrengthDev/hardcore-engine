@@ -1,29 +1,9 @@
+use crate::Error;
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::path::Path;
-use thiserror::Error;
 use tokio::fs::File;
 use tokio::io::{AsyncReadExt, BufReader};
-
-#[derive(Error, Debug)]
-pub enum ShaderError {
-    /// An error has occurred withing the system crate.
-    #[error(transparent)]
-    SystemError(#[from] hardcore_sys::Error),
-
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
-    #[error("Invalid hardcore_sys::ShaderStage value")]
-    InvalidStage,
-    #[error("Could not infer shader stage from file extension \"{0}\"")]
-    UnknownStage(String),
-    #[cfg(feature = "shader-compilation")]
-    #[error("Failed to acquire glslang compiler")]
-    NoCompiler,
-    #[cfg(feature = "shader-compilation")]
-    #[error(transparent)]
-    GLSLang(#[from] glslang::error::GlslangError),
-}
 
 #[derive(Debug, Copy, Clone)]
 pub struct ShaderStage(hardcore_sys::ShaderStage);
@@ -63,7 +43,7 @@ impl From<ShaderStage> for hardcore_sys::ShaderStage {
 }
 
 impl TryFrom<&Path> for ShaderStage {
-    type Error = ShaderError;
+    type Error = Error;
 
     fn try_from(path: &Path) -> Result<Self, Self::Error> {
         let extension = if let Some(extension) = path.extension().and_then(OsStr::to_str) {
@@ -115,9 +95,9 @@ impl TryFrom<&Path> for ShaderStage {
             stage_map
                 .get(extension)
                 .copied()
-                .ok_or(ShaderError::UnknownStage(extension.to_string()))
+                .ok_or(Error::UnknownStage(extension.to_string()))
         } else {
-            Err(ShaderError::UnknownStage("".to_string()))
+            Err(Error::UnknownStage("".to_string()))
         }
     }
 }
@@ -130,7 +110,7 @@ pub struct Shader {
 unsafe impl Send for Shader {}
 
 impl Shader {
-    pub fn try_from_bytecode(bytecode: &[u32], stage: ShaderStage) -> Result<Shader, ShaderError> {
+    pub fn try_from_bytecode(bytecode: &[u32], stage: ShaderStage) -> Result<Shader, Error> {
         let mut inner = Default::default();
 
         unsafe {
@@ -149,7 +129,7 @@ impl Shader {
     pub async fn try_from_binary_file<P: AsRef<Path>>(
         path: P,
         stage_hint: Option<ShaderStage>,
-    ) -> Result<Shader, ShaderError> {
+    ) -> Result<Shader, Error> {
         let stage = if let Some(stage) = stage_hint {
             stage
         } else {
@@ -186,7 +166,7 @@ impl Drop for Shader {
 #[cfg(feature = "shader-compilation")]
 mod compilation {
     use crate::meta::vulkan_api_version;
-    use crate::shader::{Shader, ShaderError, ShaderStage};
+    use crate::shader::{Shader, Error, ShaderStage};
     use crate::Version;
     use std::path::Path;
     use tokio::fs::File;
@@ -221,7 +201,7 @@ mod compilation {
     }
 
     impl TryFrom<ShaderStage> for glslang::ShaderStage {
-        type Error = ShaderError;
+        type Error = Error;
 
         fn try_from(value: ShaderStage) -> Result<Self, Self::Error> {
             match value.0 {
@@ -243,7 +223,7 @@ mod compilation {
                 hardcore_sys::ShaderStage::RayClosestHit => Ok(glslang::ShaderStage::ClosestHit),
                 hardcore_sys::ShaderStage::RayMiss => Ok(glslang::ShaderStage::Miss),
                 hardcore_sys::ShaderStage::RayCallable => Ok(glslang::ShaderStage::Callable),
-                _ => Err(ShaderError::UnknownStage((value.0 as i32).to_string())),
+                _ => Err(Error::UnknownStage((value.0 as i32).to_string())),
             }
         }
     }
@@ -295,14 +275,14 @@ mod compilation {
             source: &str,
             stage: ShaderStage,
             spirv_version: SpirvVersion,
-        ) -> Result<Vec<u32>, ShaderError> {
+        ) -> Result<Vec<u32>, Error> {
             trace!("Compiling \"{stage:?}\" shader source to SPIR-V..");
 
             use glslang::{
                 Compiler, CompilerOptions, ShaderInput, ShaderSource, Target, VulkanVersion,
             };
 
-            let compiler = Compiler::acquire().ok_or(ShaderError::NoCompiler)?;
+            let compiler = Compiler::acquire().ok_or(Error::NoCompiler)?;
             let vulkan = match vulkan_api_version() {
                 Version {
                     major: 1,
@@ -336,7 +316,7 @@ mod compilation {
             source: &str,
             stage: ShaderStage,
             spirv_version: SpirvVersion,
-        ) -> Result<Shader, ShaderError> {
+        ) -> Result<Shader, Error> {
             Shader::try_from_bytecode(
                 Shader::compile(source, stage, spirv_version)?.as_slice(),
                 stage,
@@ -347,7 +327,7 @@ mod compilation {
             path: P,
             stage_hint: Option<ShaderStage>,
             spirv_version: SpirvVersion,
-        ) -> Result<Shader, ShaderError> {
+        ) -> Result<Shader, Error> {
             let stage = if let Some(stage) = stage_hint {
                 stage
             } else {

@@ -5,6 +5,31 @@
 
 #include <array>
 
+template<typename X, typename Y>
+struct ConcatBits {
+    using ReturnType = void;
+};
+
+template<>
+struct ConcatBits<u8, u8> {
+    using ReturnType = u16;
+};
+
+template<>
+struct ConcatBits<u16, u16> {
+    using ReturnType = u32;
+};
+
+template<>
+struct ConcatBits<u32, u32> {
+    using ReturnType = u64;
+};
+
+template<typename X, typename Y>
+ConcatBits<X, Y>::ReturnType concat_bits(X x, Y y) {
+    return static_cast<ConcatBits<X, Y>::ReturnType>(x) << (sizeof(Y) * 8) | y;
+}
+
 template<class T>
 concept Integral = std::is_integral_v<T>; //!< An integral number type.
 
@@ -36,7 +61,7 @@ static constexpr std::array<u8, reversed_bytes_size> reversed_bytes{
  * @brief Reverse the bits of an arbitrarily sized byte array.
  *
  * While specializations may implement any arbitrary size, this function is meant to be used only by `reverse_bits`,
- * and may not im implemented for sizes irrelevant to that function.
+ * and may not be implemented for sizes irrelevant to that function.
  *
  * @tparam N Size of the array.
  * @param bytes The array to be reversed.

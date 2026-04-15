@@ -9,117 +9,7 @@
 #include <render/vars.hpp>
 #include <render/util.hpp>
 
-namespace hc::render::device {
-    std::expected<InnerSwapchain, Error> InnerSwapchain::create(
-        const VolkDeviceTable& fn_table,
-        VkDevice device,
-        const VkSwapchainCreateInfoKHR& create_info,
-        VkRenderPass render_pass
-    ) {
-        InnerSwapchain swapchain;
-
-        VkResult result = fn_table.vkCreateSwapchainKHR(device, &create_info, nullptr, &swapchain.handle.get());
-        if (result != VK_SUCCESS) {
-            HC_ERROR("Failed to create swapchain: " << to_str(result));
-            return Error(result);
-        }
-
-        u32 image_count = 0;
-        result = fn_table.vkGetSwapchainImagesKHR(device, swapchain.handle, &image_count, nullptr);
-        if (result != VK_SUCCESS) {
-            HC_ERROR("Failed to query swapchain images: " << to_str(result));
-            swapchain.destroy(fn_table, device);
-            return Error(result);
-        }
-
-        std::vector<VkImage> images(image_count);
-        result = fn_table.vkGetSwapchainImagesKHR(device, swapchain.handle, &image_count, images.data());
-        if (result != VK_SUCCESS) {
-            HC_ERROR("Failed to obtain swapchain images: " << to_str(result));
-            swapchain.destroy(fn_table, device);
-            return Error(result);
-        }
-
-        swapchain.image_views.reserve(image_count);
-        for (u32 i = 0; i < image_count; i++) {
-            VkImageViewCreateInfo view_create_info = {
-                .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-                .pNext = nullptr,
-                .flags = 0,
-                .image = images[i],
-                .viewType = VK_IMAGE_VIEW_TYPE_2D,
-                .format = create_info.imageFormat,
-                .components = {
-                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-                },
-                .subresourceRange = {
-                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel = 0,
-                    .levelCount = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount = 1,
-                },
-            };
-
-            VkImageView image_view = VK_NULL_HANDLE;
-            result = fn_table.vkCreateImageView(device, &view_create_info, nullptr, &image_view);
-            if (result != VK_SUCCESS) {
-                HC_ERROR("Failed to create swapchain image view: " << to_str(result));
-                swapchain.destroy(fn_table, device);
-                return Error(result);
-            }
-
-            swapchain.image_views.push_back(image_view);
-        }
-
-        swapchain.framebuffers.reserve(image_count);
-        for (u32 i = 0; i < image_count; i++) {
-            VkFramebufferCreateInfo framebuffer_info = {
-                .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-                .pNext = nullptr,
-                .flags = 0,
-                .renderPass = render_pass,
-                .attachmentCount = 1,
-                .pAttachments = &swapchain.image_views[i].get(),
-                .width = create_info.imageExtent.width,
-                .height = create_info.imageExtent.height,
-                .layers = 1,
-            };
-
-            VkFramebuffer framebuffer = VK_NULL_HANDLE;
-            result = fn_table.vkCreateFramebuffer(device, &framebuffer_info, nullptr, &framebuffer);
-            if (result != VK_SUCCESS) {
-                HC_ERROR("Failed to create swapchain frame buffer: " << to_str(result));
-                swapchain.destroy(fn_table, device);
-                return Error(result);
-            }
-
-            swapchain.framebuffers.push_back(framebuffer);
-        }
-
-        return swapchain;
-    }
-
-    void InnerSwapchain::destroy(const VolkDeviceTable& fn_table, VkDevice device) {
-        for (auto& framebuffer : this->framebuffers) {
-            fn_table.vkDestroyFramebuffer(device, framebuffer, nullptr);
-            framebuffer.destroy();
-        }
-        this->framebuffers.clear();
-
-        for (auto& image_view : this->image_views) {
-            fn_table.vkDestroyImageView(device, image_view, nullptr);
-            image_view.destroy();
-        }
-        this->image_views.clear();
-
-        fn_table.vkDestroySwapchainKHR(device, this->handle, nullptr);
-        this->handle.destroy();
-    }
-
+namespace hc::render::device::swapchain {
     std::expected<Swapchain, Error> Swapchain::create(
         const VolkDeviceTable& fn_table,
         VkDevice device,
@@ -248,13 +138,13 @@ namespace hc::render::device {
             .oldSwapchain = VK_NULL_HANDLE,
         };
 
-        auto inner_result = InnerSwapchain::create(fn_table, device, create_info, render_pass);
+        auto inner_result = SwapchainInstance::create(fn_table, device, create_info, render_pass);
         if (!inner_result) {
             swapchain.destroy(fn_table, device);
             return inner_result.error();
         }
 
-        swapchain.inner = *std::move(inner_result);
+        swapchain.current_instance = *std::move(inner_result);
 
         VkSemaphoreCreateInfo semaphore_info = {
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
@@ -273,17 +163,10 @@ namespace hc::render::device {
                 return Error(result);
             }
 
-            swapchain.image_semaphores.push_back(semaphore);
+            swapchain.image_semaphores.emplace_back(semaphore);
         }
 
         return swapchain;
-    }
-
-    Swapchain::~Swapchain() {
-        HC_ASSERT(
-            this->inner.handle == VK_NULL_HANDLE,
-            "Must call Swapchain::destroy before Swapchain object is destroyed"
-        );
     }
 
     void Swapchain::destroy(const VolkDeviceTable& fn_table, VkDevice device) {
@@ -293,14 +176,7 @@ namespace hc::render::device {
         }
         this->image_semaphores.clear();
 
-        while (!this->old_swapchains.empty()) {
-            this->old_swapchains.front().destroy(fn_table, device);
-            old_swapchains.pop();
-        }
-
-        if (this->inner.handle.valid()) {
-            this->inner.destroy(fn_table, device);
-        }
+        this->current_instance.destroy(fn_table, device);
 
         if (this->render_pass.valid()) {
             fn_table.vkDestroyRenderPass(device, this->render_pass, nullptr);
@@ -313,7 +189,7 @@ namespace hc::render::device {
         }
     }
 
-    std::expected<bool, Error> Swapchain::recreate(
+    std::expected<std::optional<SwapchainInstance>, Error> Swapchain::recreate(
         VkPhysicalDevice physical_device,
         const VolkDeviceTable& fn_table,
         VkDevice device,
@@ -322,8 +198,9 @@ namespace hc::render::device {
     ) {
         this->images_out_of_date = out_of_date;
 
+        // Disable swapchain recreation while window is resizing
         // if (window::is_resizing(window)) {
-        //     return false;
+        //     return std::nullopt;
         // }
 
         this->extent = window::extent(window);
@@ -375,27 +252,19 @@ namespace hc::render::device {
             .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
             .presentMode = this->present_mode,
             .clipped = VK_TRUE,
-            .oldSwapchain = this->inner.handle,
+            .oldSwapchain = this->current_instance.handle(),
         };
 
-        auto inner_result = InnerSwapchain::create(fn_table, device, create_info, this->render_pass);
-        if (!inner_result) {
-            return inner_result.error();
+        auto instance_result = SwapchainInstance::create(fn_table, device, create_info, this->render_pass);
+        if (!instance_result) {
+            return instance_result.error();
         }
-
-        this->old_swapchains.push(std::exchange(this->inner, *std::move(inner_result)));
 
         this->images_out_of_date = false;
 
         HC_DEBUG("Swapchain recreated with size (" << this->extent.width << ", " << this->extent.height << ')');
 
-        return true;
-    }
-
-    void Swapchain::destroy_old(const VolkDeviceTable& fn_table, VkDevice device) {
-        HC_ASSERT(!this->old_swapchains.empty(), "There should be an old swapchain to destroy");
-        this->old_swapchains.front().destroy(fn_table, device);
-        old_swapchains.pop();
+        return std::exchange(this->current_instance, *std::move(instance_result));
     }
 
     VkRenderPassBeginInfo Swapchain::render_pass_info(u32 image_index) {
@@ -403,13 +272,14 @@ namespace hc::render::device {
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
             .pNext = nullptr,
             .renderPass = this->render_pass,
-            .framebuffer = this->inner.framebuffers[image_index],
+            .framebuffer = this->current_instance.framebuffer(image_index),
             .renderArea = {
                 .offset = {0, 0},
                 .extent = this->extent,
             },
             .clearValueCount = 1,
             .pClearValues = &this->clear_value,
+            // TODO: the variant of the clear color union depends on the format of the texture, the surface format in this case
         };
     }
 
@@ -427,7 +297,7 @@ namespace hc::render::device {
         VkSemaphore semaphore = image_semaphores[frame_mod];
         VkResult result = fn_table.vkAcquireNextImageKHR(
             device,
-            this->inner.handle,
+            this->current_instance.handle(),
             timeout,
             semaphore,
             VK_NULL_HANDLE,

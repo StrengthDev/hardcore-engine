@@ -1,5 +1,6 @@
+use crate::Error;
+
 use hardcore_sys::Field;
-use thiserror::Error;
 
 pub use hardcore_sys::{Composition, Primitive};
 
@@ -102,8 +103,8 @@ impl Descriptor {
             .unwrap_or(0)
     }
 
-    pub(crate) fn c_desc(&self) -> Result<CDescriptor, CDescriptorError> {
-        let mut c_desc = CDescriptor::create(self.fields.len())?;
+    pub(crate) fn c_desc(&self) -> Result<CDescriptor, Error> {
+        let mut c_desc = CDescriptor::new(self.fields.len())?;
 
         for (field, c_field) in self.fields.iter().zip(c_desc.as_mut_slice()) {
             *c_field = (*field).into();
@@ -113,20 +114,12 @@ impl Descriptor {
     }
 }
 
-#[derive(Error, Debug)]
-pub enum CDescriptorError {
-    /// An error has occurred withing the system crate.
-    #[error(transparent)]
-    SystemError(#[from] hardcore_sys::Error),
-}
-
 pub(crate) struct CDescriptor {
     inner: hardcore_sys::Descriptor,
 }
 
 impl CDescriptor {
-    // TODO rename constructor type functions to new
-    fn create(field_count: usize) -> Result<Self, CDescriptorError> {
+    fn new(field_count: usize) -> Result<CDescriptor, Error> {
         let mut descriptor = CDescriptor {
             inner: Default::default(),
         };

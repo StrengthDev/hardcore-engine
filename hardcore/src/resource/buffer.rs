@@ -1,27 +1,14 @@
-use crate::resource::descriptor::{CDescriptorError, Descriptor, PrimitiveExt};
+use crate::resource::descriptor::{Descriptor, PrimitiveExt};
+use crate::Error;
 
 use hardcore_sys;
 use hardcore_sys::Primitive;
 
-use crate::dependent_handle::DependentHandle;
+use crate::handle::Handle;
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
 use std::ops::{Deref, DerefMut};
 use std::ptr;
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum BufferError {
-    /// An error has occurred withing the system crate.
-    #[error(transparent)]
-    SystemError(#[from] hardcore_sys::Error),
-
-    #[error(transparent)]
-    Descriptor(#[from] CDescriptorError),
-
-    #[error("Invalid index type")]
-    Index,
-}
 
 pub trait Buffer<'s> {
     fn id(&self) -> u64;
@@ -43,17 +30,17 @@ impl BufferContentKind {
 
 pub(crate) struct CBuffer<'s> {
     content_kind: BufferContentKind,
-    handle: DependentHandle<'s, hardcore_sys::Buffer>,
+    handle: Handle<'s, hardcore_sys::Buffer>,
 }
 
 impl<'s> CBuffer<'s> {
-    pub(crate) fn create<'d>(
+    pub(crate) fn new<'d>(
         device: u32,
         kind: hardcore_sys::BufferKind,
         descriptor: &'d Descriptor,
         count: NonZeroU64,
         writable: bool,
-    ) -> Result<Self, BufferError>
+    ) -> Result<Self, Error>
     where
         's: 'd,
     {
@@ -77,14 +64,14 @@ impl<'s> CBuffer<'s> {
         })
     }
 
-    pub(crate) fn create_index(
+    pub(crate) fn new_index(
         device: u32,
         kind: Primitive,
         count: NonZeroU64,
         writable: bool,
-    ) -> Result<Self, BufferError> {
+    ) -> Result<Self, Error> {
         if !kind.is_valid_index() {
-            return Err(BufferError::Index);
+            return Err(Error::Index);
         }
 
         let mut handle = Default::default();
@@ -128,7 +115,7 @@ impl<'s> CBuffer<'s> {
     }
 }
 
-impl<'s> Drop for CBuffer<'s> {
+impl Drop for CBuffer<'_> {
     fn drop(&mut self) {
         unsafe { hardcore_sys::destroy_buffer(self.handle.mut_ptr()) }
     }
@@ -156,22 +143,22 @@ impl<'a, T> DerefMut for MappedSlice<'a, T> {
 unsafe impl<'a, T> Send for MappedSlice<'a, T> {}
 
 pub trait DynamicBuffer<'s>: Buffer<'s> {
-    fn as_slice(&self) -> Result<MappedSlice<'s, u8>, BufferError>;
+    fn as_slice(&self) -> Result<MappedSlice<'s, u8>, Error>;
 }
 
 pub(crate) struct CDynamicBuffer<'s> {
     content_kind: BufferContentKind,
-    handle: DependentHandle<'s, hardcore_sys::DynamicBuffer>,
+    handle: Handle<'s, hardcore_sys::DynamicBuffer>,
 }
 
 impl<'s> CDynamicBuffer<'s> {
-    pub(crate) fn create(
+    pub(crate) fn new(
         device: u32,
         kind: hardcore_sys::BufferKind,
         descriptor: &Descriptor,
         count: NonZeroU64,
         writable: bool,
-    ) -> Result<Self, BufferError> {
+    ) -> Result<Self, Error> {
         let mut handle = Default::default();
         unsafe {
             let c_desc = descriptor.c_desc()?;
@@ -192,14 +179,14 @@ impl<'s> CDynamicBuffer<'s> {
         })
     }
 
-    pub(crate) fn create_index(
+    pub(crate) fn new_index(
         device: u32,
         kind: Primitive,
         count: NonZeroU64,
         writable: bool,
-    ) -> Result<Self, BufferError> {
+    ) -> Result<Self, Error> {
         if !kind.is_valid_index() {
-            return Err(BufferError::Index);
+            return Err(Error::Index);
         }
 
         let mut handle = Default::default();
@@ -207,7 +194,7 @@ impl<'s> CDynamicBuffer<'s> {
             hardcore_sys::new_dynamic_index_buffer(
                 &raw mut handle,
                 device,
-                kind.into(),
+                kind,
                 count.into(),
                 writable,
             )
@@ -242,7 +229,7 @@ impl<'s> CDynamicBuffer<'s> {
         }
     }
 
-    fn host_ptr(&self) -> Result<*mut u8, BufferError> {
+    fn host_ptr(&self) -> Result<*mut u8, Error> {
         let ptr = unsafe {
             self.handle
                 .inner
@@ -253,7 +240,7 @@ impl<'s> CDynamicBuffer<'s> {
         Ok(ptr.cast())
     }
 
-    pub(crate) fn as_slice(&self) -> Result<MappedSlice<'s, u8>, BufferError> {
+    pub(crate) fn as_slice(&self) -> Result<MappedSlice<'s, u8>, Error> {
         Ok(MappedSlice {
             ptr: ptr::slice_from_raw_parts_mut(self.host_ptr()?, self.content_kind.size()),
             phantom_data: PhantomData,
@@ -261,7 +248,7 @@ impl<'s> CDynamicBuffer<'s> {
     }
 }
 
-impl<'s> Drop for CDynamicBuffer<'s> {
+impl Drop for CDynamicBuffer<'_> {
     fn drop(&mut self) {
         unsafe { hardcore_sys::destroy_dynamic_buffer(self.handle.mut_ptr()) }
     }

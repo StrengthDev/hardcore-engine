@@ -118,11 +118,11 @@ namespace hc::render::device::memory {
         VkDeviceSize size,
         VkDeviceSize alignment
     ) {
-        auto range_res = AllocationPool::allocate(size, alignment);
-        if (!range_res) {
+        auto range_result = AllocationPool::allocate(size, alignment);
+        if (!range_result) {
             return Error(HCError_CouldNotFitInPool);
         }
-        PoolRange range = *range_res;
+        PoolRange range = *range_result;
 
         VkResult result = fn_table.vkBindImageMemory(device, image, this->memory, range.offset + range.padding);
         if (result != VK_SUCCESS) {

@@ -6,10 +6,28 @@
 #include <core/log.hpp>
 #include <render/shader.h>
 #include <render/util.hpp>
+#include <util/bits.hpp>
 #include <util/flow.hpp>
 #include <util/static_map.hpp>
 
 namespace hc::render {
+    static StaticMap<BasicKey<HCShaderStage, HCShaderStage_RayCallable>, VkShaderStageFlagBits> constexpr STAGE_MAP = {
+        {HCShaderStage_Vertex, VK_SHADER_STAGE_VERTEX_BIT},
+        {HCShaderStage_Fragment, VK_SHADER_STAGE_FRAGMENT_BIT},
+        {HCShaderStage_Compute, VK_SHADER_STAGE_COMPUTE_BIT},
+        {HCShaderStage_Mesh, VK_SHADER_STAGE_MESH_BIT_EXT},
+        {HCShaderStage_TesselationControl, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT},
+        {HCShaderStage_TesselationEvaluation, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT},
+        {HCShaderStage_Geometry, VK_SHADER_STAGE_GEOMETRY_BIT},
+        {HCShaderStage_Task, VK_SHADER_STAGE_TASK_BIT_EXT},
+        {HCShaderStage_RayGeneration, VK_SHADER_STAGE_RAYGEN_BIT_KHR},
+        {HCShaderStage_RayIntersection, VK_SHADER_STAGE_INTERSECTION_BIT_KHR},
+        {HCShaderStage_RayAnyHit, VK_SHADER_STAGE_ANY_HIT_BIT_KHR},
+        {HCShaderStage_RayClosestHit, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR},
+        {HCShaderStage_RayMiss, VK_SHADER_STAGE_MISS_BIT_KHR},
+        {HCShaderStage_RayCallable, VK_SHADER_STAGE_CALLABLE_BIT_KHR},
+    };
+
     static StaticMap<SparseKey<SpvReflectDescriptorType,
         KeyRange<SpvReflectDescriptorType, SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER, SPV_REFLECT_DESCRIPTOR_TYPE_INPUT_ATTACHMENT>,
         KeyRange<SpvReflectDescriptorType, SPV_REFLECT_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, SPV_REFLECT_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR>
@@ -73,16 +91,19 @@ namespace hc::render {
     }
 
     [[nodiscard]]
-    static inline std::expected<PODDescriptor, Error> create_basic_descriptor(SpvReflectBlockVariable const& block_variable) {
+    static inline std::expected<BasicDescriptor, Error> create_basic_descriptor(
+        SpvReflectTypeDescription const& type_description,
+        SpvReflectNumericTraits const& numeric_traits
+    ) {
         BasicDescriptor descriptor = {};
         descriptor.matrix_stride = std::numeric_limits<decltype(descriptor.matrix_stride)>::max();
 
-        switch (u32 const primitive_flag = block_variable.type_description->type_flags & PRIMITIVE_TYPE_FLAGS) {
+        switch (u32 const primitive_flag = type_description.type_flags & PRIMITIVE_TYPE_FLAGS) {
         case SPV_REFLECT_TYPE_FLAG_BOOL:
             descriptor.primitive_type = HCPrimitive_Boolean;
             break;
         case SPV_REFLECT_TYPE_FLAG_INT:
-            if (block_variable.numeric.scalar.signedness) {
+            if (numeric_traits.scalar.signedness) {
                 descriptor.primitive_type = HCPrimitive_Integer;
             } else {
                 descriptor.primitive_type = HCPrimitive_Unsigned;
@@ -96,11 +117,11 @@ namespace hc::render {
             return Error(HCError_ShaderReflectionFailed);
         }
 
-        descriptor.primitive_size = block_variable.numeric.scalar.width;
+        descriptor.primitive_size = numeric_traits.scalar.width;
 
-        if (block_variable.type_description->type_flags & SPV_REFLECT_TYPE_FLAG_MATRIX) {
-            u8 const rows = static_cast<u8>(block_variable.numeric.matrix.row_count);
-            u8 const columns = static_cast<u8>(block_variable.numeric.matrix.column_count);
+        if (type_description.type_flags & SPV_REFLECT_TYPE_FLAG_MATRIX) {
+            u8 const rows = static_cast<u8>(numeric_traits.matrix.row_count);
+            u8 const columns = static_cast<u8>(numeric_traits.matrix.column_count);
 
             auto matrix_type = MATRIX_TYPE_MAP[{rows, columns}];
             if (!matrix_type) {
@@ -109,9 +130,9 @@ namespace hc::render {
             }
 
             descriptor.composition = *matrix_type;
-            descriptor.matrix_stride = block_variable.numeric.matrix.stride;
-        } else if (u32 const count = block_variable.type_description->type_flags & SPV_REFLECT_TYPE_FLAG_VECTOR) {
-            switch (block_variable.numeric.vector.component_count) {
+            descriptor.matrix_stride = numeric_traits.matrix.stride;
+        } else if (u32 const count = type_description.type_flags & SPV_REFLECT_TYPE_FLAG_VECTOR) {
+            switch (numeric_traits.vector.component_count) {
             case 2:
                 descriptor.composition = HCComposition_Vec2;
                 break;
@@ -129,7 +150,17 @@ namespace hc::render {
             descriptor.composition = HCComposition_Scalar;
         }
 
-        return create_array_descriptor(std::move(descriptor), block_variable);
+        return descriptor;
+    }
+
+    [[nodiscard]]
+    static inline std::expected<PODDescriptor, Error> create_basic_pod_descriptor(SpvReflectBlockVariable const& block_variable) {
+        auto descriptor_result = create_basic_descriptor(*block_variable.type_description, block_variable.numeric);
+        if (!descriptor_result) {
+            return descriptor_result.error();
+        }
+
+        return create_array_descriptor(*std::move(descriptor_result), block_variable);
     }
 
     [[nodiscard]]
@@ -137,7 +168,7 @@ namespace hc::render {
         SpvReflectBlockVariable const& block_variable
     ) {
         if (block_variable.type_description->type_flags & POD_TYPE_FLAGS) {
-            return create_basic_descriptor(block_variable);
+            return create_basic_pod_descriptor(block_variable);
         } else if (block_variable.type_description->type_flags & SPV_REFLECT_TYPE_FLAG_STRUCT) {
             StructDescriptor descriptor;
             descriptor.members.reserve(block_variable.member_count);
@@ -238,7 +269,31 @@ namespace hc::render {
                 return binding_result.error();
             }
 
-            this->bindings.emplace(std::make_pair(binding->set, binding->binding), *std::move(binding_result));
+            this->bindings_map.emplace(DescriptorLocation{binding->set, binding->binding}, *std::move(binding_result));
+        }
+
+        auto const inputs_result = enumerate(
+            module,
+            &spv_reflect::ShaderModule::EnumerateInputVariables,
+            "input variables"
+        );
+        if (!inputs_result) {
+            return Error(HCError_ShaderReflectionFailed);
+        }
+
+        this->inputs.reserve(inputs_result.value().size());
+        for (auto const& input : *inputs_result) {
+            auto descriptor_result = create_basic_descriptor(*input->type_description, input->numeric);
+            if (!descriptor_result) {
+                return descriptor_result.error();
+            }
+
+            inputs.push_back(
+                {
+                    .descriptor = *std::move(descriptor_result),
+                    .location = input->location
+                }
+            );
         }
 
         this->entrypoint = module.GetEntryPointName();
@@ -251,17 +306,45 @@ namespace hc::render {
         shader.bytecode = std::move(bytecode);
         shader.stage = stage;
 
-        auto result = shader.reflect();
-        if (!result) {
+        if (auto result = shader.reflect(); !result) {
             return result.error();
         }
 
         return shader;
     }
 
-    std::size_t Shader::LocationHash::operator()(const std::pair<u32, u32>& output) const noexcept {
-        return static_cast<std::size_t>(output.first) << 32 | output.second;
+    VkShaderStageFlagBits Shader::stage_flag() const noexcept {
+        auto const* stage_flag = STAGE_MAP[this->stage];
+        HC_ASSERT(stage_flag, "All shader stages must have a matching flag");
+
+        return *stage_flag;
     }
+
+    char const* Shader::entrypoint_str() const noexcept {
+        return this->entrypoint.c_str();
+    }
+
+    std::unordered_map<DescriptorLocation, DescriptorBinding> const& Shader::bindings() const noexcept {
+        return this->bindings_map;
+    }
+
+    std::vector<ShaderInput> const& Shader::inputs_vec() const noexcept {
+        return this->inputs;
+    }
+
+    std::vector<u32> const& Shader::bytecode_vec() const noexcept {
+        return this->bytecode;
+    }
+
+    bool DescriptorLocation::operator==(DescriptorLocation const& other) const noexcept {
+        return this->set == other.set && this->binding == other.binding;
+    }
+}
+
+std::size_t std::hash<hc::render::DescriptorLocation>::operator()(
+    const hc::render::DescriptorLocation& location
+) const noexcept {
+    return std::hash<u64>{}(concat_bits(location.set, location.binding));
 }
 
 HCResult hc_create_shader(HCShader* shader, const u32* bytecode, size_t size, HCShaderStage stage) {
@@ -298,4 +381,3 @@ void hc_destroy_shader(HCShader* shader) {
         shader->inner = nullptr;
     }
 }
-

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <util/number.hpp>
-#include <render/descriptor.h>
+#include <../../../include/render/resource/descriptor.h>
 
 #include <memory>
 #include <variant>
@@ -25,6 +25,8 @@ namespace hc::render {
         ElementDescriptor element;
         u32 count;
         u32 stride;
+
+        bool operator==(const ArrayDescriptor& other) const noexcept = default;
     };
 
     struct BasicDescriptor {
@@ -32,12 +34,22 @@ namespace hc::render {
         u32 primitive_size; // In bits.
         HCComposition composition;
         u32 matrix_stride; // In bytes.
+
+        bool operator==(const BasicDescriptor& other) const noexcept = default;
     };
 
     struct MemberDescriptor;
 
     struct StructDescriptor {
         std::vector<std::unique_ptr<MemberDescriptor>> members;
+
+        StructDescriptor() = default;
+        StructDescriptor(StructDescriptor&&) = default;
+        StructDescriptor(StructDescriptor const& other);
+
+        StructDescriptor& operator=(StructDescriptor&&) = default;
+
+        bool operator==(const StructDescriptor& other) const noexcept;
     };
 
     typedef std::variant<
@@ -47,12 +59,17 @@ namespace hc::render {
     struct MemberDescriptor {
         PODDescriptor type_descriptor;
         u32 offset;
+
+        bool operator==(const MemberDescriptor& other) const noexcept = default;
     };
 
+    // TODO change name
     struct DescriptorBinding {
         std::string name;
         DescriptorType type;
         std::variant<std::monostate, PODDescriptor> descriptor;
+
+        bool operator==(const DescriptorBinding& other) const noexcept = default;
     };
 
     Sz size_of(HCPrimitive primitive);

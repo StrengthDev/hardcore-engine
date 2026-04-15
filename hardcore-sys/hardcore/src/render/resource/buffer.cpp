@@ -5,10 +5,36 @@
 #include "../renderer.hpp"
 #include "../vars.hpp"
 
-#include <render/buffer.h>
+#include <render/resource/buffer.h>
 
 #include <core/log.hpp>
 #include <util/number.hpp>
+
+namespace hc::render::buffer {
+    Buffer::Buffer(device::memory::BufferRef const& ref)
+        : ref(ref) {
+    }
+
+    device::memory::BufferRef const& Buffer::memory_ref() const noexcept {
+        return this->ref;
+    }
+
+    Sz Buffer::content_offset() const noexcept {
+        return this->ref.offset + this->ref.padding;
+    }
+
+    DynamicBuffer::DynamicBuffer(device::memory::DynamicBufferRef const& ref)
+        : ref(ref) {
+    }
+
+    device::memory::DynamicBufferRef const& DynamicBuffer::memory_ref() const noexcept {
+        return this->ref;
+    }
+
+    Sz DynamicBuffer::content_offset() const noexcept {
+        return ref.offset + ref.padding;
+    }
+}
 
 HCResult hc_new_buffer(
     HCBuffer* buffer,
@@ -176,8 +202,8 @@ HCResult hc_new_dynamic_buffer(
     *buffer = {
         .id = buffer_result->id,
         .size = buffer_result->size,
-        .data = buffer_result->data,
-        .data_offset = buffer_result->data_offset,
+        .data = buffer_result->map_ptr,
+        .data_offset = buffer_result->map_offset,
         .device = device,
     };
 
@@ -220,8 +246,8 @@ HCResult hc_new_dynamic_index_buffer(
     *buffer = {
         .id = buffer_result->id,
         .size = buffer_result->size,
-        .data = buffer_result->data,
-        .data_offset = buffer_result->data_offset,
+        .data = buffer_result->map_ptr,
+        .data_offset = buffer_result->map_offset,
         .device = device,
     };
 

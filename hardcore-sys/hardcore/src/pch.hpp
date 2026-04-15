@@ -12,7 +12,10 @@
 #include <ranges>
 #include <set>
 #include <shared_mutex>
+#include <span>
 #include <sstream>
+#include <stack>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>

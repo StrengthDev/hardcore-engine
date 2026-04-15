@@ -2,7 +2,6 @@
 
 #include <util/flow.hpp>
 #include <util/number.hpp>
-#include <util/reverse_bits.hpp>
 
 #include "graph.hpp"
 
@@ -47,160 +46,148 @@ namespace hc::render::device {
         return Graph(graphics_idx, compute_idx, transfer_idx, command_queues);
     }
 
+    void Graph::destroy(VolkDeviceTable const& fn_table, VkDevice device) {
+        render_passes.destroy(fn_table, device);
+    }
+
     Graph::Graph(u8 graphics_idx, u8 compute_idx, u8 transfer_idx, Sz command_queues)
         : graphics_idx(graphics_idx),
         compute_idx(compute_idx),
         transfer_idx(transfer_idx),
-        commands(command_queues) {
-    }
+        commands(command_queues) {}
 
-    bool Graph::validate_graph() const noexcept {
-        // Check for missing dependencies
-
-        std::unordered_set<u64> node_dependencies;
-        std::unordered_set<u64> resource_dependencies;
-        for (const auto& [id, node] : this->nodes) {
-            for (const InputResource& input : node.inputs) {
-                resource_dependencies.insert(input.id);
-                if (input.origin)
-                    node_dependencies.insert(*input.origin);
-            }
-        }
-        for (const u64 id : node_dependencies) {
-            if (!this->nodes.contains(id)) {
-                HC_ERROR(
-                    "Invalid device graph, node dependency does not exist "
-                    "(this may happen because an operation call was destroyed while still being used)"
-                );
-                return false;
-            }
-        }
-        for (const u64 id : resource_dependencies) {
-            if (!this->nodes.contains(id)) {
-                HC_ERROR(
-                    "Invalid device graph, resource dependency does not exist "
-                    "(this may happen because a resource was destroyed while still being used)"
-                );
-                return false;
+    std::expected<u64, Error> Graph::insert_node(
+        std::vector<ResourceRef>&& inputs,
+        std::vector<ResourceRef>&& outputs,
+        std::vector<u64>&& dependencies
+    ) {
+        for (auto const& input : inputs) {
+            if (!this->resources.contains(input.id)) {
+                HC_ERROR("The provided resource input does not exist: " << input.id);
+                return Error(HCError_NoSuchResource);
             }
         }
 
-        return true;
-    }
+        std::vector<std::reference_wrapper<Node>> dependency_nodes;
+        dependency_nodes.reserve(dependencies.size());
 
-    std::pair<std::unordered_set<u64>, std::vector<u64>> Graph::filter_unused_nodes() const noexcept {
-        std::vector<u64> dependency_stack;
-        std::unordered_set<u64> output_dependencies;
-        // Can assume that this will only contain unique root nodes, because the stack will never have duplicates
-        std::vector<u64> root_nodes;
-        for (auto const& [resource_id, node_id] : this->outputs) {
-            bool is_root = true;
-            for (const InputResource& input : this->nodes[node_id].inputs) {
-                if (input.origin) {
-                    is_root = false;
-                    auto [it, inserted] = output_dependencies.insert(*input.origin);
-                    if (inserted)
-                        dependency_stack.push_back(*input.origin);
-                }
+        for (auto const dependency_id : dependencies) {
+            if (!this->nodes.contains(dependency_id)) {
+                HC_ERROR("The provided execution graph node does not exist: " << dependency_id);
+                return Error(HCError_NoSuchNode);
             }
-            output_dependencies.insert(node_id);
-            if (is_root)
-                root_nodes.push_back(node_id);
-        }
-        while (!dependency_stack.empty()) {
-            const u64 current_node_id = dependency_stack.back();
-            dependency_stack.pop_back();
 
-            bool is_root = true;
-            for (const InputResource& input : this->nodes[current_node_id].inputs) {
-                if (input.origin) {
-                    is_root = false;
-                    auto [it, inserted] = output_dependencies.insert(*input.origin);
-                    if (inserted)
-                        dependency_stack.push_back(*input.origin);
-                }
+            if (this->pruned_node_ids.contains(dependency_id)) {
+                HC_ERROR("The provided execution graph node has deleted dependencies: " << dependency_id);
+                return Error(HCError_PrunedNode);
             }
-            if (is_root)
-                root_nodes.push_back(current_node_id);
+
+            dependency_nodes.emplace_back(nodes[dependency_id]);
         }
-        HC_ASSERT(
-            output_dependencies.size() <= this->nodes.size(),
-            "The number of output dependencies should be the same or lower than the number of nodes in the graph"
+
+        this->dirty = true;
+
+        auto id = nodes.insert(
+            {
+                .type = NodeType::Compute,
+                .inputs = std::move(inputs),
+                .outputs = std::move(outputs),
+                .dependencies = std::move(dependencies),
+                .dependents = {},
+            }
         );
-        if (output_dependencies.size() != this->nodes.size()) {
-            HC_WARN(
-                "There are " << (this->nodes.size() - output_dependencies.size())
-                << " unused operations within the device graph"
-            );
+
+        for (auto& dependency_node : dependency_nodes) {
+            dependency_node.get().dependents.push_back(id);
         }
 
-        return {output_dependencies, root_nodes};
+        return id;
+    }
+
+    void Graph::remove_node(u64 id) {
+        if (!this->nodes.contains(id)) {
+            HC_WARN("Node does not exist: " << id);
+            return;
+        }
+
+        this->prune_node(id);
+
+        this->pruned_node_ids.erase(id);
+        this->nodes.erase(id);
+    }
+
+    void Graph::prune_node(u64 prune_id) {
+        std::stack<u64> prune_stack;
+        prune_stack.push(prune_id);
+
+        // Prune the node and all its dependents recursively
+        while (!prune_stack.empty()) {
+            auto const id = prune_stack.top();
+            prune_stack.pop();
+
+            if (!this->pruned_node_ids.contains(id)) {
+                this->pruned_node_ids.insert(id);
+                this->dirty = true;
+
+                auto node = this->nodes[id];
+
+                for (auto const dependent_id : node.dependents) {
+                    prune_stack.push(dependent_id);
+                }
+
+                for (auto const dependency_id : node.dependencies) {
+                    std::erase(this->nodes[dependency_id].dependents, id);
+                }
+
+                node.inputs.clear();
+                node.dependents.clear();
+                node.dependencies.clear();
+            }
+        }
+    }
+
+    u64 Graph::insert_resource(buffer::Buffer&& resource) {
+        return this->resources.insert(std::move(resource));
+    }
+
+    void Graph::remove_resource(u64 id) {
+        if (!this->resources.contains(id)) {
+            HC_WARN("Resource does not exist: " << id);
+            return;
+        }
+
+        for (auto& [node_id, node] : this->nodes) {
+            if (std::ranges::find_if(node.inputs, [id](auto input) { return input.id == id; }) != node.inputs.end()) {
+                this->prune_node(node_id);
+            }
+        }
+
+        resources.erase(id);
+    }
+
+    std::expected<std::optional<u64>, Error> Graph::get_dependency_node(HCDependency const& dependency) const noexcept {
+        if (!dependency.handle) {
+            return std::nullopt;
+        }
+
+        switch (dependency.type) {
+        case HCDependencyType_RenderPass:
+            auto const* render_pass = static_cast<HCRenderPass const*>(dependency.handle);
+
+            if (auto const it = this->render_pass_datas.find(render_pass->id); it == this->render_pass_datas.end()) {
+                HC_ERROR("The provided render pass does not exist");
+                return Error(HCError_InvalidParams);
+            } else {
+                return it->second.nodes.back();
+            }
+        }
+
+        HC_ERROR("Invalid dependency type");
+        return Error(HCError_InvalidParams);
     }
 
     std::expected<void, Error> Graph::compile() {
         HC_INFO_SPAN("Compile device graph");
-        if (this->is_compiled()) {
-            return {};
-        }
-
-        if (!this->validate_graph()) {
-            return Error(HCError_InvalidRenderGraph);
-        }
-
-        auto [output_dependencies, root_nodes] = this->filter_unused_nodes();
-
-        std::queue<u64> pending_queue;
-        std::unordered_set<u64> pending_set;
-        std::unordered_set<u64> pushed_nodes;
-        std::vector<u64> push_batch;
-
-        for (const u64 node : root_nodes) {
-            auto [it, inserted] = pending_set.insert(node);
-            if (inserted)
-                pending_queue.push(node);
-        }
-
-        // Nodes are pushed in batches to the command queues, each node in a batch should be independent of each other
-        while (pushed_nodes.size() < output_dependencies.size()) {
-            Sz check_count = pending_queue.size();
-            while (0 < check_count) {
-                u64 node = pending_queue.front();
-                pending_queue.pop();
-
-                // Check if node is ready to be pushed (all of its dependencies have been pushed)
-                bool ready = true;
-                for (const InputResource& input : this->nodes[node].inputs) {
-                    if (input.origin && !pushed_nodes.contains(*input.origin)) {
-                        ready = false;
-                        break;
-                    }
-                }
-                if (ready) {
-                    pending_set.erase(node);
-                    push_batch.push_back(node);
-                    for (const OutputResource& output : this->nodes[node].outputs) {
-                        for (const u64 dependent : output.dependents) {
-                            // Only nodes that do meaningful work are pushed
-                            if (output_dependencies.contains(dependent)) {
-                                auto [it, inserted] = pending_set.insert(dependent);
-                                if (inserted)
-                                    pending_queue.push(dependent);
-                            }
-                        }
-                    }
-                } else {
-                    pending_queue.push(node);
-                }
-                check_count--;
-            }
-
-            for (const u64 node : push_batch) {
-                pushed_nodes.insert(node);
-                // TODO add commands
-            }
-
-            push_batch.clear();
-        }
 
         return {};
     }
@@ -232,77 +219,123 @@ namespace hc::render::device {
         return {};
     }
 
-    u64 Graph::add_resource(const memory::BufferRef& ref) {
-        return this->resources.insert(
-            {
-                .buffer = ref.buffer,
-                .size = ref.size,
-                .frame_pad = ref.pool_size,
-                .offset = ref.offset + ref.padding,
-                .memory = {
-                    .pool = ref.pool,
-                    .offset = ref.offset,
-                    .flags = ref.flags,
-                    .dynamic = false,
-                },
+    u64 Graph::add_resource(buffer::Buffer&& buffer) {
+        return this->resources.insert(std::move(buffer));
+    }
+
+    u64 Graph::add_resource(buffer::DynamicBuffer&& buffer) {
+        return this->dynamic_resources.insert(std::move(buffer));
+    }
+
+    buffer::Buffer Graph::remove_resource_b(u64 id) {
+        return this->resources.erase(id);
+    }
+
+    buffer::DynamicBuffer Graph::remove_resource_bd(u64 id) {
+        return this->dynamic_resources.erase(id);
+    }
+
+    u64 Graph::add_texture(texture::Texture&& texture) {
+        return this->textures.insert(std::move(texture));
+    }
+
+    texture::Texture Graph::remove_texture(u64 id) {
+        return this->textures.erase(id);
+    }
+
+    std::expected<u64, Error> Graph::create_render_pass(
+        VolkDeviceTable const& fn_table,
+        VkDevice device,
+        std::span<HCSubpass const> const& subpasses,
+        UserPredicate<Sz>&& predicate
+    ) {
+        auto render_pass_result = this->render_passes.create_render_pass(fn_table, device, subpasses, this->textures);
+        if (!render_pass_result) {
+            return render_pass_result.error();
+        }
+        u64 render_pass_id = *render_pass_result;
+
+        std::vector<u64> subpass_nodes;
+        subpass_nodes.reserve(subpasses.size());
+
+        for (auto const& subpass : subpasses) {
+            std::vector<ResourceRef> inputs;
+            std::vector<ResourceRef> outputs;
+            std::vector<u64> dependencies;
+
+            if (!subpass_nodes.empty()) {
+                dependencies.emplace_back(subpass_nodes.back());
             }
-        );
-    }
 
-    u64 Graph::add_resource(const memory::DynamicBufferRef& ref) {
-        return this->resources.insert(
-            {
-                .buffer = ref.buffer,
-                .size = ref.size,
-                .frame_pad = ref.pool_size,
-                .offset = ref.offset + ref.padding,
-                .memory = {
-                    .pool = ref.pool,
-                    .offset = ref.offset,
-                    .flags = ref.flags,
-                    .dynamic = true,
-                },
-            }
-        );
-    }
+            for (auto const& input : std::span(subpass.inputs, subpass.input_count)) {
+                auto input_node = this->get_dependency_node(input.dependency);
+                if (!input_node) {
+                    this->remove_nodes(subpass_nodes);
+                    this->render_passes.destroy_render_pass(fn_table, device, render_pass_id);
 
-    ResourceDestructionMark Graph::remove_resource(u64 id) {
-        auto resource = this->resources.erase(id);
-
-        return {
-            .usage = resource.memory.flags,
-            .pool = resource.memory.pool,
-            .offset = resource.memory.offset,
-            .dynamic = resource.memory.dynamic,
-        };
-    }
-
-    u64 Graph::add_texture(const memory::Ref& ref, VkImage image, VkImageCreateInfo const& info) {
-        return this->textures.insert(
-            {
-                .image = image,
-                .image_info = info,
-                .memory = {
-                    .pool = ref.pool,
-                    .offset = ref.offset,
-                    .flags = ref.flags,
+                    return input_node.error();
                 }
+
+                if (*input_node) {
+                    dependencies.emplace_back(**input_node);
+                }
+
+                inputs.push_back({.id = input.texture_id, .type = ResourceType::Texture});
             }
+
+            for (auto const& output : std::span(subpass.outputs, subpass.output_count)) {
+                auto output_node = this->get_dependency_node(output.dependency);
+                if (!output_node) {
+                    this->remove_nodes(subpass_nodes);
+                    this->render_passes.destroy_render_pass(fn_table, device, render_pass_id);
+
+                    return output_node.error();
+                }
+
+                if (*output_node) {
+                    dependencies.emplace_back(**output_node);
+                }
+
+                outputs.push_back({.id = output.texture_id, .type = ResourceType::Texture});
+            }
+
+            if (subpass.depth_stencil_attachment) {
+                auto depth_stencil_node = this->get_dependency_node(subpass.depth_stencil_attachment->dependency);
+                if (!depth_stencil_node) {
+                    this->remove_nodes(subpass_nodes);
+                    this->render_passes.destroy_render_pass(fn_table, device, render_pass_id);
+
+                    return depth_stencil_node.error();
+                }
+
+                if (*depth_stencil_node) {
+                    dependencies.emplace_back(**depth_stencil_node);
+                }
+
+                outputs.push_back({.id = subpass.depth_stencil_attachment->texture_id, .type = ResourceType::Texture});
+            }
+
+            auto node_result = this->insert_node(std::move(inputs), std::move(outputs), std::move(dependencies));
+            if (!node_result) {
+                this->remove_nodes(subpass_nodes);
+                this->render_passes.destroy_render_pass(fn_table, device, render_pass_id);
+
+                return node_result.error();
+            }
+
+            subpass_nodes.emplace_back(*node_result);
+        }
+
+        this->render_pass_datas.emplace(
+            render_pass_id,
+            RenderPassGraphData{.nodes = std::move(subpass_nodes), .predicate = std::move(predicate)}
         );
+
+        return render_pass_id;
     }
 
-    TextureDestructionMark Graph::remove_texture(u64 id) {
-        auto texture = this->textures.erase(id);
-
-        return {
-            .image = texture.image,
-            .memory_type_bits = texture.memory.flags,
-            .pool = texture.memory.pool,
-            .offset = texture.memory.offset,
-        };
-    }
-
-    std::size_t Graph::OutputHash::operator()(const std::pair<u64, u64>& output) const noexcept {
-        return output.first ^ reverse_bits(output.second);
+    void Graph::destroy_render_pass(VolkDeviceTable const& fn_table, VkDevice device, u64 id) {
+        this->render_pass_datas.erase(id);
+        this->render_passes.destroy_render_pass(fn_table, device, id);
     }
 }

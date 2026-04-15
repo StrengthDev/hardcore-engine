@@ -22,7 +22,7 @@ impl<'s> SharedData<'s> {
     fn new(initializer: &'s Initializer, devices: &[Device]) -> Self {
         Self {
             window: initializer
-                .create_window(
+                .new_window(
                     &devices[0],
                     1920,
                     1080,
@@ -189,7 +189,7 @@ fn main() {
         .event_format(format)
         .init();
 
-    let instance = Instance::create(ApplicationDescriptor {
+    let instance = Instance::new(ApplicationDescriptor {
         name: "Hardcore Fractal sample",
         version: Version {
             major: env!("CARGO_PKG_VERSION_MAJOR").parse().unwrap(),

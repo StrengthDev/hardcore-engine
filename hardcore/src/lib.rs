@@ -59,13 +59,17 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use tracing::{error, info, info_span};
 
 pub mod allocator;
-mod dependent_handle;
 pub mod device;
 pub mod event;
+mod handle;
 pub mod io;
 pub mod layer;
 pub mod meta;
+
+#[macro_use]
 mod native;
+pub mod color;
+mod ops;
 pub mod resource;
 pub mod shader;
 pub mod state;
@@ -99,10 +103,10 @@ pub struct ApplicationDescriptor<'a> {
 
 /// An error within the core **Hardcore** functionality.
 #[derive(Error, Debug)]
-pub enum CoreError {
+pub enum Error {
     /// An error has occurred withing the system crate.
     #[error(transparent)]
-    SystemError(#[from] hardcore_sys::Error),
+    System(#[from] hardcore_sys::Error),
 
     /// Failed to join with tokio task.
     #[error(transparent)]
@@ -116,24 +120,55 @@ pub enum CoreError {
     #[error(transparent)]
     IO(#[from] std::io::Error),
 
-    /// An error as occurred inside the native module.
-    #[error("an error as occurred inside the native module (code {code})")]
-    System {
-        /// The error code returned.
-        code: i32,
-    },
-
     /// The function isn't getting executed on the main thread.
     #[error("the function isn't getting executed on the main thread")]
     NotMain,
 
-    /// The context has not been initialised yet.
+    /// The context has not been initialized yet.
     #[error("the context has not been initialised yet")]
     Uninitialised,
 
     /// The provided string could not be converted into a C string.
     #[error("the provided string could not be converted into a C string")]
     InvalidString(#[from] std::ffi::NulError),
+
+    /// Unknown shader stage.
+    #[error("Could not infer shader stage from file extension \"{0}\"")]
+    UnknownStage(String),
+
+    /// Failed to acquire glslang compiler.
+    #[cfg(feature = "shader-compilation")]
+    #[error("Failed to acquire glslang compiler")]
+    NoCompiler,
+
+    /// GLSLang compiler error.
+    #[cfg(feature = "shader-compilation")]
+    #[error(transparent)]
+    GLSLang(#[from] glslang::error::GlslangError),
+
+    /// Failed to submit call to another thread.
+    #[error("failed to submit call to another thread")]
+    Send,
+
+    /// Failed to execute call in another thread.
+    #[error("failed to execute call in another thread")]
+    Execute,
+
+    /// Failed to receive call execution result from another thread.
+    #[error("failed to receive call execution result from another thread")]
+    ReceiveResult,
+
+    /// Invalid index type.
+    #[error("Invalid index type")]
+    Index,
+
+    /// The specified texture format does not exist.
+    #[error("The specified texture format does not exist")]
+    FormatDoesNotExist,
+
+    /// The specified input parameters are not valid.
+    #[error("The specified input parameters are not valid: {0}")]
+    InvalidParams(String),
 }
 
 pub struct Initializer {
@@ -156,12 +191,12 @@ impl Instance {
     /// Initialise the library context.
     ///
     /// This function must be called before any other library functions may be used.
-    pub fn create(app: ApplicationDescriptor) -> Result<Instance, CoreError> {
+    pub fn new(app: ApplicationDescriptor) -> Result<Instance, Error> {
         std::thread::current()
             .name()
             .is_none_or(move |name| name == "main")
             .then_some(())
-            .ok_or(CoreError::NotMain)?;
+            .ok_or(Error::NotMain)?;
 
         THREAD_KIND.set(ThreadKind::Main);
 
@@ -205,10 +240,7 @@ impl Instance {
     /// The main loop function.
     ///
     /// This function **MUST** be called in the *main* thread in a non-async environment.
-    pub fn run<'s, InitializeFn, SharedData>(
-        &self,
-        initialize: InitializeFn,
-    ) -> Result<(), CoreError>
+    pub fn run<'s, InitializeFn, SharedData>(&self, initialize: InitializeFn) -> Result<(), Error>
     where
         InitializeFn: FnOnce(
                 &'s Initializer,
@@ -220,10 +252,10 @@ impl Instance {
             + 'static,
     {
         if EVENT_TX.read().is_none() {
-            return Err(CoreError::Uninitialised);
+            return Err(Error::Uninitialised);
         }
 
-        let (io_caller, mut io_executor) = io::create_context();
+        let (io_caller, mut io_executor) = io::new_context();
 
         info!("Starting main loop");
 
@@ -262,7 +294,7 @@ static LAYER_INITIALIZER: Initializer = Initializer { _pvt: () };
 fn core_run<'s, InitializeFn, SharedData>(
     io_caller: io::Caller,
     initialize: InitializeFn,
-) -> Result<(), CoreError>
+) -> Result<(), Error>
 where
     InitializeFn: FnOnce(
             &'s Initializer,
@@ -276,10 +308,10 @@ where
 
     let mut event_rx = {
         let mut event_lock = EVENT_RX.lock();
-        event_lock.take().ok_or(CoreError::Uninitialised)?
+        event_lock.take().ok_or(Error::Uninitialised)?
     };
 
-    let mut state = State::create(Device::count(), io_caller);
+    let mut state = State::new(Device::count(), io_caller);
 
     let (mut layers, mut shared_data) = initialize(&LAYER_INITIALIZER, &state.devices);
 
@@ -331,12 +363,12 @@ where
 ///
 /// # Parameters
 /// * `event` - The event to be sent to the queue.
-pub(crate) fn emit_event(event: Event) -> Result<(), CoreError> {
+pub(crate) fn emit_event(event: Event) -> Result<(), Error> {
     let guard = EVENT_TX.read();
     if let Some(tx) = guard.as_ref() {
         tx.send(event)?;
         Ok(())
     } else {
-        Err(CoreError::Uninitialised)
+        Err(Error::Uninitialised)
     }
 }

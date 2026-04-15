@@ -25,7 +25,6 @@ namespace hc::render {
     static HCVulkanDebugCallbackFn user_debug_callback = nullptr;
     static std::vector<device::Device> devices;
 
-
     static std::expected<std::vector<bool>, Error> layer_support(const std::vector<const char*>& layer_names) {
         u32 layer_count;
         VkResult result = vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
@@ -207,7 +206,7 @@ namespace hc::render {
         }
 
 #ifdef HC_HEADLESS
-        std::vector<const char *> extensions;
+        std::vector<const char*> extensions;
 #else
         u32 glfw_extension_count = 0;
         const char** glfw_extensions;
@@ -253,7 +252,6 @@ namespace hc::render {
         return {};
     }
 
-
     static std::expected<void, Error> init_devices(const std::vector<const char*>& layers) {
         u32 device_count = 0;
         VkResult result = vkEnumeratePhysicalDevices(global_instance, &device_count, nullptr);
@@ -288,6 +286,10 @@ namespace hc::render {
     }
 
     std::expected<void, Error> init(const HCApplicationDescriptor& app, const HCRenderParams& params) {
+        if (params.max_frames_in_flight == 0) {
+            HC_ERROR("Number of maximum frames in flight must be 1 or greater");
+            return Error(HCError_InvalidParams);
+        }
         max_frames_in_flight_count = params.max_frames_in_flight;
 
         VkResult result = volkInitialize();
@@ -339,9 +341,9 @@ namespace hc::render {
         }
 #endif // HC_LOGGING
 
-        auto device_res = init_devices(layers);
-        if (!device_res) {
-            return device_res.error();
+        auto device_result = init_devices(layers);
+        if (!device_result) {
+            return device_result.error();
         }
 
         frame_mod = 0;
@@ -420,8 +422,7 @@ const u32 HC_VOLK_HEADER_VERSION = VOLK_HEADER_VERSION;
 HCResult hc_render_tick() {
     std::expected<void, hc::Error> return_result = {};
 
-    u8 next_mod = hc::render::frame_mod + 1;
-    next_mod = next_mod < hc::render::max_frames_in_flight_count ? next_mod : 0;
+    u8 next_mod = (hc::render::frame_mod + 1) % hc::render::max_frames_in_flight_count;
 
     for (auto& device : hc::render::devices) {
         auto tick_result = device.tick(hc::render::frame_mod, next_mod);
@@ -440,19 +441,8 @@ HCResult hc_render_tick() {
 }
 
 HCResult hc_render_finish() {
-    u8 frame_count = hc::render::max_frames_in_flight_count + 1;
-    std::vector<u8> frame_mods;
-    frame_mods.reserve(frame_count);
-
-    for (u8 i = 0; i < frame_count; ++i) {
-        frame_mods.push_back(hc::render::frame_mod);
-
-        u8 next_mod = hc::render::frame_mod + 1;
-        hc::render::frame_mod = next_mod < hc::render::max_frames_in_flight_count ? next_mod : 0;
-    }
-
     for (auto& device : hc::render::devices) {
-        device.finish(frame_mods);
+        device.finish();
     }
 
     return {.success = true};

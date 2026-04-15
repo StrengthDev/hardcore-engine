@@ -572,12 +572,12 @@ void hc_destroy_window(HCWindow* window) {
         hc::window::StaticWindow& static_window = hc::window::window_map.at(handle);
         device = static_window.owning_device;
     }
-    auto device_res = hc::render::device_at(device);
-    if (!device_res) {
+    auto device_result = hc::render::device_at(device);
+    if (!device_result) {
         HC_UNREACHABLE("Windows should always refer to a valid device");
     }
 
-    (*device_res)->destroy_swapchain(handle);
+    (*device_result)->destroy_swapchain(handle);
 
     window->handle = nullptr;
 }

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../core/result.h"
-
 #include "descriptor.h"
+
+#include "../../core/result.h"
 
 #ifdef __cplusplus
 extern "C" {

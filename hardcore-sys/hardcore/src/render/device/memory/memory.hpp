@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../destruction_mark.hpp"
 #include "heap_manager.hpp"
 #include "resource_pool.hpp"
 //#include "memory/staging_pool.hpp"
@@ -300,7 +299,7 @@ namespace hc::render::device::memory {
 
         Memory(Memory&&) noexcept = default;
 
-        Memory& operator=(Memory&&) = default;
+        Memory& operator=(Memory&&) noexcept = default;
 
         [[nodiscard]] std::expected<void, Error> map_ranges(VolkDeviceTable const& fn_table, VkDevice device, u8 frame_mod);
 
@@ -308,14 +307,14 @@ namespace hc::render::device::memory {
 
         [[nodiscard]] std::expected<void, Error> flush_ranges(VolkDeviceTable const& fn_table, VkDevice device, u8 frame_mod);
 
-        [[nodiscard]] std::expected<BufferRef, Error> alloc(
+        [[nodiscard]] std::expected<BufferRef, Error> alloc_buffer(
             VolkDeviceTable const& fn_table,
             VkDevice device,
             VkBufferUsageFlags flags,
             VkDeviceSize size
         );
 
-        [[nodiscard]] std::expected<DynamicBufferRef, Error> alloc_dyn(
+        [[nodiscard]] std::expected<DynamicBufferRef, Error> alloc_buffer_dyn(
             VolkDeviceTable const& fn_table,
             VkDevice device,
             VkBufferUsageFlags flags,
@@ -329,8 +328,9 @@ namespace hc::render::device::memory {
             VkImage image
         );
 
-        void free(ResourceDestructionMark const& mark);
-        void free(TextureDestructionMark const& mark);
+        void free_buffer(BufferRef const& ref);
+        void free_dynamic_buffer(DynamicBufferRef const& ref);
+        void free_texture(Ref const& ref);
 
         [[nodiscard]] inline bool host_coherent_dynamic_heap() const noexcept {
             return this->heap_manager.host_coherent_dynamic_heap();

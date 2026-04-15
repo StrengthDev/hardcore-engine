@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../core/result.h"
+#include "../../core/result.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -88,13 +88,28 @@ enum HCTextureComponentFormat {
  * @brief The numeric format of each component in a texture.
  */
 enum HCTextureNumericFormat {
-    HCTextureNumericFormat_UNorm, //!< The components are unsigned normalized values in the range [0, 1].
-    HCTextureNumericFormat_SNorm, //!< The components are signed normalized values in the range [-1, 1].
+    /**
+     * The components are unsigned normalized values in the range [0, 1].
+     *
+     * For example: a raw 8bit integer value of 0 gets interpreted as 0.0f, a value of 255 as 1.0f, a value of 127 as
+     * about 0.5f, etc...
+     */
+    HCTextureNumericFormat_UNorm,
+
+    /**
+     * The components are signed normalized values in the range [-1, 1].
+     *
+     * For example: a raw 8bit integer value of -127 gets interpreted as -1.0f, a value of 127 as 1.0f, a value of 0 as
+     * 0.0f, etc...
+     */
+    HCTextureNumericFormat_SNorm,
+
     /**
      * The components are unsigned integer values that get converted to floating-point in the range [0, 2^n - 1]
      * (n being the number of bits in the component).
      */
     HCTextureNumericFormat_UScaled,
+
     /**
      * The components are signed integer values that get converted to floating-point in the range
      * [-2^(n - 1), 2^(n - 1) - 1]
@@ -107,29 +122,34 @@ enum HCTextureNumericFormat {
      * (n being the number of bits in the component)
      */
     HCTextureNumericFormat_UInt,
+
     /**
      * The components are signed integer values in the range [-2^(n - 1), 2^(n - 1) - 1]
      * [-2^(n - 1), 2^(n - 1) - 1]
      * (n being the number of bits in the component)
      */
     HCTextureNumericFormat_SInt,
+
     /**
      * The components are unsigned floating-point numbers (used by packed, shared exponent, and some compressed formats).
      *
      * Typically used for HDR images.
      */
     HCTextureNumericFormat_UFloat,
+
     /**
      * The components are signed floating-point numbers.
      *
      * Typically used for HDR images.
      */
     HCTextureNumericFormat_SFloat,
+
     /**
      * The R, G, and B components are unsigned normalized values that represent values using sRGB nonlinear encoding,
      * while the A component (if one exists) is a regular unsigned normalized value.
      */
     HCTextureNumericFormat_SRGB,
+
     /**
      * The components are signed fractional integer values that get converted to floating-point in the range
      * [-1024, 1023.96875].
@@ -177,12 +197,33 @@ enum HCTextureBlockSize {
     HCTextureBlockSize_BS12x12, //!< 12x12 compressed texel blocks.
 };
 
-/**
- * @brief A number representing the underlying texture format.
- *
- * This value should match exactly with the VkFormat used.
- */
-typedef int32_t HCTextureFormatID;
+struct HCTextureFormatStandard {
+    enum HCTextureComponentFormat component_format;
+    enum HCTextureNumericFormat numeric_format;
+};
+
+struct HCTextureFormatCompressed {
+    enum HCTextureCompression compression;
+    enum HCTextureNumericFormat numeric_format;
+    enum HCTextureBlockSize block_size;
+};
+
+union HCTextureFormatUnion {
+    struct HCTextureFormatStandard standard;
+    struct HCTextureFormatCompressed compressed;
+};
+
+enum HCTextureFormatType {
+    HCTextureFormatType_Standard,
+    HCTextureFormatType_Compressed,
+};
+
+struct HCTextureFormat {
+    union HCTextureFormatUnion format;
+    enum HCTextureFormatType type;
+};
+
+bool hc_validate_texture_format(struct HCTextureFormat const* format);
 
 /**
  * @brief The sample count of a texture.
@@ -211,25 +252,24 @@ struct HCTexture {
     uint32_t device; //!< The ID of the device which this texture belongs to.
 };
 
-HCTextureFormatID hc_texture_format_id_standard(
-    enum HCTextureComponentFormat component_format,
-    enum HCTextureNumericFormat numeric_format
-);
-HCTextureFormatID hc_texture_format_id_compressed(
-    enum HCTextureCompression compression,
-    enum HCTextureNumericFormat numeric_format,
-    enum HCTextureBlockSize block_size
-);
-
 struct HCResult hc_create_texture(
     struct HCTexture* texture,
     uint32_t device,
     struct HCTextureDimensions dims,
-    HCTextureFormatID format,
+    struct HCTextureFormat format,
     uint32_t mip_levels,
     enum HCTextureSampleCount sample_count
 );
+
 void hc_destroy_texture(struct HCTexture* texture);
+
+struct HCTextureViewParams {
+    uint32_t base_layer;
+    uint32_t layer_count;
+    uint32_t base_mip_level;
+    uint32_t mip_level_count;
+    bool cube;
+};
 
 #ifdef __cplusplus
 }

@@ -1,8 +1,10 @@
 use crate::resource::buffer::{
-    Buffer, BufferError, CBuffer, CDynamicBuffer, DynamicBuffer, LayoutBuffer, MappedSlice,
+    Buffer, CBuffer, CDynamicBuffer, DynamicBuffer, LayoutBuffer, MappedSlice,
     ShaderWritableBuffer, VertexBufferLike,
 };
 use crate::resource::descriptor::Descriptor;
+use crate::resource::Synchronization;
+use crate::Error;
 
 use std::num::NonZeroU64;
 
@@ -10,22 +12,44 @@ pub struct VertexBuffer<'s, const WRITABLE: bool> {
     inner: CBuffer<'s>,
 }
 
-impl<'s, const WRITABLE: bool> VertexBuffer<'s, WRITABLE> {
-    pub(crate) fn create<'d>(
+impl<'s> VertexBuffer<'s, false> {
+    pub(crate) fn new<'d>(
         device: u32,
         descriptor: &'d Descriptor,
         count: NonZeroU64,
-    ) -> Result<VertexBuffer<'s, WRITABLE>, BufferError>
+    ) -> Result<VertexBuffer<'s, false>, Error>
     where
         's: 'd,
     {
-        Ok(VertexBuffer::<'s, WRITABLE> {
-            inner: CBuffer::create(
+        Ok(VertexBuffer::<'s, false> {
+            inner: CBuffer::new(
                 device,
                 hardcore_sys::BufferKind::Vertex,
                 descriptor,
                 count,
-                WRITABLE,
+                false,
+            )?,
+        })
+    }
+}
+
+impl<'s> VertexBuffer<'s, true> {
+    pub(crate) fn new<'d>(
+        device: u32,
+        descriptor: &'d Descriptor,
+        count: NonZeroU64,
+        synchronization: Synchronization,
+    ) -> Result<VertexBuffer<'s, true>, Error>
+    where
+        's: 'd,
+    {
+        Ok(VertexBuffer::<'s, true> {
+            inner: CBuffer::new(
+                device,
+                hardcore_sys::BufferKind::Vertex,
+                descriptor,
+                count,
+                true,
             )?,
         })
     }
@@ -52,13 +76,13 @@ pub struct DynamicVertexBuffer<'s> {
 }
 
 impl<'s> DynamicVertexBuffer<'s> {
-    pub(crate) fn create(
+    pub(crate) fn new(
         device: u32,
         descriptor: &Descriptor,
         count: NonZeroU64,
-    ) -> Result<DynamicVertexBuffer, BufferError> {
+    ) -> Result<DynamicVertexBuffer, Error> {
         Ok(DynamicVertexBuffer {
-            inner: CDynamicBuffer::create(
+            inner: CDynamicBuffer::new(
                 device,
                 hardcore_sys::BufferKind::Vertex,
                 descriptor,
@@ -76,7 +100,7 @@ impl<'s> Buffer<'s> for DynamicVertexBuffer<'s> {
 }
 
 impl<'s> DynamicBuffer<'s> for DynamicVertexBuffer<'s> {
-    fn as_slice<'a>(&self) -> Result<MappedSlice<'s, u8>, BufferError> {
+    fn as_slice<'a>(&self) -> Result<MappedSlice<'s, u8>, Error> {
         self.inner.as_slice()
     }
 }

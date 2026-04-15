@@ -49,6 +49,18 @@ namespace hc {
         case VK_ERROR_MEMORY_MAP_FAILED:
             this->error = HCError_MemoryMapFailed;
             break;
+        case VK_ERROR_UNKNOWN:
+            this->error = HCError_VulkanUnknown;
+            break;
+        case VK_ERROR_VALIDATION_FAILED_EXT:
+            this->error = HCError_ValidationFailed;
+            break;
+        case VK_ERROR_FRAGMENTATION:
+            this->error = HCError_Fragmentation;
+            break;
+        case VK_ERROR_INVALID_SHADER_NV:
+            this->error = HCError_InvalidShader;
+            break;
         default: HC_UNREACHABLE("All relevant return types must be implemented");
         }
     }

@@ -233,8 +233,8 @@ namespace hc::render::device {
             pools.reserve(max_frames_in_flight);
 
             for (u8 i = 0; i < max_frames_in_flight; ++i) {
-                auto pool_res = CommandPool::create(fn_table, device, queue_family);
-                if (!pool_res) {
+                auto pool_result = CommandPool::create(fn_table, device, queue_family);
+                if (!pool_result) {
                     for (auto& pool : pools) {
                         pool.destroy(fn_table, device);
                     }
@@ -242,9 +242,9 @@ namespace hc::render::device {
 
                     scheduler.destroy(fn_table, device);
 
-                    return std::unexpected(pool_res.error());
+                    return std::unexpected(pool_result.error());
                 }
-                pools.push_back(*std::move(pool_res));
+                pools.push_back(*std::move(pool_result));
             }
 
             scheduler.queues.push_back(

@@ -1,23 +1,43 @@
 #pragma once
 
+#include "../device/memory/reference.hpp"
+
 #include <util/number.hpp>
 
 namespace hc::render::buffer {
-	/**
-	* @brief The inner parameters of a resource buffer.
-	*/
-	struct Params {
-		u64 id; //!< The ID of this buffer within the device.
-		Sz size; //!< The amount of usable memory occupied by this buffer, in bytes.
-	};
+    class Buffer {
+    public:
+        explicit Buffer(device::memory::BufferRef const& ref);
 
-	/**
-	* @brief The inner parameters of a dynamic resource buffer.
-	*/
-	struct DynamicParams {
-		u64 id; //!< The ID of this buffer within the device.
-		Sz size; //!< The amount of usable memory occupied by this buffer, in bytes.
-		void **data; //!< A pointer to the underlying buffer backing this buffer's data.
-		Sz data_offset; //!< The offset to this buffer's data within the underlying buffer which backs this one.
-	};
+        [[nodiscard]] device::memory::BufferRef const& memory_ref() const noexcept;
+
+        [[nodiscard]] Sz content_offset() const noexcept;
+
+    private:
+        device::memory::BufferRef ref;
+    };
+
+    struct BufferData {
+        u64 id;
+        Sz size;
+    };
+
+    struct DynamicBufferData {
+        u64 id;
+        Sz size;
+        void** map_ptr;
+        Sz map_offset;
+    };
+
+    class DynamicBuffer {
+    public:
+        explicit DynamicBuffer(device::memory::DynamicBufferRef const& ref);
+
+        [[nodiscard]] device::memory::DynamicBufferRef const& memory_ref() const noexcept;
+
+        [[nodiscard]] Sz content_offset() const noexcept;
+
+    private:
+        device::memory::DynamicBufferRef ref;
+    };
 }
