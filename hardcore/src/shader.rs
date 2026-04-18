@@ -166,37 +166,40 @@ impl Drop for Shader {
 #[cfg(feature = "shader-compilation")]
 mod compilation {
     use crate::meta::vulkan_api_version;
-    use crate::shader::{Shader, Error, ShaderStage};
+    use crate::shader::{Error, Shader, ShaderStage};
     use crate::Version;
     use std::path::Path;
     use tokio::fs::File;
     use tokio::io::AsyncReadExt;
     use tracing::trace;
 
-    impl From<glslang::ShaderStage> for ShaderStage {
-        fn from(value: glslang::ShaderStage) -> Self {
+    impl TryFrom<glslang::ShaderStage> for ShaderStage {
+        type Error = Error;
+
+        fn try_from(value: glslang::ShaderStage) -> Result<Self, Self::Error> {
             let stage = match value {
-                glslang::ShaderStage::Vertex => hardcore_sys::ShaderStage::Vertex,
-                glslang::ShaderStage::Fragment => hardcore_sys::ShaderStage::Fragment,
-                glslang::ShaderStage::Compute => hardcore_sys::ShaderStage::Compute,
-                glslang::ShaderStage::Mesh => hardcore_sys::ShaderStage::Mesh,
+                glslang::ShaderStage::Vertex => Ok(hardcore_sys::ShaderStage::Vertex),
+                glslang::ShaderStage::Fragment => Ok(hardcore_sys::ShaderStage::Fragment),
+                glslang::ShaderStage::Compute => Ok(hardcore_sys::ShaderStage::Compute),
+                glslang::ShaderStage::Mesh => Ok(hardcore_sys::ShaderStage::Mesh),
                 glslang::ShaderStage::TesselationControl => {
-                    hardcore_sys::ShaderStage::TesselationControl
+                    Ok(hardcore_sys::ShaderStage::TesselationControl)
                 }
                 glslang::ShaderStage::TesselationEvaluation => {
-                    hardcore_sys::ShaderStage::TesselationEvaluation
+                    Ok(hardcore_sys::ShaderStage::TesselationEvaluation)
                 }
-                glslang::ShaderStage::Geometry => hardcore_sys::ShaderStage::Geometry,
-                glslang::ShaderStage::Task => hardcore_sys::ShaderStage::Task,
-                glslang::ShaderStage::RayGeneration => hardcore_sys::ShaderStage::RayGeneration,
-                glslang::ShaderStage::Intersect => hardcore_sys::ShaderStage::RayIntersection,
-                glslang::ShaderStage::AnyHit => hardcore_sys::ShaderStage::RayAnyHit,
-                glslang::ShaderStage::ClosestHit => hardcore_sys::ShaderStage::RayClosestHit,
-                glslang::ShaderStage::Miss => hardcore_sys::ShaderStage::RayMiss,
-                glslang::ShaderStage::Callable => hardcore_sys::ShaderStage::RayCallable,
+                glslang::ShaderStage::Geometry => Ok(hardcore_sys::ShaderStage::Geometry),
+                glslang::ShaderStage::Task => Ok(hardcore_sys::ShaderStage::Task),
+                glslang::ShaderStage::RayGeneration => Ok(hardcore_sys::ShaderStage::RayGeneration),
+                glslang::ShaderStage::Intersect => Ok(hardcore_sys::ShaderStage::RayIntersection),
+                glslang::ShaderStage::AnyHit => Ok(hardcore_sys::ShaderStage::RayAnyHit),
+                glslang::ShaderStage::ClosestHit => Ok(hardcore_sys::ShaderStage::RayClosestHit),
+                glslang::ShaderStage::Miss => Ok(hardcore_sys::ShaderStage::RayMiss),
+                glslang::ShaderStage::Callable => Ok(hardcore_sys::ShaderStage::RayCallable),
+                _ => Err(Error::UnknownStage(format!("{value:?}"))),
             };
 
-            stage.into()
+            stage.map(Into::into)
         }
     }
 

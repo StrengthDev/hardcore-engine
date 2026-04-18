@@ -10,16 +10,16 @@ license-file = "../LICENSE"
 publish = true
 
 [dependencies]
-glslang = { version = "0.6.2", optional = true }
+glslang = { version = "0.8.0", optional = true }
 hardcore-sys = { path = "../hardcore-sys" }
 parking_lot = { version = "0.12.5", features = ["send_guard"], optional = true }
-thiserror = "2.0.17"
-tokio = { version = "1.49.0", features = ["fs", "io-util", "rt", "rt-multi-thread", "sync", "signal", "time"] }
+thiserror = "2.0.18"
+tokio = { version = "1.52.1", features = ["fs", "io-util", "rt", "rt-multi-thread", "sync", "signal", "time"] }
 tracing = "0.1.44"
 
 [dev-dependencies]
-tokio = { version = "1.49.0", features = ["macros"] }
-tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+tokio = { version = "1.52.1", features = ["macros"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 [features]
 headless = ["hardcore-sys/headless"]

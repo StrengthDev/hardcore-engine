@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use bindgen::callbacks::{EnumVariantCustomBehavior, EnumVariantValue, ParseCallbacks};
+use bindgen::callbacks::{EnumVariantCustomBehavior, EnumVariantValue, ItemInfo, ParseCallbacks};
 use bindgen::EnumVariation;
 use cmake::Config;
 use regex::Regex;
@@ -134,10 +134,10 @@ impl ParseCallbacks for StripPrefixCallback {
         })
     }
 
-    fn item_name(&self, original_item_name: &str) -> Option<String> {
+    fn item_name(&self, item_info: ItemInfo<'_>) -> Option<String> {
         let prefixes = ["hc_", "HC_", "HC"];
         for prefix in prefixes {
-            let new_name = original_item_name.strip_prefix(prefix);
+            let new_name = item_info.name.strip_prefix(prefix);
             if new_name.is_some() {
                 return new_name.map(str::to_string);
             }

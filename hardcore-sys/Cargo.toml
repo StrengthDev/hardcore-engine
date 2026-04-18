@@ -11,12 +11,12 @@ exclude = []
 publish = true
 
 [dependencies]
-link-cplusplus = "1.0.10"
+link-cplusplus = "1.0.12"
 
 [build-dependencies]
-bindgen = "0.71.1"
-cmake = "0.1.54"
-regex = "1.11.1"
+bindgen = "0.72.1"
+cmake = "0.1.58"
+regex = "1.12.3"
 
 [features]
 headless = []
