@@ -1,8 +1,9 @@
 #pragma once
 
+#include "../vulkan.hpp"
+
 #include <core/error.hpp>
 #include <util/number.hpp>
-#include "util/uncopyable.hpp"
 
 namespace hc::render::device {
     struct QueueSelection {
@@ -13,10 +14,10 @@ namespace hc::render::device {
     };
 
     struct CommandPool {
-        ExternalHandle<VkCommandPool, VK_NULL_HANDLE> handle;
-        ExternalHandle<VkCommandBuffer, VK_NULL_HANDLE> buffer;
-        ExternalHandle<VkFence, VK_NULL_HANDLE> fence;
-        ExternalHandle<VkSemaphore, VK_NULL_HANDLE> semaphore;
+        vk::CommandPool handle;
+        vk::CommandBuffers buffers;
+        vk::Fence fence;
+        vk::Semaphore semaphore;
 
         static std::expected<CommandPool, Error> create(
             const VolkDeviceTable& fn_table,
@@ -28,7 +29,7 @@ namespace hc::render::device {
     };
 
     struct Queue {
-        ExternalHandle<VkQueue, VK_NULL_HANDLE> handle;
+        VkQueue handle;
         u32 family = std::numeric_limits<u32>::max();
         VkQueueFamilyProperties family_properties;
         std::vector<CommandPool> pools;

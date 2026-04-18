@@ -1,8 +1,9 @@
 
 #pragma once
 
+#include "../../vulkan.hpp"
+
 #include <core/error.hpp>
-#include <util/uncopyable.hpp>
 #include <util/number.hpp>
 
 #include <vulkan/vulkan.h>
@@ -24,8 +25,8 @@ namespace hc::render::device::swapchain {
         [[nodiscard]] VkFramebuffer framebuffer(u32 index) const { return this->framebuffers[index]; }
 
     private:
-        ExternalHandle<VkSwapchainKHR, VK_NULL_HANDLE> swapchain_handle;
-        std::vector<ExternalHandle<VkImageView, VK_NULL_HANDLE>> image_views;
-        std::vector<ExternalHandle<VkFramebuffer, VK_NULL_HANDLE>> framebuffers;
+        vk::Swapchain swapchain_handle;
+        std::vector<vk::ImageView> image_views;
+        std::vector<vk::Framebuffer> framebuffers;
     };
 }

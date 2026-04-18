@@ -6,8 +6,7 @@
 namespace hc::render {
     void RenderPassBank::destroy(VolkDeviceTable const& fn_table, VkDevice device) noexcept {
         for (auto& render_pass : this->instances | std::views::values) {
-            fn_table.vkDestroyRenderPass(device, render_pass.handle, nullptr);
-            render_pass.handle.destroy();
+            render_pass.handle.destroy(fn_table, device);
         }
 
         this->bank.clear();
@@ -45,8 +44,7 @@ namespace hc::render {
         instance.ref_count--;
 
         if (instance.ref_count == 0) {
-            fn_table.vkDestroyRenderPass(device, instance.handle, nullptr);
-            instance.handle.destroy();
+            instance.handle.destroy(fn_table, device);
 
             this->instances.erase(render_pass.instance_key());
         }

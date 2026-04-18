@@ -12,14 +12,14 @@ namespace hc::render::device::swapchain {
     ) {
         SwapchainInstance swapchain;
 
-        VkResult result = fn_table.vkCreateSwapchainKHR(device, &create_info, nullptr, &swapchain.swapchain_handle.get());
-        if (result != VK_SUCCESS) {
-            HC_ERROR("Failed to create swapchain: " << to_str(result));
-            return Error(result);
+        auto swapchain_result = vk::Swapchain::create(fn_table, device, &create_info);
+        if (!swapchain_result) {
+            return swapchain_result.error();
         }
+        swapchain.swapchain_handle = *std::move(swapchain_result);
 
         u32 image_count = 0;
-        result = fn_table.vkGetSwapchainImagesKHR(device, swapchain.swapchain_handle, &image_count, nullptr);
+        VkResult result = fn_table.vkGetSwapchainImagesKHR(device, swapchain.swapchain_handle, &image_count, nullptr);
         if (result != VK_SUCCESS) {
             HC_ERROR("Failed to query swapchain images: " << to_str(result));
             swapchain.destroy(fn_table, device);
@@ -58,15 +58,13 @@ namespace hc::render::device::swapchain {
                 },
             };
 
-            VkImageView image_view = VK_NULL_HANDLE;
-            result = fn_table.vkCreateImageView(device, &view_create_info, nullptr, &image_view);
-            if (result != VK_SUCCESS) {
-                HC_ERROR("Failed to create swapchain image view: " << to_str(result));
+            auto view_result = vk::ImageView::create(fn_table, device, &view_create_info);
+            if (!view_result) {
                 swapchain.destroy(fn_table, device);
-                return Error(result);
+                return view_result.error();
             }
 
-            swapchain.image_views.emplace_back(image_view);
+            swapchain.image_views.emplace_back(*std::move(view_result));
         }
 
         swapchain.framebuffers.reserve(image_count);
@@ -83,15 +81,13 @@ namespace hc::render::device::swapchain {
                 .layers = 1,
             };
 
-            VkFramebuffer framebuffer = VK_NULL_HANDLE;
-            result = fn_table.vkCreateFramebuffer(device, &framebuffer_info, nullptr, &framebuffer);
-            if (result != VK_SUCCESS) {
-                HC_ERROR("Failed to create swapchain frame buffer: " << to_str(result));
+            auto framebuffer_result = vk::Framebuffer::create(fn_table, device, &framebuffer_info);
+            if (!framebuffer_result) {
                 swapchain.destroy(fn_table, device);
-                return Error(result);
+                return framebuffer_result.error();
             }
 
-            swapchain.framebuffers.emplace_back(framebuffer);
+            swapchain.framebuffers.emplace_back(*std::move(framebuffer_result));
         }
 
         return swapchain;
@@ -99,20 +95,17 @@ namespace hc::render::device::swapchain {
 
     void SwapchainInstance::destroy(const VolkDeviceTable& fn_table, VkDevice device) {
         for (auto& framebuffer : this->framebuffers) {
-            fn_table.vkDestroyFramebuffer(device, framebuffer, nullptr);
-            framebuffer.destroy();
+            framebuffer.destroy(fn_table, device);
         }
         this->framebuffers.clear();
 
         for (auto& image_view : this->image_views) {
-            fn_table.vkDestroyImageView(device, image_view, nullptr);
-            image_view.destroy();
+            image_view.destroy(fn_table, device);
         }
         this->image_views.clear();
 
         if (this->swapchain_handle.valid()) {
-            fn_table.vkDestroySwapchainKHR(device, this->swapchain_handle, nullptr);
-            this->swapchain_handle.destroy();
+            this->swapchain_handle.destroy(fn_table, device);
         }
     }
 }

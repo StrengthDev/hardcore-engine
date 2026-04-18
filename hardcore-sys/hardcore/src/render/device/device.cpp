@@ -150,12 +150,11 @@ namespace hc::render::device {
             .pEnabledFeatures = &features,
         };
 
-        VkDevice handle;
-        VkResult vk_result = vkCreateDevice(physical_handle, &create_info, nullptr, &handle);
-        if (vk_result != VK_SUCCESS) {
-            HC_ERROR("Failed to create Vulkan logical device: " << to_str(vk_result));
-            return Error(vk_result);
+        auto device_result = vk::Device::create(physical_handle, &create_info);
+        if (!device_result) {
+            return device_result.error();
         }
+        vk::Device handle = *std::move(device_result);
 
         volkLoadDeviceTable(&device.fn_table, handle);
 
@@ -180,13 +179,14 @@ namespace hc::render::device {
             .pInitialData = nullptr
         };
 
-        vk_result = device.fn_table.vkCreatePipelineCache(handle, &cache_info, nullptr, &device.pipeline_cache.get());
-        if (vk_result != VK_SUCCESS) {
-            HC_ERROR("Failed to create pipeline cache: " << to_str(vk_result));
+        auto cache_result = vk::PipelineCache::create(device.fn_table, handle, &cache_info);
+        if (!cache_result) {
             device.memory.destroy(device.fn_table, handle);
             device.fn_table.vkDestroyDevice(handle, nullptr);
-            return Error(vk_result);
+
+            return cache_result.error();
         }
+        device.pipeline_cache = *std::move(cache_result);
 
         device.graph = Graph::create(
             device.scheduler.graphics_queues()[0].get().family,
@@ -195,24 +195,17 @@ namespace hc::render::device {
         );
 
         device.physical_handle = physical_handle;
-        device.handle = handle;
+        device.handle = std::move(handle);
 
         return device;
     }
 
     Device::~Device() {
-        if (this->handle.valid()) {
-            this->graph.destroy(this->fn_table, this->handle);
-
-            this->fn_table.vkDestroyPipelineCache(this->handle, this->pipeline_cache, nullptr);
-            this->pipeline_cache.destroy();
-
-            this->memory.destroy(this->fn_table, this->handle);
-            this->scheduler.destroy(this->fn_table, this->handle);
-            this->fn_table.vkDestroyDevice(this->handle, nullptr);
-            this->physical_handle.destroy();
-            this->handle.destroy();
-        }
+        this->graph.destroy(this->fn_table, this->handle);
+        this->pipeline_cache.destroy(this->fn_table, this->handle);
+        this->memory.destroy(this->fn_table, this->handle);
+        this->scheduler.destroy(this->fn_table, this->handle);
+        this->handle.destroy(this->fn_table);
     }
 
     std::expected<void, Error> Device::tick(u8 frame_mod, u8 next_frame_mod) {
@@ -504,7 +497,7 @@ namespace hc::render::device {
         if (!texture_result) {
             return texture_result.error();
         }
-        VkImage image = *texture_result;
+        vk::Image image = *std::move(texture_result);
 
         auto ref_result = this->memory.alloc_texture(this->fn_table, this->handle, image);
         if (!ref_result) {
@@ -513,7 +506,7 @@ namespace hc::render::device {
         memory::Ref ref = *ref_result;
 
         texture::TextureData data = {
-            .id = this->graph.add_texture(texture::Texture(ref, image, image_info)),
+            .id = this->graph.add_texture(texture::Texture(ref, std::move(image), image_info)),
             .size = ref.size,
         };
 
@@ -550,7 +543,7 @@ namespace hc::render::device {
     }
 
     std::expected<void, Error> Device::present_queue_windows(u8 frame_mod, Queue const& queue, const std::vector<GLFWwindow*>& windows) {
-        VkCommandBuffer cmd_buffer = queue.pools[frame_mod].buffer;
+        VkCommandBuffer cmd_buffer = queue.pools[frame_mod].buffers[0];
         VkFence render_finished_fence = queue.pools[frame_mod].fence;
         VkSemaphore render_finished_semaphore = queue.pools[frame_mod].semaphore;
 

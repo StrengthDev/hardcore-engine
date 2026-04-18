@@ -33,7 +33,7 @@ namespace hc::render {
         AttachmentMap input_map;
         AttachmentMap output_map;
         AttachmentMap depth_stencil_map;
-        
+
         // TODO maybe do some of these checks on the render pass, and then a preprocessed object gets passed in the arguments
         //  instead of the texture bank
 
@@ -179,12 +179,10 @@ namespace hc::render {
         return refs;
     }
 
-    std::expected<ExternalHandle<VkRenderPass, nullptr>, Error> RenderPassInstanceKey::create_instance(
+    std::expected<vk::RenderPass, Error> RenderPassInstanceKey::create_instance(
         VolkDeviceTable const& fn_table,
         VkDevice device
     ) const noexcept {
-        VkRenderPass handle;
-
         struct SubpassAttachmentRefs {
             std::vector<VkAttachmentReference> inputs;
             std::vector<VkAttachmentReference> outputs;
@@ -237,13 +235,7 @@ namespace hc::render {
             .pDependencies = dependencies.data(),
         };
 
-        VkResult result = fn_table.vkCreateRenderPass(device, &create_info, nullptr, &handle);
-        if (result != VK_SUCCESS) {
-            HC_ERROR("Failed to create render pass: " << to_str(result));
-            return Error(result);
-        }
-
-        return handle;
+        return vk::RenderPass::create(fn_table, device, &create_info);
     }
 
     static bool equivalent_maps(std::unordered_map<u32, u32> const& lhs, std::unordered_map<u32, u32> const& rhs) {

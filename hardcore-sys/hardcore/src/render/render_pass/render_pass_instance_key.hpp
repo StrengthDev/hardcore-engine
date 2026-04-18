@@ -4,8 +4,7 @@
 #include <render/ops/render_pass.h>
 
 #include "../resource/texture.hpp"
-
-#include <vulkan/vulkan.h>
+#include "../vulkan.hpp"
 
 #include <core/error.hpp>
 #include <util/bank.hpp>
@@ -24,7 +23,7 @@ namespace hc::render {
         );
 
         [[nodiscard]]
-        std::expected<ExternalHandle<VkRenderPass, VK_NULL_HANDLE>, Error> create_instance(
+        std::expected<vk::RenderPass, Error> create_instance(
             VolkDeviceTable const& fn_table,
             VkDevice device
         ) const noexcept;

@@ -273,19 +273,16 @@ namespace hc::render::texture {
         return nullptr;
     }
 
-    Texture::Texture(device::memory::Ref const& ref, VkImage image, VkImageCreateInfo const& image_info)
-        : ref(ref), handle(image), image_info(image_info) {}
+    Texture::Texture(device::memory::Ref const& ref, vk::Image&& image, VkImageCreateInfo const& image_info)
+        : ref(ref), handle(std::move(image)), image_info(image_info) {}
 
     void Texture::destroy(VolkDeviceTable const& fn_table, VkDevice device) {
         for (auto& view : this->views | std::views::values) {
-            fn_table.vkDestroyImageView(device, view.handle, nullptr);
-            view.handle.destroy();
+            view.handle.destroy(fn_table, device);
         }
         this->views.clear();
 
-        fn_table.vkDestroyImage(device, this->handle, nullptr);
-
-        this->handle.destroy();
+        this->handle.destroy(fn_table, device);
     }
 
     device::memory::Ref const& Texture::memory_ref() const noexcept {
@@ -328,14 +325,13 @@ namespace hc::render::texture {
         view.ref_count--;
 
         if (view.ref_count == 0) {
-            fn_table.vkDestroyImageView(device, view.handle, nullptr);
-            view.handle.destroy();
+            view.handle.destroy(fn_table, device);
 
             this->views.erase(params);
         }
     }
 
-    std::expected<VkImage, Error> create_image(
+    std::expected<vk::Image, Error> create_image(
         VkPhysicalDevice physical_device,
         VolkDeviceTable const& fn_table,
         VkDevice device,
@@ -416,25 +412,16 @@ namespace hc::render::texture {
             return Error(HCError_TextureParamsNotSupported);
         }
 
-        VkImage image;
-        result = fn_table.vkCreateImage(device, &image_info, nullptr, &image);
-        if (result != VK_SUCCESS) {
-            HC_ERROR("Failed to create image: " << to_str(result));
-            return Error(result);
-        }
-
-        return image;
+        return vk::Image::create(fn_table, device, &image_info);
     }
 
-    std::expected<VkImageView, Error> create_image_view(
+    std::expected<vk::ImageView, Error> create_image_view(
         VolkDeviceTable const& fn_table,
         VkDevice device,
         VkImage image,
         VkImageCreateInfo const& image_info,
         HCTextureViewParams const& view_params
     ) {
-        VkImageView image_view;
-
         if (view_params.layer_count == 0) {
             HC_ERROR("View layer count must be greater than 0");
             return Error(HCError_InvalidParams);
@@ -514,13 +501,7 @@ namespace hc::render::texture {
             },
         };
 
-        VkResult result = fn_table.vkCreateImageView(device, &view_info, nullptr, &image_view);
-        if (result != VK_SUCCESS) {
-            HC_ERROR("Failed to create image view");
-            return Error(result);
-        }
-
-        return image_view;
+        return vk::ImageView::create(fn_table, device, &view_info);
     }
 }
 

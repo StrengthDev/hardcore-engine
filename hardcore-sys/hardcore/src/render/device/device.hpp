@@ -7,6 +7,8 @@
 #include "memory/memory.hpp"
 #include "swapchain/swapchain.hpp"
 
+#include "../vulkan.hpp"
+
 #include "../resource/descriptor.hpp"
 #include "../resource/buffer.hpp"
 #include "../resource/texture.hpp"
@@ -103,7 +105,7 @@ namespace hc::render::device {
             const std::vector<GLFWwindow*>& windows
         );
 
-        ExternalHandle<VkPhysicalDevice, VK_NULL_HANDLE> physical_handle;
+        VkPhysicalDevice physical_handle;
         VkPhysicalDeviceProperties properties = {};
         VkPhysicalDeviceFeatures features = {};
         Scheduler scheduler;
@@ -112,11 +114,11 @@ namespace hc::render::device {
         std::unordered_map<u32, std::vector<GLFWwindow*>> queue_windows;
         std::unordered_map<GLFWwindow*, swapchain::Swapchain> swapchains;
 
-        ExternalHandle<VkPipelineCache, VK_NULL_HANDLE> pipeline_cache;
+        vk::PipelineCache pipeline_cache;
 
         Cleaner cleaner;
 
-        ExternalHandle<VkDevice, VK_NULL_HANDLE> handle;
+        vk::Device handle;
         VolkDeviceTable fn_table = {};
     };
 }

@@ -5,8 +5,6 @@
 
 #include "scheduler.hpp"
 
-#include "util/flow.hpp"
-
 namespace hc::render::device {
     std::expected<CommandPool, Error> CommandPool::create(
         const VolkDeviceTable& fn_table,
@@ -22,11 +20,11 @@ namespace hc::render::device {
             .queueFamilyIndex = queue_family,
         };
 
-        VkResult result = fn_table.vkCreateCommandPool(device, &pool_info, nullptr, &pool.handle.get());
-        if (result != VK_SUCCESS) {
-            HC_ERROR("Failed to create command pool: " << to_str(result));
-            return Error(result);
+        auto pool_result = vk::CommandPool::create(fn_table, device, &pool_info);
+        if (!pool_result) {
+            return pool_result.error();
         }
+        pool.handle = *std::move(pool_result);
 
         VkCommandBufferAllocateInfo command_buffer_info = {
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -36,12 +34,12 @@ namespace hc::render::device {
             .commandBufferCount = 1,
         };
 
-        result = fn_table.vkAllocateCommandBuffers(device, &command_buffer_info, &pool.buffer.get());
-        if (result != VK_SUCCESS) {
-            HC_ERROR("Failed to allocate command buffer: " << to_str(result));
+        auto buffer_result = vk::CommandBuffers::create(fn_table, device, &command_buffer_info);
+        if (!buffer_result) {
             pool.destroy(fn_table, device);
-            return Error(result);
+            return buffer_result.error();
         }
+        pool.buffers = *std::move(buffer_result);
 
         VkFenceCreateInfo fence_info = {
             .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
@@ -49,12 +47,12 @@ namespace hc::render::device {
             .flags = VK_FENCE_CREATE_SIGNALED_BIT,
         };
 
-        result = fn_table.vkCreateFence(device, &fence_info, nullptr, &pool.fence.get());
-        if (result != VK_SUCCESS) {
-            HC_ERROR("Failed to create command pool fence: " << to_str(result));
+        auto fence_result = vk::Fence::create(fn_table, device, &fence_info);
+        if (!fence_result) {
             pool.destroy(fn_table, device);
-            return Error(result);
+            return fence_result.error();
         }
+        pool.fence = *std::move(fence_result);
 
         VkSemaphoreCreateInfo semaphore_info = {
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
@@ -62,34 +60,21 @@ namespace hc::render::device {
             .flags = 0,
         };
 
-        result = fn_table.vkCreateSemaphore(device, &semaphore_info, nullptr, &pool.semaphore.get());
-        if (result != VK_SUCCESS) {
-            HC_ERROR("Failed to create command pool semaphore: " << to_str(result));
+        auto semaphore_result = vk::Semaphore::create(fn_table, device, &semaphore_info);
+        if (!semaphore_result) {
             pool.destroy(fn_table, device);
-            return Error(result);
+            return semaphore_result.error();
         }
+        pool.semaphore = *std::move(semaphore_result);
 
         return pool;
     }
 
     void CommandPool::destroy(const VolkDeviceTable& fn_table, VkDevice device) {
-        if (this->semaphore.valid()) {
-            fn_table.vkDestroySemaphore(device, this->semaphore, nullptr);
-            this->semaphore.destroy();
-        }
-
-        if (this->fence.valid()) {
-            fn_table.vkDestroyFence(device, this->fence, nullptr);
-            this->fence.destroy();
-        }
-
-        if (this->buffer.valid()) {
-            fn_table.vkFreeCommandBuffers(device, this->handle, 1, &this->buffer.get());
-            this->buffer.destroy();
-        }
-
-        fn_table.vkDestroyCommandPool(device, this->handle, nullptr);
-        this->handle.destroy();
+        this->semaphore.destroy(fn_table, device);
+        this->fence.destroy(fn_table, device);
+        this->buffers.destroy(fn_table, device, this->handle);
+        this->handle.destroy(fn_table, device);
     }
 
     std::expected<QueueSelection, Error> Scheduler::select_queues(VkPhysicalDevice physical_device) {
@@ -273,7 +258,7 @@ namespace hc::render::device {
             queue.pools.clear();
 
             // Queues aren't freed
-            queue.handle.destroy();
+            queue.handle = VK_NULL_HANDLE;
         }
 
         this->queues.clear();

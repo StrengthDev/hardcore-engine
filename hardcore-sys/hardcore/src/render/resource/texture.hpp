@@ -1,12 +1,12 @@
 #pragma once
 
+#include "../vulkan.hpp"
 #include "../device/memory/reference.hpp"
 
 #include <render/resource/texture.h>
 
 #include <core/error.hpp>
 #include <util/number.hpp>
-#include <util/uncopyable.hpp>
 
 #include <expected>
 #include <unordered_map>
@@ -20,13 +20,13 @@ struct std::hash<HCTextureViewParams> {
 
 namespace hc::render::texture {
     struct TextureView {
-        ExternalHandle<VkImageView, VK_NULL_HANDLE> handle;
+        vk::ImageView handle;
         u32 ref_count;
     };
 
     class Texture {
     public:
-        Texture(device::memory::Ref const& ref, VkImage image, VkImageCreateInfo const& image_info);
+        Texture(device::memory::Ref const& ref, vk::Image&& image, VkImageCreateInfo const& image_info);
 
         void destroy(VolkDeviceTable const& fn_table, VkDevice device);
 
@@ -48,7 +48,7 @@ namespace hc::render::texture {
 
     private:
         device::memory::Ref ref;
-        ExternalHandle<VkImage, VK_NULL_HANDLE> handle;
+        vk::Image handle;
         VkImageCreateInfo image_info;
 
         std::unordered_map<HCTextureViewParams, TextureView> views;
@@ -59,14 +59,14 @@ namespace hc::render::texture {
         Sz size;
     };
 
-    [[nodiscard]] std::expected<VkImage, Error> create_image(
+    [[nodiscard]] std::expected<vk::Image, Error> create_image(
         VkPhysicalDevice physical_device,
         VolkDeviceTable const& fn_table,
         VkDevice device,
         VkImageCreateInfo const& image_info
     );
 
-    [[nodiscard]] std::expected<VkImageView, Error> create_image_view(
+    [[nodiscard]] std::expected<vk::ImageView, Error> create_image_view(
         VolkDeviceTable const& fn_table,
         VkDevice device,
         VkImage image,

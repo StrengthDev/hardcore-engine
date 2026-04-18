@@ -4,6 +4,8 @@
 #include "render_pass.hpp"
 #include "render_pass_instance_key.hpp"
 
+#include "../vulkan.hpp"
+
 #include <util/bank.hpp>
 #include <util/uncopyable.hpp>
 
@@ -35,7 +37,7 @@ namespace hc::render {
         Bank<RenderPass> bank;
 
         struct RenderPassInstance {
-            ExternalHandle<VkRenderPass, VK_NULL_HANDLE> handle;
+            vk::RenderPass handle;
             u32 ref_count;
         };
 

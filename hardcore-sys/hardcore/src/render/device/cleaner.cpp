@@ -5,6 +5,8 @@
 
 #include <core/window.hpp>
 
+#include <util/flow.hpp>
+
 namespace hc::render::device {
     Cleaner::Cleaner() {
         Sz const queue_count = max_frames_in_flight();

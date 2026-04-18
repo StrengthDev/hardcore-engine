@@ -1,8 +1,10 @@
+
 #include <pch.hpp>
 
 #include "util.hpp"
 #include "renderer.hpp"
 #include "vars.hpp"
+#include "vulkan.hpp"
 #include "device/device.hpp"
 
 #include <core/log.hpp>
@@ -20,8 +22,8 @@ namespace hc::render {
     static u8 max_frames_in_flight_count = std::numeric_limits<u8>::max();
     static u8 frame_mod = std::numeric_limits<u8>::max();
 
-    static ExternalHandle<VkInstance, VK_NULL_HANDLE> global_instance;
-    static ExternalHandle<VkDebugUtilsMessengerEXT, VK_NULL_HANDLE> debug_messenger;
+    static vk::Instance global_instance;
+    static vk::DebugUtilsMessenger debug_messenger;
     static HCVulkanDebugCallbackFn user_debug_callback = nullptr;
     static std::vector<device::Device> devices;
 
@@ -165,7 +167,7 @@ namespace hc::render {
         return VK_FALSE;
     }
 
-    static std::expected<void, Error> create_instance(
+    static std::expected<vk::Instance, Error> create_instance(
         const HCApplicationDescriptor& app,
         const std::vector<const char*>& layers
     ) {
@@ -244,12 +246,7 @@ namespace hc::render {
         instance_info.enabledLayerCount = static_cast<u32>(layers.size());
         instance_info.ppEnabledLayerNames = layers.data();
 
-        VkResult result = vkCreateInstance(&instance_info, nullptr, &global_instance.get());
-        if (result != VK_SUCCESS) {
-            HC_ERROR("Failed to initialize Vulkan instance: " << to_str(result));
-            return Error(result);
-        }
-        return {};
+        return vk::Instance::create(&instance_info);
     }
 
     static std::expected<void, Error> init_devices(const std::vector<const char*>& layers) {
@@ -313,6 +310,8 @@ namespace hc::render {
         if (!instance_result) {
             return instance_result.error();
         }
+        global_instance = *std::move(instance_result);
+
         volkLoadInstanceOnly(global_instance);
 
 #ifdef HC_LOGGING
@@ -333,12 +332,11 @@ namespace hc::render {
 
         debug_info.pUserData = nullptr;
 
-        // vkCreateDebugUtilsMessengerEXT is loaded via Volk
-        result = vkCreateDebugUtilsMessengerEXT(global_instance, &debug_info, nullptr, &debug_messenger.get());
-        if (result != VK_SUCCESS) {
-            HC_ERROR("Failed to initialize debug messenger: " << to_str(result));
-            return Error(result);
+        auto debug_messenger_result = vk::DebugUtilsMessenger::create(global_instance, &debug_info);
+        if (!debug_messenger_result) {
+            return debug_messenger_result.error();
         }
+        debug_messenger = *std::move(debug_messenger_result);
 #endif // HC_LOGGING
 
         auto device_result = init_devices(layers);
@@ -355,17 +353,11 @@ namespace hc::render {
         devices.clear();
 
 #ifdef HC_LOGGING
-        if (debug_messenger.valid()) {
-            vkDestroyDebugUtilsMessengerEXT(global_instance, debug_messenger, nullptr);
-            debug_messenger.destroy();
-            user_debug_callback = nullptr;
-        }
+        debug_messenger.destroy(global_instance);
+        user_debug_callback = nullptr;
 #endif // HC_LOGGING
 
-        if (global_instance.valid()) {
-            vkDestroyInstance(global_instance, nullptr);
-            global_instance.destroy();
-        }
+        global_instance.destroy();
 
         volkFinalize();
 
