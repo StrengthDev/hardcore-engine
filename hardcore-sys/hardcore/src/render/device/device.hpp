@@ -19,6 +19,7 @@
 #include <render/ops/render_pass.h>
 #include <render/resource/buffer.h>
 
+#include <util/concurrent_queue.hpp>
 #include <util/number.hpp>
 #include <util/user_predicate.hpp>
 
@@ -45,13 +46,21 @@ namespace hc::render::device {
 
         [[nodiscard]] const char* name() const noexcept;
 
+        // Called from Window::create which may be running in another thread, however window creation is a special case,
+        // even if Window::create is indeed being executed on another thread, the render thread should block on this
+        // operation as the application code may perform some other operation after window creation which alters the
+        // swapchain. So NO synchronization is done here.
         [[nodiscard]] std::expected<void, Error> create_swapchain(
             GLFWwindow* window,
-            ExternalHandle<VkSurfaceKHR, VK_NULL_HANDLE>&& surface,
             VkExtent2D extent
         );
 
+        // Same as create_swapchain, this is called from Window::disable which may be running on another thread, and
+        // just like creation, this is a special case as well. NO synchronization is done here.
         void destroy_swapchain(GLFWwindow* window);
+
+        // Called from a window callback, which may be running in another thread, should be synchronized
+        void resize_framebuffer(GLFWwindow const* window, VkExtent2D extent) noexcept;
 
         [[nodiscard]] std::expected<buffer::BufferData, Error> new_buffer(
             HCBufferKind kind,
@@ -98,21 +107,30 @@ namespace hc::render::device {
     private:
         Device() = default;
 
+        void update_framebuffers() noexcept;
+
         [[nodiscard]] std::expected<void, Error> present(u8 frame_mod);
         [[nodiscard]] std::expected<void, Error> present_queue_windows(
             u8 frame_mod,
             Queue const& queue,
-            const std::vector<GLFWwindow*>& windows
+            const std::vector<GLFWwindow const*>& windows
         );
 
-        VkPhysicalDevice physical_handle;
+        VkPhysicalDevice physical_handle = VK_NULL_HANDLE;
         VkPhysicalDeviceProperties properties = {};
         VkPhysicalDeviceFeatures features = {};
         Scheduler scheduler;
         Graph graph;
         memory::Memory memory;
-        std::unordered_map<u32, std::vector<GLFWwindow*>> queue_windows;
-        std::unordered_map<GLFWwindow*, swapchain::Swapchain> swapchains;
+
+        struct FramebufferResize {
+            GLFWwindow const* window;
+            VkExtent2D extent;
+        };
+
+        std::unordered_map<u32, std::vector<GLFWwindow const*>> queue_windows;
+        std::unordered_map<GLFWwindow const*, swapchain::Swapchain> swapchains;
+        ConcurrentQueue<FramebufferResize> framebuffer_resizes;
 
         vk::PipelineCache pipeline_cache;
 

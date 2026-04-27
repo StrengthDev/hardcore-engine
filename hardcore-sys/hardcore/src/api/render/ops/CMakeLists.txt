@@ -1,6 +1,5 @@
 
 target_sources(${PROJECT_NAME}
     PRIVATE
-        error.cpp
-        log.cpp
+        render_pass.cpp
 )

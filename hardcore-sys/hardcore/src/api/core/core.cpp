@@ -1,10 +1,12 @@
+
 #include <pch.hpp>
 
-#include "log.hpp"
-
 #include <core/core.h>
+
+#include <core/log.hpp>
+
 #ifndef HC_HEADLESS
-#include <core/window.hpp>
+#include <window/context.hpp>
 #endif // HC_HEADLESS
 
 #include <render/renderer.hpp>
@@ -21,7 +23,7 @@ HCResult hc_init(HCInitParams params) {
 #endif // HC_LOGGING
 
 #ifndef HC_HEADLESS
-    auto window_result = hc::window::init_context();
+    auto window_result = hc::window::Context::instance().init();
     if (!window_result) {
         return window_result.error();
     }
@@ -36,10 +38,9 @@ HCResult hc_init(HCInitParams params) {
 }
 
 void hc_term() {
-    // TODO destroy all windows
     hc::render::term();
 
 #ifndef HC_HEADLESS
-    hc::window::terminate_context();
+    hc::window::Context::instance().terminate();
 #endif // HC_HEADLESS
 }

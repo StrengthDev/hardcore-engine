@@ -1,6 +1,6 @@
 
 target_sources(${PROJECT_NAME}
     PRIVATE
-        error.cpp
-        log.cpp
+        core.cpp
+        window.cpp
 )

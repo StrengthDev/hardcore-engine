@@ -4,9 +4,9 @@
 
 #include <core/error.hpp>
 #include <core/glfw.hpp>
+#include <render/vulkan.hpp>
 
 #include <util/number.hpp>
-#include <util/uncopyable.hpp>
 
 namespace hc::render::device::swapchain {
     struct SurfaceInfo {
@@ -45,7 +45,7 @@ namespace hc::render::device::swapchain {
         [[nodiscard]] static std::expected<Swapchain, Error> create(
             const VolkDeviceTable& fn_table,
             VkDevice device,
-            ExternalHandle<VkSurfaceKHR, VK_NULL_HANDLE>&& surface,
+            vk::Surface&& surface,
             SurfaceInfo&& surface_info,
             SwapchainParams&& params
         );
@@ -56,11 +56,12 @@ namespace hc::render::device::swapchain {
 
         void destroy(const VolkDeviceTable& fn_table, VkDevice device);
 
+        void resize(VkExtent2D extent) noexcept;
+
         [[nodiscard]] std::expected<std::optional<SwapchainInstance>, Error> recreate(
             VkPhysicalDevice physical_device,
             const VolkDeviceTable& fn_table,
             VkDevice device,
-            GLFWwindow* window,
             bool out_of_date
         );
 
@@ -80,45 +81,31 @@ namespace hc::render::device::swapchain {
         [[nodiscard]] bool is_out_of_date() const noexcept { return this->images_out_of_date; }
 
     private:
-        // Hide default constructor, swapchains should be created using the factory function `Swapchain::create`.
         Swapchain() = default;
 
         SwapchainInstance current_instance;
 
-        /**
-         * @brief The surface of the window from which the swapchain is created.
-         */
-        ExternalHandle<VkSurfaceKHR, VK_NULL_HANDLE> surface;
+        vk::Surface surface;
 
-        /**
-         * @brief The surface format to use.
-         */
         VkSurfaceFormatKHR surface_format = VkSurfaceFormatKHR{
             .format = VK_FORMAT_B8G8R8A8_UNORM,
             .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
         };
-        VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR; //!< The presentation mode to use.
+        VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
 
-        VkExtent2D extent = VkExtent2D{.width = 0, .height = 0}; //!< The extent (dimensions) of the swapchain images.
+        VkExtent2D current_extent = VkExtent2D{.width = 0, .height = 0};
+        VkExtent2D new_extent = VkExtent2D{.width = 0, .height = 0};
         VkViewport viewport;
         VkRect2D scissor;
         VkClearValue clear_value = {0.5f, 0.5f, 0.5f, 1.0f};
-        ExternalHandle<VkRenderPass, VK_NULL_HANDLE> render_pass;
+        vk::RenderPass render_pass;
 
-        /**
-         * @brief The parameters used to create a new swapchain.
-         */
         struct CreationParams {
             u32 image_count = 0;
             VkSurfaceTransformFlagBitsKHR transform = VK_SURFACE_TRANSFORM_FLAG_BITS_MAX_ENUM_KHR;
         } creation_params;
 
-        /**
-         * @brief Collection of semaphores used to sync access by the device to the swapchain images.
-         *
-         * Size matches the maximum number of frames in flight.
-         */
-        std::vector<ExternalHandle<VkSemaphore, VK_NULL_HANDLE>> image_semaphores;
+        std::vector<vk::Semaphore> image_semaphores;
 
         bool images_out_of_date = false;
     };

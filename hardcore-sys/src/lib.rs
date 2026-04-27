@@ -12,6 +12,7 @@ impl core::fmt::Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::GLFWInitFailed => write!(f, "Failed to initialize global GLFW context."),
+            Error::GLFWAlreadyInitialized => write!(f, "GLFW context has already been initialized."),
             Error::VulkanInitFailed => write!(f, "Failed to initialize global Vulkan context."),
             Error::VulkanLayerNotFound => write!(f, "One or more required Vulkan layers were not found."),
             Error::VulkanExtensionNotFound => write!(f, "One or more required Vulkan extensions were not found."),

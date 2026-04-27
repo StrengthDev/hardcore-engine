@@ -1,9 +1,9 @@
+
 #pragma once
 
-#include "number.hpp"
 #include "flow.hpp"
+#include "number.hpp"
 
-#include <optional>
 #include <unordered_map>
 #include <utility>
 
@@ -110,12 +110,12 @@ public:
     * @param id The id of the element to be accessed.
     * @return An optional containing the element if it exists.
     */
-    [[nodiscard]] std::optional<T&> find(ID id) noexcept {
-        if (auto it = this->map.find(id); it == this->map.end()) {
-            return std::nullopt;
-        } else {
-            return it->second;
+    [[nodiscard]] T* find(ID id) noexcept {
+        if (auto it = this->map.find(id); it != this->map.end()) {
+            return &it->second;
         }
+
+        return nullptr;
     }
 
     /**
@@ -124,12 +124,12 @@ public:
     * @param id The id of the element to be accessed.
     * @return An optional containing the element if it exists.
     */
-    [[nodiscard]] std::optional<T const&> find(ID id) const noexcept {
-        if (auto it = this->map.find(id); it == this->map.end()) {
-            return std::nullopt;
-        } else {
-            return it->second;
+    [[nodiscard]] T const* find(ID id) const noexcept {
+        if (auto it = this->map.find(id); it != this->map.end()) {
+            return &it->second;
         }
+
+        return nullptr;
     }
 
     /**

@@ -11,6 +11,7 @@ extern "C" {
  */
 enum HCError {
     HCError_GLFWInitFailed, //!< Failed to initialize global GLFW context.
+    HCError_GLFWAlreadyInitialized, //!< GLFW context has already been initialized.
     HCError_VulkanInitFailed, //!< Failed to initialize global Vulkan context.
     HCError_VulkanLayerNotFound, //!< One or more required Vulkan layers were not found.
     HCError_VulkanExtensionNotFound, //!< One or more required Vulkan extensions were not found.

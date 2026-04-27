@@ -30,11 +30,11 @@ struct HCInitParams {
 };
 
 /**
- * @brief Initialise the library.
+ * @brief Initialize the library.
  *
  * This function must be called before any other library functions may be used.
  *
- * @param params The initialisation parameters.
+ * @param params The initialization parameters.
  *
  * @return Result value object.
  */

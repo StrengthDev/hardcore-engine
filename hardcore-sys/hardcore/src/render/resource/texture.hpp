@@ -19,6 +19,8 @@ struct std::hash<HCTextureViewParams> {
 };
 
 namespace hc::render::texture {
+    VkFormat const* to_vk_format(HCTextureFormat const& format);
+
     struct TextureView {
         vk::ImageView handle;
         u32 ref_count;

@@ -1,9 +1,11 @@
 
+#include <pch.hpp>
+
 #include "cleaner.hpp"
 
 #include "render/vars.hpp"
 
-#include <core/window.hpp>
+#include <window/context.hpp>
 
 #include <util/flow.hpp>
 
@@ -38,7 +40,7 @@ namespace hc::render::device {
                 DestructionHandler{
                     [&fn_table, &device](Window& window) {
                         window.swapchain.destroy(fn_table, device);
-                        window::destroy(window.window);
+                        window::Context::instance().destroy_window(window.window);
                     },
                     [&fn_table, &device](swapchain::SwapchainInstance& swapchain) {
                         swapchain.destroy(fn_table, device);

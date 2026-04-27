@@ -1,5 +1,3 @@
 
-add_subdirectory(api)
 add_subdirectory(core)
 add_subdirectory(render)
-add_subdirectory(window)

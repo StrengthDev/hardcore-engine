@@ -2,6 +2,7 @@
 
 #ifndef HC_HEADLESS
 
+#include "../core/result.h"
 #include "../core/version.h"
 
 #ifdef __cplusplus
@@ -38,23 +39,23 @@ enum HCCursorMode {
  * A window button input action.
  */
 enum HCButtonAction {
-    HCButtonAction_Release, //!< Stop pressing a button.
-    HCButtonAction_Press, //!< Begin pressing of a button.
-    HCButtonAction_Repeat, //!< The repeated input which happens when a button is being held down.
+    HCButtonAction_Release = 0, //!< Stop pressing a button.
+    HCButtonAction_Press = 1, //!< Begin pressing of a button.
+    HCButtonAction_Repeat = 2, //!< The repeated input which happens when a button is being held down.
 };
 
 /**
  * The identifier of a mouse button.
  */
 enum HCMouseButton {
-    HCMouseButton_Button1, //!< Mouse button 1, also known as the left mouse button.
-    HCMouseButton_Button2, //!< Mouse button 2, also known as the right mouse button.
-    HCMouseButton_Button3, //!< Mouse button 3, also known as the middle mouse button.
-    HCMouseButton_Button4, //!< Mouse button 4.
-    HCMouseButton_Button5, //!< Mouse button 5.
-    HCMouseButton_Button6, //!< Mouse button 6.
-    HCMouseButton_Button7, //!< Mouse button 7.
-    HCMouseButton_Button8, //!< Mouse button 8.
+    HCMouseButton_Button1 = 0, //!< Mouse button 1, also known as the left mouse button.
+    HCMouseButton_Button2 = 1, //!< Mouse button 2, also known as the right mouse button.
+    HCMouseButton_Button3 = 2, //!< Mouse button 3, also known as the middle mouse button.
+    HCMouseButton_Button4 = 3, //!< Mouse button 4.
+    HCMouseButton_Button5 = 4, //!< Mouse button 5.
+    HCMouseButton_Button6 = 5, //!< Mouse button 6.
+    HCMouseButton_Button7 = 6, //!< Mouse button 7.
+    HCMouseButton_Button8 = 7, //!< Mouse button 8.
 
     HCMouseButton_Left = HCMouseButton_Button1, //!< The left mouse button, an alias for mouse button 1.
     HCMouseButton_Right = HCMouseButton_Button2, //!< The right mouse button, an alias for mouse button 2.
@@ -458,7 +459,6 @@ typedef void (*HCWindowJoystickCallback)(size_t window, enum HCDeviceEvent event
  * `hc_destroy_window` used to destroy the instance.
  */
 struct HCWindow {
-    void* handle; //!< The internal handle of this window.
     size_t id; //!< The global id of this window.
 };
 
@@ -486,9 +486,9 @@ void hc_poll_events();
  * @brief Constructs a new `HCWindow`.
  *
  * @param window A pointer to which the new window's data will be written to.
- * @param params The window initialisation parameters.
+ * @param params The window initialization parameters.
  *
- * @return The newly created `HCWindow`. The returned object is invalid if some error has occurred.
+ * @return Result value object.
  */
 struct HCResult hc_new_window(struct HCWindow* window, struct HCWindowParams params);
 
@@ -502,14 +502,15 @@ struct HCResult hc_new_window(struct HCWindow* window, struct HCWindowParams par
  */
 void hc_destroy_window(struct HCWindow* window);
 
-
 /**
  * @brief Set the cursor mode of a window.
  *
  * @param window A pointer to the `HCWindow` for which the cursor mode is set.
  * @param cursor_mode The cursor mode to change into.
+ *
+ * @return Result value object.
  */
-void hc_set_window_cursor_mode(struct HCWindow* window, enum HCCursorMode cursor_mode);
+struct HCResult hc_set_window_cursor_mode(struct HCWindow* window, enum HCCursorMode cursor_mode);
 
 /**
  * @brief Sets the window position callback.
@@ -518,8 +519,10 @@ void hc_set_window_cursor_mode(struct HCWindow* window, enum HCCursorMode cursor
  *
  * @param window A pointer to the `HCWindow` for which the callback is set.
  * @param callback A pointer to the new callback function.
+ *
+ * @return Result value object.
  */
-void hc_set_window_position_callback(struct HCWindow* window, HCWindowPositionCallback callback);
+struct HCResult hc_set_window_position_callback(struct HCWindow* window, HCWindowPositionCallback callback);
 
 /**
  * @brief Sets the window size callback.
@@ -528,8 +531,10 @@ void hc_set_window_position_callback(struct HCWindow* window, HCWindowPositionCa
  *
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
+ *
+ * @return Result value object.
  */
-void hc_set_window_size_callback(struct HCWindow* window, HCWindowSizeCallback callback);
+struct HCResult hc_set_window_size_callback(struct HCWindow* window, HCWindowSizeCallback callback);
 
 /**
  * @brief Sets the window close callback.
@@ -538,8 +543,10 @@ void hc_set_window_size_callback(struct HCWindow* window, HCWindowSizeCallback c
  *
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
+ *
+ * @return Result value object.
  */
-void hc_set_window_close_callback(struct HCWindow* window, HCWindowCloseCallback callback);
+struct HCResult hc_set_window_close_callback(struct HCWindow* window, HCWindowCloseCallback callback);
 
 /**
  * @brief Sets the window refresh callback.
@@ -548,8 +555,10 @@ void hc_set_window_close_callback(struct HCWindow* window, HCWindowCloseCallback
  *
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
+ *
+ * @return Result value object.
  */
-void hc_set_window_refresh_callback(struct HCWindow* window, HCWindowRefreshCallback callback);
+struct HCResult hc_set_window_refresh_callback(struct HCWindow* window, HCWindowRefreshCallback callback);
 
 /**
  * @brief Sets the window focus callback.
@@ -558,8 +567,10 @@ void hc_set_window_refresh_callback(struct HCWindow* window, HCWindowRefreshCall
  *
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
+ *
+ * @return Result value object.
  */
-void hc_set_window_focus_callback(struct HCWindow* window, HCWindowFocusCallback callback);
+struct HCResult hc_set_window_focus_callback(struct HCWindow* window, HCWindowFocusCallback callback);
 
 /**
  * @brief Sets the window minimize callback.
@@ -568,8 +579,10 @@ void hc_set_window_focus_callback(struct HCWindow* window, HCWindowFocusCallback
  *
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
+ *
+ * @return Result value object.
  */
-void hc_set_window_minimize_callback(struct HCWindow* window, HCWindowMinimizeCallback callback);
+struct HCResult hc_set_window_minimize_callback(struct HCWindow* window, HCWindowMinimizeCallback callback);
 
 /**
  * @brief Sets the window maximize callback.
@@ -578,8 +591,10 @@ void hc_set_window_minimize_callback(struct HCWindow* window, HCWindowMinimizeCa
  *
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
+ *
+ * @return Result value object.
  */
-void hc_set_window_maximize_callback(struct HCWindow* window, HCWindowMaximizeCallback callback);
+struct HCResult hc_set_window_maximize_callback(struct HCWindow* window, HCWindowMaximizeCallback callback);
 
 /**
  * @brief Sets the window framebuffer callback.
@@ -588,8 +603,10 @@ void hc_set_window_maximize_callback(struct HCWindow* window, HCWindowMaximizeCa
  *
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
+ *
+ * @return Result value object.
  */
-void hc_set_window_framebuffer_callback(struct HCWindow* window, HCWindowFramebufferCallback callback);
+struct HCResult hc_set_window_framebuffer_callback(struct HCWindow* window, HCWindowFramebufferCallback callback);
 
 /**
  * @brief Sets the window scale callback.
@@ -598,8 +615,10 @@ void hc_set_window_framebuffer_callback(struct HCWindow* window, HCWindowFramebu
  *
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
+ *
+ * @return Result value object.
  */
-void hc_set_window_scale_callback(struct HCWindow* window, HCWindowScaleCallback callback);
+struct HCResult hc_set_window_scale_callback(struct HCWindow* window, HCWindowScaleCallback callback);
 
 /**
  * @brief Sets the mouse button callback.
@@ -608,8 +627,10 @@ void hc_set_window_scale_callback(struct HCWindow* window, HCWindowScaleCallback
  *
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
+ *
+ * @return Result value object.
  */
-void hc_set_window_mouse_button_callback(struct HCWindow* window, HCWindowMouseButtonCallback callback);
+struct HCResult hc_set_window_mouse_button_callback(struct HCWindow* window, HCWindowMouseButtonCallback callback);
 
 /**
  * @brief Sets the cursor position callback.
@@ -618,8 +639,10 @@ void hc_set_window_mouse_button_callback(struct HCWindow* window, HCWindowMouseB
  *
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
+ *
+ * @return Result value object.
  */
-void hc_set_window_cursor_position_callback(struct HCWindow* window, HCWindowCursorPositionCallback callback);
+struct HCResult hc_set_window_cursor_position_callback(struct HCWindow* window, HCWindowCursorPositionCallback callback);
 
 /**
  * @brief Sets the cursor enter callback.
@@ -628,8 +651,10 @@ void hc_set_window_cursor_position_callback(struct HCWindow* window, HCWindowCur
  *
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
+ *
+ * @return Result value object.
  */
-void hc_set_window_cursor_enter_callback(struct HCWindow* window, HCWindowCursorEnterCallback callback);
+struct HCResult hc_set_window_cursor_enter_callback(struct HCWindow* window, HCWindowCursorEnterCallback callback);
 
 /**
  * @brief Sets the scroll callback.
@@ -638,8 +663,10 @@ void hc_set_window_cursor_enter_callback(struct HCWindow* window, HCWindowCursor
  *
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
+ *
+ * @return Result value object.
  */
-void hc_set_window_scroll_callback(struct HCWindow* window, HCWindowScrollCallback callback);
+struct HCResult hc_set_window_scroll_callback(struct HCWindow* window, HCWindowScrollCallback callback);
 
 /**
  * @brief Sets the key callback.
@@ -648,8 +675,10 @@ void hc_set_window_scroll_callback(struct HCWindow* window, HCWindowScrollCallba
  *
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
+ *
+ * @return Result value object.
  */
-void hc_set_window_key_callback(struct HCWindow* window, HCWindowKeyCallback callback);
+struct HCResult hc_set_window_key_callback(struct HCWindow* window, HCWindowKeyCallback callback);
 
 /**
  * @brief Sets the character callback.
@@ -658,8 +687,10 @@ void hc_set_window_key_callback(struct HCWindow* window, HCWindowKeyCallback cal
  *
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
+ *
+ * @return Result value object.
  */
-void hc_set_window_char_callback(struct HCWindow* window, HCWindowCharCallback callback);
+struct HCResult hc_set_window_char_callback(struct HCWindow* window, HCWindowCharCallback callback);
 
 /**
  * @brief Sets the character with modifiers callback.
@@ -668,8 +699,10 @@ void hc_set_window_char_callback(struct HCWindow* window, HCWindowCharCallback c
  *
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
+ *
+ * @return Result value object.
  */
-void hc_set_window_char_mods_callback(struct HCWindow* window, HCWindowCharModsCallback callback);
+struct HCResult hc_set_window_char_mods_callback(struct HCWindow* window, HCWindowCharModsCallback callback);
 
 /**
  * @brief Sets the window drop callback.
@@ -678,8 +711,10 @@ void hc_set_window_char_mods_callback(struct HCWindow* window, HCWindowCharModsC
  *
  * @param window a pointer to the `HCWindow` for which the callback is set.
  * @param callback a pointer to the new callback function.
+ *
+ * @return Result value object.
  */
-void hc_set_window_drop_callback(struct HCWindow* window, HCWindowDropCallback callback);
+struct HCResult hc_set_window_drop_callback(struct HCWindow* window, HCWindowDropCallback callback);
 
 //void hc_set_window_monitor_callback(struct HCWindow *window, HCWindowMonitorCallback callback);
 //

@@ -1,7 +1,7 @@
 
 #include <pch.hpp>
 
-#include "descriptor.hpp"
+#include <render/resource/descriptor.h>
 
 #include <core/log.hpp>
 #include <util/number.hpp>
@@ -71,38 +71,46 @@ static Sz size_of(const HCField* fields, Sz count) {
     return total;
 }
 
-namespace hc::render {
-    StructDescriptor::StructDescriptor(StructDescriptor const& other) {
-        this->members.reserve(other.members.size());
-
-        for (auto const& member : other.members) {
-            members.push_back(std::make_unique<MemberDescriptor>(*member));
-        }
+HCResult hc_create_descriptor(HCDescriptor* descriptor, Sz field_count) {
+    if (!descriptor) {
+        HC_ERROR("Null descriptor pointer");
+        return {.error = HCError_InvalidParams, .success = false};
     }
 
-    bool StructDescriptor::operator==(const StructDescriptor& other) const noexcept {
-        if (this->members.size() != other.members.size()) {
-            return false;
-        }
-
-        for (auto const& [this_member, other_member] : std::views::zip(this->members, other.members)) {
-            if (*this_member != *other_member) {
-                return false;
-            }
-        }
-
-        return true;
+    if (field_count == 0) {
+        HC_ERROR("Invalid field count");
+        return {.error = HCError_InvalidParams, .success = false};
     }
 
-    Sz size_of(HCPrimitive primitive) {
-        return ::size_of(primitive);
+    // TODO this is kinda dumb innit? may as well allow users to make the allocation themselves
+    auto* fields = static_cast<HCField*>(std::malloc(sizeof(HCField) * field_count));
+    *descriptor = {.fields = fields, .field_count = fields ? field_count : 0, .alignment = HCAlignment_Unknown};
+    return {.success = true};
+}
+
+void hc_destroy_descriptor(HCDescriptor* descriptor) {
+    if (!descriptor) {
+        return;
     }
 
-    Descriptor::Descriptor(const HCDescriptor& descriptor)
-        : fields(descriptor.fields, descriptor.fields + descriptor.field_count) {
+    if (!descriptor->fields || !descriptor->field_count) {
+        HC_WARN("Attempted to destroy invalid descriptor");
+        return;
     }
 
-    Sz Descriptor::size() const noexcept {
-        return size_of(this->fields.data(), this->fields.size());
+    std::free(descriptor->fields);
+    descriptor->fields = nullptr;
+    descriptor->field_count = 0;
+}
+
+Sz hc_descriptor_size(const HCDescriptor* descriptor) {
+    if (!descriptor)
+        return 0;
+
+    if (!descriptor->fields || !descriptor->field_count) {
+        HC_WARN("Invalid descriptor");
+        return 0;
     }
+
+    return size_of(descriptor->fields, descriptor->field_count);
 }

@@ -2,9 +2,9 @@
 
 // TODO add example
 
-use crate::Error;
 use crate::handle::Handle;
-use crate::io::{Call};
+use crate::io::Call;
+use crate::Error;
 
 pub use hardcore_sys::CursorMode;
 use hardcore_sys::{
@@ -40,6 +40,7 @@ pub(super) enum WindowCall {
         window: hardcore_sys::Window,
     },
     SetCursorMode {
+        result_channel: tokio::sync::oneshot::Sender<Result<(), Error>>,
         window: *mut hardcore_sys::Window,
         cursor_mode: CursorMode,
     },
@@ -64,9 +65,15 @@ impl WindowCall {
                     .map_err(move |_| Error::Execute)?
             }
             WindowCall::SetCursorMode {
+                result_channel,
                 window,
                 cursor_mode,
-            } => unsafe { hardcore_sys::set_window_cursor_mode(window, cursor_mode) },
+            } => {
+                let result = unsafe { hardcore_sys::set_window_cursor_mode(window, cursor_mode) };
+                result_channel
+                    .send(result.into_std_result().map_err(Into::into))
+                    .map_err(move |_| Error::Execute)?
+            }
         };
 
         Ok(())
@@ -142,23 +149,25 @@ impl<'s> Window<'s> {
             new_window(&raw mut handle, params).into_std_result()?;
 
             let ptr = &raw mut handle;
-            set_window_position_callback(ptr, Some(callback::position));
-            set_window_size_callback(ptr, Some(callback::size));
-            set_window_close_callback(ptr, Some(callback::close));
-            set_window_refresh_callback(ptr, Some(callback::refresh));
-            set_window_focus_callback(ptr, Some(callback::focus));
-            set_window_minimize_callback(ptr, Some(callback::minimize));
-            set_window_maximize_callback(ptr, Some(callback::maximize));
-            set_window_framebuffer_callback(ptr, Some(callback::framebuffer));
-            set_window_scale_callback(ptr, Some(callback::scale));
-            set_window_mouse_button_callback(ptr, Some(callback::mouse_button));
-            set_window_cursor_position_callback(ptr, Some(callback::cursor_position));
-            set_window_cursor_enter_callback(ptr, Some(callback::entered));
-            set_window_scroll_callback(ptr, Some(callback::scroll));
-            set_window_key_callback(ptr, Some(callback::key));
-            set_window_char_callback(ptr, Some(callback::char));
-            set_window_char_mods_callback(ptr, Some(callback::char_mods));
-            set_window_drop_callback(ptr, Some(callback::drop));
+            set_window_position_callback(ptr, Some(callback::position)).into_std_result()?;
+            set_window_size_callback(ptr, Some(callback::size)).into_std_result()?;
+            set_window_close_callback(ptr, Some(callback::close)).into_std_result()?;
+            set_window_refresh_callback(ptr, Some(callback::refresh)).into_std_result()?;
+            set_window_focus_callback(ptr, Some(callback::focus)).into_std_result()?;
+            set_window_minimize_callback(ptr, Some(callback::minimize)).into_std_result()?;
+            set_window_maximize_callback(ptr, Some(callback::maximize)).into_std_result()?;
+            set_window_framebuffer_callback(ptr, Some(callback::framebuffer)).into_std_result()?;
+            set_window_scale_callback(ptr, Some(callback::scale)).into_std_result()?;
+            set_window_mouse_button_callback(ptr, Some(callback::mouse_button))
+                .into_std_result()?;
+            set_window_cursor_position_callback(ptr, Some(callback::cursor_position))
+                .into_std_result()?;
+            set_window_cursor_enter_callback(ptr, Some(callback::entered)).into_std_result()?;
+            set_window_scroll_callback(ptr, Some(callback::scroll)).into_std_result()?;
+            set_window_key_callback(ptr, Some(callback::key)).into_std_result()?;
+            set_window_char_callback(ptr, Some(callback::char)).into_std_result()?;
+            set_window_char_mods_callback(ptr, Some(callback::char_mods)).into_std_result()?;
+            set_window_drop_callback(ptr, Some(callback::drop)).into_std_result()?;
 
             handle
         };
@@ -181,12 +190,16 @@ impl<'s> Window<'s> {
 
     /// Set the cursor mode for this window.
     pub fn set_cursor_mode(&mut self, cursor_mode: CursorMode) -> Result<(), Error> {
+        let (tx, rx) = tokio::sync::oneshot::channel();
         let call = WindowCall::SetCursorMode {
+            result_channel: tx,
             window: self.handle.mut_ptr(),
             cursor_mode,
         };
 
-        Ok(self.io_caller.submit(Call::Window(call))?)
+        self.io_caller.submit(Call::Window(call))?;
+
+        rx.blocking_recv().map_err(move |_| Error::ReceiveResult)?
     }
 }
 

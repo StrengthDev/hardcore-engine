@@ -1,3 +1,4 @@
+
 #pragma once
 
 #ifdef __cplusplus
@@ -9,7 +10,7 @@ extern "C" {
 #include "../core/log.h"
 
 // Vulkan debug callback scope bits.
-// Match original values.
+// These should match the original values.
 
 /**
  * Designates general or miscellaneous events.

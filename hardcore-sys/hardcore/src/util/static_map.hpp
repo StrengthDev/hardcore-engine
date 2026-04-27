@@ -11,22 +11,24 @@
 
 namespace hc {
     template<class T>
+    concept Keyable = std::is_integral_v<T> || std::is_enum_v<T>;
+
+    template<class T>
     concept KeyLike = requires(T key) {
         { T::count } -> std::convertible_to<Sz>;
         { key.to_index() } -> std::convertible_to<std::optional<Sz>>;
     };
 
-    template<typename T, T LAST, T FIRST = static_cast<T>(0)>
-        requires ((std::is_integral_v<T> || std::is_enum_v<T>) && FIRST <= LAST)
+    template<Keyable T, T LAST, T FIRST = static_cast<T>(0)>
+        requires (FIRST <= LAST)
     class BasicKey {
     public:
         static Sz constexpr count = static_cast<Sz>(static_cast<i64>(LAST) - static_cast<i64>(FIRST) + 1);
 
         constexpr BasicKey(T value) noexcept
-            : value(value) {
-        }
+            : value(value) {}
 
-        std::optional<Sz> constexpr to_index() const noexcept {
+        [[nodiscard]] std::optional<Sz> constexpr to_index() const noexcept {
             if (this->value >= FIRST && this->value <= LAST) {
                 return static_cast<Sz>(static_cast<i64>(this->value) - static_cast<i64>(FIRST));
             }
@@ -43,24 +45,23 @@ namespace hc {
         { R::last } -> std::convertible_to<T>;
     };
 
-    template<typename KeyType, KeyType FIRST, KeyType LAST>
-        requires ((std::is_integral_v<KeyType> || std::is_enum_v<KeyType>) && FIRST <= LAST)
+    template<Keyable T, T FIRST, T LAST>
+        requires (FIRST <= LAST)
     struct KeyRange {
-        static KeyType constexpr first = FIRST;
-        static KeyType constexpr last = LAST;
+        static T constexpr first = FIRST;
+        static T constexpr last = LAST;
     };
 
-    template<typename T, typename... Ranges>
-        requires (KeyRangeLike<Ranges, T> && ...) && (0 < sizeof...(Ranges))
+    template<Keyable T, KeyRangeLike<T>... Ranges>
+        requires (sizeof...(Ranges) > 0)
     class SparseKey {
     public:
         static Sz constexpr count = (BasicKey<T, Ranges::last, Ranges::first>::count + ...);
 
         constexpr SparseKey(T value) noexcept
-            : value(value) {
-        }
+            : value(value) {}
 
-        std::optional<Sz> constexpr to_index() const noexcept {
+        [[nodiscard]] std::optional<Sz> constexpr to_index() const noexcept {
             return to_index<BasicKey<T, Ranges::last, Ranges::first>...>(0);
         }
 
@@ -68,8 +69,8 @@ namespace hc {
 
     private:
         template<KeyLike Key, KeyLike... Keys>
-        std::optional<Sz> constexpr to_index(Sz accumulated_index) const noexcept {
-            auto index = Key(value).to_index();
+        [[nodiscard]] std::optional<Sz> constexpr to_index(Sz accumulated_index) const noexcept {
+            auto index = Key(this->value).to_index();
             index = index.transform([accumulated_index](Sz value) { return accumulated_index + value; });
 
             if constexpr (0 < sizeof...(Keys)) {
@@ -90,10 +91,9 @@ namespace hc {
         static Sz constexpr count = (KeyTypes::count * ...);
 
         constexpr KeyUnion(KeyTypes... values) noexcept
-            : values(values...) {
-        }
+            : values(values...) {}
 
-        std::optional<Sz> constexpr to_index() const noexcept {
+        [[nodiscard]] std::optional<Sz> constexpr to_index() const noexcept {
             return this->to_index_recursive<0>(1);
         }
 
@@ -101,7 +101,7 @@ namespace hc {
 
     private:
         template<Sz KEY>
-        std::optional<Sz> constexpr to_index_recursive(Sz accumulated_count) const noexcept {
+        [[nodiscard]] std::optional<Sz> constexpr to_index_recursive(Sz accumulated_count) const noexcept {
             auto key = std::get<KEY>(this->values);
             using KeyType = decltype(key);
 
@@ -123,10 +123,10 @@ namespace hc {
         }
     };
 
-    template<KeyLike KeyType, typename T>
+    template<KeyLike K, typename V>
     class StaticMap {
     public:
-        constexpr StaticMap(std::initializer_list<std::pair<KeyType, T>> list) {
+        constexpr StaticMap(std::initializer_list<std::pair<K, V>> list) {
             for (auto const& [key, value] : list) {
                 auto index = key.to_index();
                 if (!index) {
@@ -137,16 +137,16 @@ namespace hc {
             }
         }
 
-        constexpr T* operator[](KeyType key) noexcept {
+        [[nodiscard]] constexpr V* operator[](K key) noexcept {
             return this->at(key);
         }
 
-        constexpr T const* operator[](KeyType key) const noexcept {
+        [[nodiscard]] constexpr V const* operator[](K key) const noexcept {
             return this->at(key);
         }
 
     private:
-        constexpr T* at(KeyType key) noexcept {
+        constexpr V* at(K key) noexcept {
             if (auto const index = key.to_index()) {
                 if (auto& value = this->table[*index]) {
                     return &*value;
@@ -156,7 +156,7 @@ namespace hc {
             return nullptr;
         }
 
-        constexpr T const* at(KeyType key) const noexcept {
+        constexpr V const* at(K key) const noexcept {
             if (auto const index = key.to_index()) {
                 if (auto const& value = this->table[*index]) {
                     return &*value;
@@ -166,6 +166,6 @@ namespace hc {
             return nullptr;
         }
 
-        std::array<std::optional<T>, KeyType::count> table;
+        std::array<std::optional<V>, K::count> table;
     };
 };

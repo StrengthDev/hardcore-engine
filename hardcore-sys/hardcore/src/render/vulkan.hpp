@@ -4,9 +4,11 @@
 #include "util.hpp"
 
 #include <core/error.hpp>
+#include <core/glfw.hpp>
 #include <core/log.hpp>
 
 #include <util/flow.hpp>
+#include <util/function_signature.hpp>
 #include <util/number.hpp>
 
 #include <vulkan/vulkan.h>
@@ -30,7 +32,7 @@ namespace vk {
         HandleBase(HandleBase&& other) noexcept : value(std::exchange(other.value, VK_NULL_HANDLE)) {}
 
         HandleBase& operator=(HandleBase&& other) noexcept {
-            HC_ASSERT(!this->valid(), "Inner value cannot be overwritten if already assigned");
+            HC_ASSERT(!this->valid(), "Inner handle value cannot be overwritten if already assigned");
             this->value = std::exchange(other.value, VK_NULL_HANDLE);
             return *this;
         }
@@ -61,7 +63,7 @@ namespace vk {
         HandlesBase(HandlesBase&& other) noexcept : values(std::move(other.values)) {}
 
         HandlesBase& operator=(HandlesBase&& other) noexcept {
-            HC_ASSERT(!this->valid(), "Inner values cannot be overwritten if already assigned");
+            HC_ASSERT(!this->valid(), "Inner handle values cannot be overwritten if already assigned");
             this->values = std::move(other.values);
             return *this;
         }
@@ -95,34 +97,6 @@ namespace vk {
         std::vector<T> values = VK_NULL_HANDLE;
     };
 
-    template<const unsigned I, typename... Args>
-    struct ArgGetter;
-
-    template<typename Arg, typename... Args>
-    struct ArgGetter<0, Arg, Args...> {
-        using Type = Arg;
-    };
-
-    template<const unsigned I, typename Arg, typename... Args>
-    struct ArgGetter<I, Arg, Args...> {
-        using Type = ArgGetter<I - 1, Args...>::Type;
-    };
-
-    template<typename T>
-    struct Signature;
-
-    template<typename R, typename... Args>
-    struct Signature<R(**)(Args...)> {
-        template<const unsigned I>
-        using Arg = ArgGetter<I, Args...>::Type;
-    };
-
-    template<typename R, typename... Args>
-    struct Signature<R(*VolkDeviceTable::*)(Args...)> {
-        template<const unsigned I>
-        using Arg = ArgGetter<I, Args...>::Type;
-    };
-
     class Instance : public HandleBase<VkInstance> {
     public:
         Instance() = default;
@@ -153,7 +127,7 @@ namespace vk {
     template<typename T, typename CT, CT create_fn, typename DT, DT destroy_fn>
     class InstanceHandle : public HandleBase<T> {
     public:
-        using CreateInfo = Signature<CT>::template Arg<1>;
+        using CreateInfo = FunctionSignature<CT>::template Arg<1>;
 
         InstanceHandle() = default;
 
@@ -183,6 +157,7 @@ namespace vk {
 #define STANDARD_VK_INSTANCE_HANDLE(Handle, CreateFn, DestroyFn) InstanceHandle<Handle, decltype(&CreateFn), &CreateFn, decltype(&DestroyFn), &DestroyFn>
 
     typedef STANDARD_VK_INSTANCE_HANDLE(VkDebugUtilsMessengerEXT, vkCreateDebugUtilsMessengerEXT, vkDestroyDebugUtilsMessengerEXT) DebugUtilsMessenger;
+    typedef STANDARD_VK_INSTANCE_HANDLE(VkSurfaceKHR, glfwCreateWindowSurface, vkDestroySurfaceKHR) Surface;
 
 #undef STANDARD_VK_INSTANCE_HANDLE
 
@@ -216,7 +191,7 @@ namespace vk {
     template<typename T, typename CT, CT create_fn, typename DT, DT destroy_fn>
     class DeviceHandle : public HandleBase<T> {
     public:
-        using CreateInfo = Signature<CT>::template Arg<1>;
+        using CreateInfo = FunctionSignature<CT>::template Arg<1>;
 
         DeviceHandle() = default;
 
@@ -264,8 +239,8 @@ namespace vk {
     template<typename T, typename CT, CT create_fn, typename DT, DT destroy_fn, typename P, P count_projection>
     class DeviceHandles : public HandlesBase<T> {
     public:
-        using CreateInfo = Signature<CT>::template Arg<1>;
-        using Pool = Signature<DT>::template Arg<1>;
+        using CreateInfo = FunctionSignature<CT>::template Arg<1>;
+        using Pool = FunctionSignature<DT>::template Arg<1>;
 
         DeviceHandles() : DeviceHandles(0) {}
 

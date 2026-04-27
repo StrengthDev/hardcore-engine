@@ -1,15 +1,15 @@
 
 #include <pch.hpp>
 
-#include "util.hpp"
 #include "renderer.hpp"
+
+#include "util.hpp"
 #include "vars.hpp"
 #include "vulkan.hpp"
+
 #include "device/device.hpp"
 
 #include <core/log.hpp>
-#include <render/renderer.h>
-#include <render/device.h>
 
 #ifndef HC_HEADLESS
 #include <core/glfw.hpp>
@@ -17,7 +17,6 @@
 
 namespace hc::render {
     static auto constexpr VALIDATION_LAYER_NAME = "VK_LAYER_KHRONOS_validation";
-    static u32 constexpr VULKAN_API_VERSION = VK_API_VERSION_1_3;
 
     static u8 max_frames_in_flight_count = std::numeric_limits<u8>::max();
     static u8 frame_mod = std::numeric_limits<u8>::max();
@@ -364,6 +363,31 @@ namespace hc::render {
         max_frames_in_flight_count = std::numeric_limits<u8>::max();
     }
 
+    std::expected<void, Error> tick() {
+        std::expected<void, Error> return_result = {};
+
+        u8 next_mod = (frame_mod + 1) % max_frames_in_flight_count;
+
+        for (auto& device : devices) {
+            auto tick_result = device.tick(frame_mod, next_mod);
+            if (!tick_result && return_result) {
+                return_result = tick_result;
+            }
+        }
+
+        frame_mod = next_mod;
+
+        return return_result;
+    }
+
+    std::expected<void, Error> finish() {
+        for (auto& device : devices) {
+            device.finish();
+        }
+
+        return {};
+    }
+
     u8 max_frames_in_flight() {
         return max_frames_in_flight_count;
     }
@@ -393,62 +417,4 @@ namespace hc::render {
 
         return &devices[id];
     }
-}
-
-struct VersionBitfield {
-    u32 patch : 12;
-    u32 minor : 10;
-    u32 major : 7;
-    u32 variant : 3;
-};
-
-static constexpr HCVersion bitfield_to_version(u32 version_bitfield) {
-    auto [patch, minor, major, variant] = std::bit_cast<VersionBitfield>(version_bitfield);
-    return {.major = major, .minor = minor, .patch = patch,};
-}
-
-const HCVersion HC_VULKAN_API_VERSION = bitfield_to_version(hc::render::VULKAN_API_VERSION);
-const HCVersion HC_VULKAN_HEADERS_VERSION = bitfield_to_version(VK_HEADER_VERSION_COMPLETE);
-const u32 HC_VOLK_HEADER_VERSION = VOLK_HEADER_VERSION;
-
-HCResult hc_render_tick() {
-    std::expected<void, hc::Error> return_result = {};
-
-    u8 next_mod = (hc::render::frame_mod + 1) % hc::render::max_frames_in_flight_count;
-
-    for (auto& device : hc::render::devices) {
-        auto tick_result = device.tick(hc::render::frame_mod, next_mod);
-        if (!tick_result && return_result) {
-            return_result = tick_result;
-        }
-    }
-
-    hc::render::frame_mod = next_mod;
-
-    if (!return_result) {
-        return return_result.error();
-    }
-
-    return {.success = true};
-}
-
-HCResult hc_render_finish() {
-    for (auto& device : hc::render::devices) {
-        device.finish();
-    }
-
-    return {.success = true};
-}
-
-u32 hc_device_count() {
-    return static_cast<u32>(hc::render::device_list().size());
-}
-
-const char* hc_device_name(u32 device) {
-    auto device_result = hc::render::device_at(device);
-    if (!device_result) {
-        return nullptr;
-    }
-
-    return (*device_result)->name();
 }

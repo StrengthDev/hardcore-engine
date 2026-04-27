@@ -1,11 +1,12 @@
+
 #include <pch.hpp>
 
 #include "shader.hpp"
 #include "util.hpp"
 
 #include <core/log.hpp>
-#include <render/shader.h>
 #include <render/util.hpp>
+
 #include <util/bits.hpp>
 #include <util/flow.hpp>
 #include <util/static_map.hpp>
@@ -345,39 +346,4 @@ std::size_t std::hash<hc::render::DescriptorLocation>::operator()(
     const hc::render::DescriptorLocation& location
 ) const noexcept {
     return std::hash<u64>{}(concat_bits(location.set, location.binding));
-}
-
-HCResult hc_create_shader(HCShader* shader, const u32* bytecode, size_t size, HCShaderStage stage) {
-    if (!shader) {
-        HC_ERROR("Null shader pointer");
-        return {.error = HCError_InvalidParams, .success = false};
-    }
-
-    if (!bytecode) {
-        HC_ERROR("Null bytecode pointer");
-        return {.error = HCError_InvalidParams, .success = false};
-    }
-
-    if (!size) {
-        HC_ERROR("Invalid bytecode length");
-        return {.error = HCError_InvalidParams, .success = false};
-    }
-
-    auto shader_result = hc::render::Shader::create(std::vector(bytecode, bytecode + size), stage);
-    if (!shader_result) {
-        return shader_result.error();
-    }
-
-    auto* shader_ptr = new hc::render::Shader;
-    *shader_ptr = *std::move(shader_result);
-    *shader = {.inner = shader_ptr};
-
-    return {.success = true};
-}
-
-void hc_destroy_shader(HCShader* shader) {
-    if (shader && shader->inner) {
-        delete static_cast<hc::render::Shader*>(shader->inner);
-        shader->inner = nullptr;
-    }
 }

@@ -8,9 +8,14 @@
 #include <render/renderer.h>
 
 namespace hc::render {
+    u32 constexpr VULKAN_API_VERSION = VK_API_VERSION_1_3;
+
     [[nodiscard]] std::expected<void, Error> init(const HCApplicationDescriptor& app, const HCRenderParams& params);
 
     void term();
+
+    [[nodiscard]] std::expected<void, Error> tick();
+    [[nodiscard]] std::expected<void, Error> finish();
 
     [[nodiscard]] VkInstance vk_instance();
 
