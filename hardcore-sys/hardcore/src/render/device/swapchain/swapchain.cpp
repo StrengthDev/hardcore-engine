@@ -106,7 +106,7 @@ namespace hc::render::device::swapchain {
             .pDependencies = &dependency,
         };
 
-        auto render_pass_result = vk::RenderPass::create(fn_table, device, &render_pass_info);
+        auto render_pass_result = vk::RenderPass::create(fn_table, device, render_pass_info);
         if (!render_pass_result) {
             swapchain.destroy(fn_table, device);
             return render_pass_result.error();
@@ -152,7 +152,7 @@ namespace hc::render::device::swapchain {
 
         swapchain.image_semaphores.reserve(max_frames_in_flight());
         for (u8 i = 0; i < max_frames_in_flight(); ++i) {
-            auto semaphore_result = vk::Semaphore::create(fn_table, device, &semaphore_info);
+            auto semaphore_result = vk::Semaphore::create(fn_table, device, semaphore_info);
             if (!semaphore_result) {
                 swapchain.destroy(fn_table, device);
                 return semaphore_result.error();

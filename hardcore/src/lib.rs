@@ -169,6 +169,10 @@ pub enum Error {
     /// The specified input parameters are not valid.
     #[error("The specified input parameters are not valid: {0}")]
     InvalidParams(String),
+
+    /// The native library has provided an unexpected value.
+    #[error("The native library has provided an unexpected value")]
+    UnexpectedValue,
 }
 
 pub struct Initializer {

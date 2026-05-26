@@ -1,6 +1,6 @@
 use crate::Error;
 
-use hardcore_sys::Field;
+use hardcore_sys::{DescriptorCategory, Field, TypeDescriptor};
 
 pub use hardcore_sys::{Composition, Primitive};
 
@@ -53,6 +53,96 @@ impl CompositionExt for Composition {
             Composition::Mat4x4 => 16,
             _ => 0,
         }
+    }
+}
+
+#[derive(Debug)]
+pub enum Descriptor2 {
+    Basic {
+        primitive_type: Primitive,
+        primitive_size: u32,
+        composition: Composition,
+        matrix_stride: u32,
+    },
+    Array {
+        element_descriptor: Box<Descriptor2>,
+        count: u32,
+        stride: u32,
+    },
+    Pointer(Box<Descriptor2>),
+    Struct {
+        members: Vec<(u32, Descriptor2)>,
+    },
+    OpaqueType,
+}
+
+fn parse_descriptor(descriptor_data: &[TypeDescriptor], index: u16) -> Result<Descriptor2, Error> {
+    let descriptor = &descriptor_data[index as usize];
+
+    match descriptor.type_category {
+        DescriptorCategory::Basic => {
+            let descriptor = unsafe { &descriptor.type_descriptor.basic_descriptor };
+
+            Ok(Descriptor2::Basic {
+                primitive_type: descriptor.primitive_type,
+                primitive_size: descriptor.primitive_size,
+                composition: descriptor.composition,
+                matrix_stride: descriptor.matrix_stride,
+            })
+        }
+        DescriptorCategory::Array => {
+            let descriptor = unsafe { &descriptor.type_descriptor.array_descriptor };
+
+            Ok(Descriptor2::Array {
+                element_descriptor: Box::new(parse_descriptor(
+                    descriptor_data,
+                    descriptor.element_type_idx,
+                )?),
+                count: descriptor.count,
+                stride: descriptor.stride,
+            })
+        }
+        DescriptorCategory::Pointer => {
+            let descriptor = unsafe { &descriptor.type_descriptor.pointer_descriptor };
+
+            Ok(Descriptor2::Pointer(Box::new(parse_descriptor(
+                descriptor_data,
+                descriptor.type_idx,
+            )?)))
+        }
+        DescriptorCategory::Struct => {
+            let descriptor = unsafe { &descriptor.type_descriptor.struct_descriptor };
+
+            let mut members: Vec<(u32, Descriptor2)> =
+                Vec::with_capacity(descriptor.member_count as usize);
+
+            for i in descriptor.first_member_type_idx
+                ..descriptor.first_member_type_idx + descriptor.member_count
+            {
+                let member = &descriptor_data[i as usize];
+                if member.type_category != DescriptorCategory::Member {
+                    return Err(Error::UnexpectedValue);
+                }
+
+                let member = unsafe { &member.type_descriptor.member_descriptor };
+                members.push((
+                    member.offset,
+                    parse_descriptor(descriptor_data, member.type_idx)?,
+                ));
+            }
+
+            Ok(Descriptor2::Struct { members })
+        }
+        DescriptorCategory::Opaque => Ok(Descriptor2::OpaqueType),
+        _ => Err(Error::UnexpectedValue),
+    }
+}
+
+impl TryFrom<&[TypeDescriptor]> for Descriptor2 {
+    type Error = Error;
+
+    fn try_from(value: &[TypeDescriptor]) -> Result<Self, Self::Error> {
+        parse_descriptor(value, 0)
     }
 }
 

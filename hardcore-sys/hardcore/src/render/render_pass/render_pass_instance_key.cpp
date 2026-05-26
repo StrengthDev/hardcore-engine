@@ -235,7 +235,7 @@ namespace hc::render {
             .pDependencies = dependencies.data(),
         };
 
-        return vk::RenderPass::create(fn_table, device, &create_info);
+        return vk::RenderPass::create(fn_table, device, create_info);
     }
 
     static bool equivalent_maps(std::unordered_map<u32, u32> const& lhs, std::unordered_map<u32, u32> const& rhs) {

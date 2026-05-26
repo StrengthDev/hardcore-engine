@@ -411,7 +411,7 @@ namespace hc::render::texture {
             return Error(HCError_TextureParamsNotSupported);
         }
 
-        return vk::Image::create(fn_table, device, &image_info);
+        return vk::Image::create(fn_table, device, image_info);
     }
 
     std::expected<vk::ImageView, Error> create_image_view(
@@ -500,6 +500,6 @@ namespace hc::render::texture {
             },
         };
 
-        return vk::ImageView::create(fn_table, device, &view_info);
+        return vk::ImageView::create(fn_table, device, view_info);
     }
 }

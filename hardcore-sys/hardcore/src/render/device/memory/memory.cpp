@@ -812,7 +812,7 @@ namespace hc::render::device::memory {
         VkDeviceSize size
     ) {
         if (!this->buffer_pools.contains(flags)) {
-            this->buffer_pools.insert({flags, {}});
+            this->buffer_pools.insert({ flags, {} });
         }
 
         VkDeviceSize alignment = this->alignment_of(flags);
@@ -846,7 +846,7 @@ namespace hc::render::device::memory {
             << " bytes + " << padding << " padding bytes"
         );
 
-        return BufferRef{
+        return BufferRef {
             {
                 .pool = pool_id,
                 .pool_size = pools[pool_id].capacity(),
@@ -867,7 +867,7 @@ namespace hc::render::device::memory {
         u8 frame_mod
     ) {
         if (!this->dynamic_buffer_pools.contains(flags)) {
-            this->dynamic_buffer_pools.insert({flags, {}});
+            this->dynamic_buffer_pools.insert({ flags, {} });
         }
 
         VkDeviceSize alignment = this->alignment_of(flags);
@@ -915,7 +915,7 @@ namespace hc::render::device::memory {
             << allocated_size << " bytes + " << padding << " padding bytes"
         );
 
-        return DynamicBufferRef{
+        return DynamicBufferRef {
             {
                 {
                     .pool = pool_id,
@@ -949,7 +949,7 @@ namespace hc::render::device::memory {
                 break;
             }
 
-            if (range_result.error() != HCError_CouldNotFitInPool) {
+            if (range_result.error().value() != HCError_CouldNotFitInPool) {
                 return range_result.error();
             }
         }
@@ -982,7 +982,7 @@ namespace hc::render::device::memory {
             << " bytes offset, " << allocated_size << " bytes + " << padding << " padding bytes"
         );
 
-        return Ref{
+        return Ref {
             .pool = pool_id,
             .pool_size = pools[pool_id].capacity(),
             .size = allocated_size,

@@ -12,9 +12,11 @@
 #include <util/number.hpp>
 
 #include <vulkan/vulkan.h>
+
 #include <volk.h>
 
 #include <expected>
+#include <type_traits>
 #include <vector>
 
 namespace vk {
@@ -97,14 +99,17 @@ namespace vk {
         std::vector<T> values = VK_NULL_HANDLE;
     };
 
+    template<typename F>
+    concept Deferrable = std::is_same_v<typename FunctionSignature<F>::template Arg<1>, VkDeferredOperationKHR>;
+
     class Instance : public HandleBase<VkInstance> {
     public:
         Instance() = default;
 
         [[nodiscard]]
-        static std::expected<Instance, hc::Error> create(VkInstanceCreateInfo const* create_info) {
+        static std::expected<Instance, hc::Error> create(VkInstanceCreateInfo const& create_info) {
             VkInstance vulkan_handle = VK_NULL_HANDLE;
-            VkResult const result = vkCreateInstance(create_info, nullptr, &vulkan_handle);
+            VkResult const result = vkCreateInstance(&create_info, nullptr, &vulkan_handle);
             if (result != VK_SUCCESS) {
                 HC_ERROR("Failed to create " << typeid(VkInstance).name() << ": " << hc::render::to_str(result));
                 return hc::Error(result);
@@ -127,12 +132,33 @@ namespace vk {
     template<typename T, typename CT, CT create_fn, typename DT, DT destroy_fn>
     class InstanceHandle : public HandleBase<T> {
     public:
-        using CreateInfo = FunctionSignature<CT>::template Arg<1>;
+        using CreateInfo = std::remove_pointer_t<typename FunctionSignature<CT>::template Arg<1>>;
 
         InstanceHandle() = default;
 
         [[nodiscard]]
-        static std::expected<InstanceHandle, hc::Error> create(VkInstance instance, CreateInfo create_info) {
+        static std::expected<InstanceHandle, hc::Error> create(
+            VkInstance instance,
+            CreateInfo& create_info
+        ) requires (!std::is_same_v<CreateInfo, GLFWwindow>) {
+            T vulkan_handle = VK_NULL_HANDLE;
+            VkResult const result = (*create_fn)(instance, &create_info, nullptr, &vulkan_handle);
+            if (result != VK_SUCCESS) {
+                HC_ERROR("Failed to create " << typeid(T).name() << ": " << hc::render::to_str(result));
+                return hc::Error(result);
+            }
+
+            InstanceHandle handle;
+            handle.value = vulkan_handle;
+
+            return std::move(handle);
+        }
+
+        [[nodiscard]]
+        static std::expected<InstanceHandle, hc::Error> create(
+            VkInstance instance,
+            CreateInfo* create_info
+        ) requires std::is_same_v<CreateInfo, GLFWwindow> {
             T vulkan_handle = VK_NULL_HANDLE;
             VkResult const result = (*create_fn)(instance, create_info, nullptr, &vulkan_handle);
             if (result != VK_SUCCESS) {
@@ -166,9 +192,9 @@ namespace vk {
         Device() = default;
 
         [[nodiscard]]
-        static std::expected<Device, hc::Error> create(VkPhysicalDevice device, VkDeviceCreateInfo const* create_info) {
+        static std::expected<Device, hc::Error> create(VkPhysicalDevice device, VkDeviceCreateInfo const& create_info) {
             VkDevice vulkan_handle = VK_NULL_HANDLE;
-            VkResult const result = vkCreateDevice(device, create_info, nullptr, &vulkan_handle);
+            VkResult const result = vkCreateDevice(device, &create_info, nullptr, &vulkan_handle);
             if (result != VK_SUCCESS) {
                 HC_ERROR("Failed to create " << typeid(VkDevice).name() << ": " << hc::render::to_str(result));
                 return hc::Error(result);
@@ -191,7 +217,7 @@ namespace vk {
     template<typename T, typename CT, CT create_fn, typename DT, DT destroy_fn>
     class DeviceHandle : public HandleBase<T> {
     public:
-        using CreateInfo = FunctionSignature<CT>::template Arg<1>;
+        using CreateInfo = std::remove_pointer_t<typename FunctionSignature<CT>::template Arg<1>>;
 
         DeviceHandle() = default;
 
@@ -199,10 +225,10 @@ namespace vk {
         static std::expected<DeviceHandle, hc::Error> create(
             VolkDeviceTable const& fn_table,
             VkDevice device,
-            CreateInfo create_info
+            CreateInfo& create_info
         ) {
             T vulkan_handle = VK_NULL_HANDLE;
-            VkResult const result = (fn_table.*create_fn)(device, create_info, nullptr, &vulkan_handle);
+            VkResult const result = (fn_table.*create_fn)(device, &create_info, nullptr, &vulkan_handle);
             if (result != VK_SUCCESS) {
                 HC_ERROR("Failed to create " << typeid(T).name() << ": " << hc::render::to_str(result));
                 return hc::Error(result);
@@ -233,13 +259,15 @@ namespace vk {
     typedef STANDARD_VK_DEVICE_HANDLE(VkCommandPool, vkCreateCommandPool, vkDestroyCommandPool) CommandPool;
     typedef STANDARD_VK_DEVICE_HANDLE(VkFence, vkCreateFence, vkDestroyFence) Fence;
     typedef STANDARD_VK_DEVICE_HANDLE(VkSemaphore, vkCreateSemaphore, vkDestroySemaphore) Semaphore;
+    typedef STANDARD_VK_DEVICE_HANDLE(VkShaderModule, vkCreateShaderModule, vkDestroyShaderModule) ShaderModule;
+    typedef STANDARD_VK_DEVICE_HANDLE(VkPipelineLayout, vkCreatePipelineLayout, vkDestroyPipelineLayout) PipelineLayout;
 
 #undef STANDARD_VK_DEVICE_HANDLE
 
     template<typename T, typename CT, CT create_fn, typename DT, DT destroy_fn, typename P, P count_projection>
     class DeviceHandles : public HandlesBase<T> {
     public:
-        using CreateInfo = FunctionSignature<CT>::template Arg<1>;
+        using CreateInfo = std::remove_pointer_t<typename FunctionSignature<CT>::template Arg<1>>;
         using Pool = FunctionSignature<DT>::template Arg<1>;
 
         DeviceHandles() : DeviceHandles(0) {}
@@ -248,11 +276,11 @@ namespace vk {
         static std::expected<DeviceHandles, hc::Error> create(
             VolkDeviceTable const& fn_table,
             VkDevice device,
-            CreateInfo create_info
+            CreateInfo& create_info
         ) {
-            DeviceHandles handles(create_info->*count_projection);
+            DeviceHandles handles(create_info.*count_projection);
 
-            VkResult const result = (fn_table.*create_fn)(device, create_info, handles.values.data());
+            VkResult const result = (fn_table.*create_fn)(device, &create_info, handles.values.data());
             if (result != VK_SUCCESS) {
                 HC_ERROR("Failed to allocate " << typeid(T).name() << ": " << hc::render::to_str(result));
                 return hc::Error(result);
@@ -280,9 +308,86 @@ namespace vk {
         explicit DeviceHandles(Sz count) : HandlesBase<T>(count) {}
     };
 
-#define STANDARD_VK_DEVICE_HANDLES(Handle, CreateFn, DestroyFn, CountPredicate) DeviceHandles<Handle, decltype(&VolkDeviceTable::CreateFn), &VolkDeviceTable::CreateFn, decltype(&VolkDeviceTable::DestroyFn), &VolkDeviceTable::DestroyFn, decltype(&CountPredicate), &CountPredicate>
+#define STANDARD_VK_DEVICE_HANDLES(Handle, CreateFn, DestroyFn, CountProjection) DeviceHandles<Handle, decltype(&VolkDeviceTable::CreateFn), &VolkDeviceTable::CreateFn, decltype(&VolkDeviceTable::DestroyFn), &VolkDeviceTable::DestroyFn, decltype(&CountProjection), &CountProjection>
 
     typedef STANDARD_VK_DEVICE_HANDLES(VkCommandBuffer, vkAllocateCommandBuffers, vkFreeCommandBuffers, VkCommandBufferAllocateInfo::commandBufferCount) CommandBuffers;
 
 #undef STANDARD_VK_DEVICE_HANDLES
+
+    template<typename T, typename CT, CT create_fn, typename DT, DT destroy_fn>
+    class PipelineHandle : public HandleBase<T> {
+    public:
+        template<typename F>
+        struct CreateInfoHelper {};
+
+        template<Deferrable F>
+        struct CreateInfoHelper<F> {
+            using Type = FunctionSignature<CT>::template Arg<4>;
+        };
+
+        template<typename F> requires (!Deferrable<F>)
+        struct CreateInfoHelper<F> {
+            using Type = FunctionSignature<CT>::template Arg<3>;
+        };
+
+        using CreateInfo = std::remove_pointer_t<typename CreateInfoHelper<CT>::Type>;
+
+        PipelineHandle() = default;
+
+        [[nodiscard]]
+        static std::expected<PipelineHandle, hc::Error> create(
+            VolkDeviceTable const& fn_table,
+            VkDevice device,
+            VkPipelineCache cache,
+            CreateInfo& create_info
+        ) requires (!Deferrable<CT>) {
+            T vulkan_handle = VK_NULL_HANDLE;
+            VkResult const result = (fn_table.*create_fn)(device, cache, 1, &create_info, nullptr, &vulkan_handle);
+            if (result != VK_SUCCESS) {
+                HC_ERROR("Failed to create " << typeid(T).name() << ": " << hc::render::to_str(result));
+                return hc::Error(result);
+            }
+
+            PipelineHandle handle;
+            handle.value = vulkan_handle;
+
+            return std::move(handle);
+        }
+
+        [[nodiscard]]
+        static std::expected<PipelineHandle, hc::Error> create(
+            VolkDeviceTable const& fn_table,
+            VkDevice device,
+            VkPipelineCache cache,
+            CreateInfo& create_info,
+            VkDeferredOperationKHR deferred_operation = VK_NULL_HANDLE
+        ) requires Deferrable<CT> {
+            T vulkan_handle = VK_NULL_HANDLE;
+            VkResult const result = (fn_table.*create_fn)(device, deferred_operation, cache, 1, &create_info, nullptr, &vulkan_handle);
+            if (result != VK_SUCCESS) {
+                HC_ERROR("Failed to create " << typeid(T).name() << ": " << hc::render::to_str(result));
+                return hc::Error(result);
+            }
+
+            PipelineHandle handle;
+            handle.value = vulkan_handle;
+
+            return std::move(handle);
+        }
+
+        void destroy(VolkDeviceTable const& fn_table, VkDevice device) {
+            if (this->valid()) {
+                (fn_table.*destroy_fn)(device, this->value, nullptr);
+                this->value = VK_NULL_HANDLE;
+            }
+        }
+    };
+
+#define STANDARD_VK_PIPELINE_HANDLE(Handle, CreateFn, DestroyFn) PipelineHandle<Handle, decltype(&VolkDeviceTable::CreateFn), &VolkDeviceTable::CreateFn, decltype(&VolkDeviceTable::DestroyFn), &VolkDeviceTable::DestroyFn>
+
+    typedef STANDARD_VK_PIPELINE_HANDLE(VkPipeline, vkCreateGraphicsPipelines, vkDestroyPipeline) GraphicsPipeline;
+    typedef STANDARD_VK_PIPELINE_HANDLE(VkPipeline, vkCreateComputePipelines, vkDestroyPipeline) ComputePipeline;
+    typedef STANDARD_VK_PIPELINE_HANDLE(VkPipeline, vkCreateRayTracingPipelinesKHR, vkDestroyPipeline) RayTracingPipeline;
+
+#undef STANDARD_VK_PIPELINE_HANDLE
 }

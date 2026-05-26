@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/result.h"
+#include "../render/resource/descriptor.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,6 +36,8 @@ struct HCShader {
 struct HCResult hc_create_shader(struct HCShader* shader, const uint32_t* bytecode, size_t size, enum HCShaderStage stage);
 
 void hc_destroy_shader(struct HCShader* shader);
+
+struct HCResult hc_shader_push_constants(struct HCShader const* shader, struct HCTypeDescriptor* descriptor_data, uint32_t* data_count);
 
 #ifdef __cplusplus
 }

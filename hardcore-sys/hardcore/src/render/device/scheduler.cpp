@@ -20,7 +20,7 @@ namespace hc::render::device {
             .queueFamilyIndex = queue_family,
         };
 
-        auto pool_result = vk::CommandPool::create(fn_table, device, &pool_info);
+        auto pool_result = vk::CommandPool::create(fn_table, device, pool_info);
         if (!pool_result) {
             return pool_result.error();
         }
@@ -34,7 +34,7 @@ namespace hc::render::device {
             .commandBufferCount = 1,
         };
 
-        auto buffer_result = vk::CommandBuffers::create(fn_table, device, &command_buffer_info);
+        auto buffer_result = vk::CommandBuffers::create(fn_table, device, command_buffer_info);
         if (!buffer_result) {
             pool.destroy(fn_table, device);
             return buffer_result.error();
@@ -47,7 +47,7 @@ namespace hc::render::device {
             .flags = VK_FENCE_CREATE_SIGNALED_BIT,
         };
 
-        auto fence_result = vk::Fence::create(fn_table, device, &fence_info);
+        auto fence_result = vk::Fence::create(fn_table, device, fence_info);
         if (!fence_result) {
             pool.destroy(fn_table, device);
             return fence_result.error();
@@ -60,7 +60,7 @@ namespace hc::render::device {
             .flags = 0,
         };
 
-        auto semaphore_result = vk::Semaphore::create(fn_table, device, &semaphore_info);
+        auto semaphore_result = vk::Semaphore::create(fn_table, device, semaphore_info);
         if (!semaphore_result) {
             pool.destroy(fn_table, device);
             return semaphore_result.error();

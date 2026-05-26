@@ -118,7 +118,10 @@ namespace hc::render::device {
 
         VkPhysicalDevice physical_handle = VK_NULL_HANDLE;
         VkPhysicalDeviceProperties properties = {};
-        VkPhysicalDeviceFeatures features = {};
+
+        VkPhysicalDeviceVulkan12Features features12 = {};
+        VkPhysicalDeviceFeatures2 features = {};
+
         Scheduler scheduler;
         Graph graph;
         memory::Memory memory;

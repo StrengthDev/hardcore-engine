@@ -16,6 +16,7 @@ namespace hc::render {
     class RenderPassInstanceKey {
     public:
         RenderPassInstanceKey() = default;
+
         [[nodiscard]]
         static std::expected<RenderPassInstanceKey, Error> create(
             std::span<HCSubpass const> const& subpasses,

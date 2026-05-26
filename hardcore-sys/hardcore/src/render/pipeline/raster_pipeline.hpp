@@ -1,69 +1,73 @@
 
 #pragma once
 
-#include "descriptor_pool.hpp"
+#include "raster_pipeline_instance.hpp"
+#include "raster_pipeline_params.hpp"
+#include "shader_stages.hpp"
 
 #include "../shader/shader.hpp"
 
+#include <core/error.hpp>
+
+#include <util/bank.hpp>
+
 #include <vulkan/vulkan.h>
 
-#include <core/error.hpp>
-#include <util/uncopyable.hpp>
+#include <unordered_map>
 
-namespace hc::render {
-    // TODO move this
-    // TODO this name is bad, change to interpretation or something
-    enum class VertexNumericFormat : u8 {
-        UNorm,
-        SNorm,
-        UScaled,
-        SScaled,
-        UInt,
-        SInt,
-        UFloat,
-        SFloat,
-    };
-
-    struct InputBufferAttribute {
-        u32 location;
-        u8 size; //!< Component size, in bytes.
-        VertexNumericFormat format;
-        HCComposition composition;
-        u32 offset; //!< In bytes, relative to binding stride.
-    };
-
-    struct InputBufferDescription {
-        u32 binding;
-        VkVertexInputRate input_rate; //!< Indicates when to advance to the next buffer element, after each vertex or each instance.
-        std::vector<InputBufferAttribute> attributes;
-        u32 stride; //!< In bytes.
-    };
-
-    class RasterPipelineState {
-        // this guy will merely receive optionals and help fill the create_info accordingly
-        // within the render graph, the pipeline node will keep track of how the state is
-        // managed (constant/depends on something like render target/can be arbitrarily modified by user/etc)
-    };
-
+namespace hc::render::pipeline {
     class RasterPipeline {
     public:
         [[nodiscard]]
         static std::expected<RasterPipeline, Error> create(
             VolkDeviceTable const& fn_table,
             VkDevice device,
-            VkPipelineCache cache,
             std::vector<Shader> const& shaders,
-            std::vector<InputBufferDescription> const& buffer_descriptions
+            HCRasterPipelineParams const& params
         );
 
         void destroy(VolkDeviceTable const& fn_table, VkDevice device);
 
+        [[nodiscard]]
+        std::expected<VkPipeline, Error> get_instance(
+            VolkDeviceTable const& fn_table,
+            VkDevice device,
+            VkPipelineCache cache,
+            VkRenderPass render_pass,
+            u32 subpass
+        ) noexcept;
+
+        void free_instance(
+            VolkDeviceTable const& fn_table,
+            VkDevice device,
+            VkRenderPass render_pass,
+            u32 subpass
+        ) noexcept;
+
     private:
         RasterPipeline() = default;
 
-        ExternalHandle<VkPipeline, VK_NULL_HANDLE> handle;
-        ExternalHandle<VkPipelineLayout, VK_NULL_HANDLE> layout;
+        struct InstanceKey {
+            VkRenderPass render_pass;
+            u32 subpass;
 
-        DescriptorPool descriptor_pool;
+            bool operator==(InstanceKey const&) const noexcept = default;
+        };
+
+        struct InstanceKeyHash {
+            Sz operator()(InstanceKey const& key) const noexcept;
+        };
+
+        struct Instance {
+            RasterPipelineInstance instance;
+            u32 ref_count;
+        };
+
+        ShaderStages shaders;
+        RasterPipelineParams params;
+        vk::PipelineLayout layout;
+        u32 color_attachment_count = 0;
+
+        std::unordered_map<InstanceKey, Instance, InstanceKeyHash> instances;
     };
 }

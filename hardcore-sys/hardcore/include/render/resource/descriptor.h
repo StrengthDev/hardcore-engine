@@ -39,6 +39,60 @@ enum HCComposition {
     HCComposition_Mat4x4, //!< A 4x4 matrix of values.
 };
 
+struct HCBasicDescriptor {
+    enum HCPrimitive primitive_type;
+    uint32_t primitive_size; // In bits.
+    enum HCComposition composition;
+    uint32_t matrix_stride; // In bytes.
+};
+
+struct HCArrayDescriptor {
+    uint16_t element_type_idx;
+    uint32_t count;
+    uint32_t stride;
+};
+
+struct HCPointerDescriptor {
+    uint16_t type_idx;
+};
+
+struct HCMemberDescriptor {
+    uint16_t type_idx;
+    uint32_t offset;
+};
+
+struct HCStructDescriptor {
+    uint16_t first_member_type_idx;
+    uint16_t member_count;
+};
+
+enum HCOpaqueDescriptor {
+    HCOpaqueDescriptor_Texture,
+};
+
+enum HCDescriptorCategory {
+    HCDescriptorCategory_Basic,
+    HCDescriptorCategory_Array,
+    HCDescriptorCategory_Pointer,
+    HCDescriptorCategory_Member,
+    HCDescriptorCategory_Struct,
+    HCDescriptorCategory_Opaque,
+};
+
+union HCGenericDescriptor {
+    struct HCBasicDescriptor basic_descriptor;
+    struct HCArrayDescriptor array_descriptor;
+    struct HCPointerDescriptor pointer_descriptor;
+    struct HCMemberDescriptor member_descriptor;
+    struct HCStructDescriptor struct_descriptor;
+    enum HCOpaqueDescriptor opaque_descriptor;
+};
+
+struct HCTypeDescriptor {
+    enum HCDescriptorCategory type_category;
+    union HCGenericDescriptor type_descriptor;
+};
+
 /**
  * @brief A description of a descriptor's field.
  */

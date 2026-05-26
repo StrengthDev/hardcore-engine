@@ -16,6 +16,7 @@ impl core::fmt::Display for Error {
             Error::VulkanInitFailed => write!(f, "Failed to initialize global Vulkan context."),
             Error::VulkanLayerNotFound => write!(f, "One or more required Vulkan layers were not found."),
             Error::VulkanExtensionNotFound => write!(f, "One or more required Vulkan extensions were not found."),
+            Error::VulkanFeatureNotSupported => write!(f, "One or more required Vulkan features are not supported by the hardware."),
             Error::OutOfHostMemory => write!(f, "Out of host memory."),
             Error::OutOfDeviceMemory => write!(f, "Out of device memory."),
             Error::IncompatibleDriver => write!(f, "System driver is not compatible with the Vulkan version being used."),

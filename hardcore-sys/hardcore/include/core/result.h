@@ -15,6 +15,7 @@ enum HCError {
     HCError_VulkanInitFailed, //!< Failed to initialize global Vulkan context.
     HCError_VulkanLayerNotFound, //!< One or more required Vulkan layers were not found.
     HCError_VulkanExtensionNotFound, //!< One or more required Vulkan extensions were not found.
+    HCError_VulkanFeatureNotSupported, //!< One or more required Vulkan features are not supported by the hardware.
     HCError_OutOfHostMemory, //!< Out of host memory.
     HCError_OutOfDeviceMemory, //!< Out of device memory.
     HCError_IncompatibleDriver, //!< System driver is not compatible with the Vulkan version being used.

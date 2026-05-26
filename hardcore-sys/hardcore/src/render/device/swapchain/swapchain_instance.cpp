@@ -12,7 +12,7 @@ namespace hc::render::device::swapchain {
     ) {
         SwapchainInstance swapchain;
 
-        auto swapchain_result = vk::Swapchain::create(fn_table, device, &create_info);
+        auto swapchain_result = vk::Swapchain::create(fn_table, device, create_info);
         if (!swapchain_result) {
             return swapchain_result.error();
         }
@@ -58,7 +58,7 @@ namespace hc::render::device::swapchain {
                 },
             };
 
-            auto view_result = vk::ImageView::create(fn_table, device, &view_create_info);
+            auto view_result = vk::ImageView::create(fn_table, device, view_create_info);
             if (!view_result) {
                 swapchain.destroy(fn_table, device);
                 return view_result.error();
@@ -81,7 +81,7 @@ namespace hc::render::device::swapchain {
                 .layers = 1,
             };
 
-            auto framebuffer_result = vk::Framebuffer::create(fn_table, device, &framebuffer_info);
+            auto framebuffer_result = vk::Framebuffer::create(fn_table, device, framebuffer_info);
             if (!framebuffer_result) {
                 swapchain.destroy(fn_table, device);
                 return framebuffer_result.error();

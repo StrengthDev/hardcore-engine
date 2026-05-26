@@ -141,6 +141,13 @@ impl<'s> Layer<'s> for FractalLayer<'s> {
                 ..
             } => {
                 self.action_signal = true;
+                let x = self
+                    .vert_shader
+                    .push_constants()
+                    .expect("Failed to get push constant descriptor");
+                if let Some(t) = &x {
+                    println!("{x:?}");
+                }
             }
             Event::Window {
                 event:

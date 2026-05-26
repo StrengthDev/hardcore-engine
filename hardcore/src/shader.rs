@@ -6,6 +6,7 @@ use tokio::fs::File;
 use tokio::io::{AsyncReadExt, BufReader};
 
 #[derive(Debug, Copy, Clone)]
+#[repr(transparent)]
 pub struct ShaderStage(hardcore_sys::ShaderStage);
 
 impl ShaderStage {
@@ -154,6 +155,41 @@ impl Shader {
 
     pub fn stage(&self) -> ShaderStage {
         self.stage
+    }
+
+    pub fn push_constants(&self) -> Result<Option<Descriptor2>, Error> {
+        let mut count = 0u32;
+        unsafe {
+            hardcore_sys::shader_push_constants(
+                std::ptr::addr_of!(self.inner),
+                std::ptr::null_mut(),
+                std::ptr::addr_of_mut!(count),
+            )
+        }
+        .into_std_result()?;
+
+        if count == 0 {
+            return Ok(None);
+        }
+
+        let empty_descriptor = hardcore_sys::TypeDescriptor {
+            type_category: hardcore_sys::DescriptorCategory::Opaque,
+            type_descriptor: hardcore_sys::GenericDescriptor {
+                opaque_descriptor: hardcore_sys::OpaqueDescriptor::Texture,
+            },
+        };
+        let mut descriptors = vec![empty_descriptor; count as usize];
+
+        unsafe {
+            hardcore_sys::shader_push_constants(
+                std::ptr::addr_of!(self.inner),
+                descriptors.as_mut_ptr(),
+                std::ptr::addr_of_mut!(count),
+            )
+        }
+        .into_std_result()?;
+
+        Ok(Some(descriptors.as_slice().try_into()?))
     }
 }
 
@@ -346,5 +382,6 @@ mod compilation {
     }
 }
 
+use crate::resource::descriptor::Descriptor2;
 #[cfg(feature = "shader-compilation")]
 pub use compilation::*;

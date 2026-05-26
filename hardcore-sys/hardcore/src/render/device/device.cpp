@@ -109,7 +109,28 @@ namespace hc::render::device {
         Device device;
         vkGetPhysicalDeviceProperties(physical_handle, &device.properties);
         HC_INFO("Physical device found: " << device.properties.deviceName);
-        vkGetPhysicalDeviceFeatures(physical_handle, &device.features);
+
+        device.features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+        device.features.pNext = &device.features12;
+        device.features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+
+        vkGetPhysicalDeviceFeatures2(physical_handle, &device.features);
+
+        bool all_features_supported = true;
+
+        if (!device.features12.bufferDeviceAddress) {
+            HC_ERROR("Buffer device address feature not supported");
+            all_features_supported = false;
+        }
+
+        if (!device.features12.descriptorIndexing) {
+            HC_ERROR("Descriptor indexing feature not supported");
+            all_features_supported = false;
+        }
+
+        if (!all_features_supported) {
+            return Error(HCError_VulkanFeatureNotSupported);
+        }
 
         device.physical_handle = physical_handle;
 
@@ -137,8 +158,7 @@ namespace hc::render::device {
 
         VkPhysicalDeviceFeatures features = {};
 
-        std::vector<const char*> extensions;
-        extensions.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+        char const* extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
         VkDeviceCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -148,12 +168,12 @@ namespace hc::render::device {
             .pQueueCreateInfos = queue_infos.data(),
             .enabledLayerCount = static_cast<u32>(layers.size()),
             .ppEnabledLayerNames = layers.data(),
-            .enabledExtensionCount = static_cast<u32>(extensions.size()),
-            .ppEnabledExtensionNames = extensions.data(),
+            .enabledExtensionCount = sizeof(extensions) / sizeof(char const*),
+            .ppEnabledExtensionNames = extensions,
             .pEnabledFeatures = &features,
         };
 
-        auto device_result = vk::Device::create(physical_handle, &create_info);
+        auto device_result = vk::Device::create(physical_handle, create_info);
         if (!device_result) {
             return device_result.error();
         }
@@ -181,7 +201,7 @@ namespace hc::render::device {
             .pInitialData = nullptr
         };
 
-        auto cache_result = vk::PipelineCache::create(device.fn_table, device.handle, &cache_info);
+        auto cache_result = vk::PipelineCache::create(device.fn_table, device.handle, cache_info);
         if (!cache_result) {
             return cache_result.error();
         }
@@ -348,7 +368,7 @@ namespace hc::render::device {
         );
         HC_ASSERT(count, "Must have something to allocate");
 
-        VkBufferUsageFlags flags = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        VkBufferUsageFlags flags = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR;
         switch (kind) {
         case HCBufferKind_Vertex:
             flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
@@ -412,7 +432,7 @@ namespace hc::render::device {
         );
         HC_ASSERT(count, "Must have something to allocate");
 
-        VkBufferUsageFlags flags = 0;
+        VkBufferUsageFlags flags = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR;
         switch (kind) {
         case HCBufferKind_Vertex:
             flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;

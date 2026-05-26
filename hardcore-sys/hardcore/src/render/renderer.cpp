@@ -108,14 +108,18 @@ namespace hc::render {
         [[maybe_unused]] void* user_data
     ) {
         char type[] = "[----]";
-        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT)
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT) {
             type[1] = 'G';
-        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT)
+        }
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) {
             type[2] = 'V';
-        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
+        }
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) {
             type[3] = 'P';
-        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT)
+        }
+        if (message_type & VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT) {
             type[4] = 'B';
+        }
 
         if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
             HC_ERROR("Vulkan " << type << ": " << callback_data->pMessage);
@@ -178,13 +182,15 @@ namespace hc::render {
             version.patch
         );
 
-        VkApplicationInfo app_info = {};
-        app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-        app_info.pApplicationName = app.name;
-        app_info.applicationVersion = VK_MAKE_API_VERSION(0, app.version.major, app.version.minor, app.version.patch);
-        app_info.pEngineName = "Hardcore";
-        app_info.engineVersion = VK_MAKE_API_VERSION(0, HC_MAJOR, HC_MINOR, HC_MAJOR);
-        app_info.apiVersion = VULKAN_API_VERSION;
+        VkApplicationInfo app_info = {
+            .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+            .pNext = nullptr,
+            .pApplicationName = app.name,
+            .applicationVersion = VK_MAKE_API_VERSION(0, app.version.major, app.version.minor, app.version.patch),
+            .pEngineName = "Hardcore",
+            .engineVersion = VK_MAKE_API_VERSION(0, HC_MAJOR, HC_MINOR, HC_MAJOR),
+            .apiVersion = VULKAN_API_VERSION,
+        };
 
         auto found_layers = layer_support(layers);
         if (!found_layers) {
@@ -237,15 +243,18 @@ namespace hc::render {
             return Error(HCError_VulkanExtensionNotFound);
         }
 
-        VkInstanceCreateInfo instance_info = {};
-        instance_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        instance_info.pApplicationInfo = &app_info;
-        instance_info.enabledExtensionCount = static_cast<u32>(extensions.size());
-        instance_info.ppEnabledExtensionNames = extensions.data();
-        instance_info.enabledLayerCount = static_cast<u32>(layers.size());
-        instance_info.ppEnabledLayerNames = layers.data();
+        VkInstanceCreateInfo instance_info = {
+            .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
+            .pApplicationInfo = &app_info,
+            .enabledLayerCount = static_cast<u32>(layers.size()),
+            .ppEnabledLayerNames = layers.data(),
+            .enabledExtensionCount = static_cast<u32>(extensions.size()),
+            .ppEnabledExtensionNames = extensions.data(),
+        };
 
-        return vk::Instance::create(&instance_info);
+        return vk::Instance::create(instance_info);
     }
 
     static std::expected<void, Error> init_devices(const std::vector<const char*>& layers) {
@@ -265,6 +274,8 @@ namespace hc::render {
             HC_ERROR("Failed to query physical devices: " << to_str(result));
             return Error(result);
         }
+
+        HC_INFO("Found " << physical_handles.size() << " device(s)");
 
         for (auto physical_handle : physical_handles) {
             auto device_result = device::Device::create(physical_handle, layers);
@@ -314,24 +325,26 @@ namespace hc::render {
         volkLoadInstanceOnly(global_instance);
 
 #ifdef HC_LOGGING
-        VkDebugUtilsMessengerCreateInfoEXT debug_info = {};
-        debug_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-        debug_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-        debug_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-            VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        VkDebugUtilsMessengerCreateInfoEXT debug_info = {
+            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+            .pNext = nullptr,
+            .flags = 0,
+            .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT
+            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT
+            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT
+            | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+            .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT
+            | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT
+            | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+            .pfnUserCallback = params.debug_callback ? custom_debug_callback : default_debug_callback,
+            .pUserData = nullptr,
+        };
 
         if (params.debug_callback) {
             user_debug_callback = params.debug_callback;
-            debug_info.pfnUserCallback = custom_debug_callback;
-        } else {
-            debug_info.pfnUserCallback = default_debug_callback;
         }
 
-        debug_info.pUserData = nullptr;
-
-        auto debug_messenger_result = vk::DebugUtilsMessenger::create(global_instance, &debug_info);
+        auto debug_messenger_result = vk::DebugUtilsMessenger::create(global_instance, debug_info);
         if (!debug_messenger_result) {
             return debug_messenger_result.error();
         }

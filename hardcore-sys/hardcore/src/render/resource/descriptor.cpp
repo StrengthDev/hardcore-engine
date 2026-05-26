@@ -72,35 +72,26 @@ static Sz size_of(const HCField* fields, Sz count) {
 }
 
 namespace hc::render {
-    StructDescriptor::StructDescriptor(StructDescriptor const& other) {
-        this->members.reserve(other.members.size());
-
-        for (auto const& member : other.members) {
-            members.push_back(std::make_unique<MemberDescriptor>(*member));
-        }
+    std::vector<HCTypeDescriptor> const& Descriptor2::data_vec() const noexcept {
+        return this->descriptor_data;
     }
 
-    bool StructDescriptor::operator==(const StructDescriptor& other) const noexcept {
-        if (this->members.size() != other.members.size()) {
-            return false;
-        }
-
-        for (auto const& [this_member, other_member] : std::views::zip(this->members, other.members)) {
-            if (*this_member != *other_member) {
-                return false;
-            }
-        }
-
-        return true;
+    Sz Descriptor2::size() const noexcept {
+        return this->total_size;
     }
+
+    Descriptor2::Descriptor2(std::vector<HCTypeDescriptor>&& descriptor_data, Sz total_size) noexcept
+        : descriptor_data(descriptor_data), total_size(total_size) {}
+
+    Descriptor2::Descriptor2(std::pair<std::vector<HCTypeDescriptor>, Sz>&& pair) noexcept
+        : Descriptor2(std::move(pair.first), pair.second) {}
 
     Sz size_of(HCPrimitive primitive) {
         return ::size_of(primitive);
     }
 
     Descriptor::Descriptor(const HCDescriptor& descriptor)
-        : fields(descriptor.fields, descriptor.fields + descriptor.field_count) {
-    }
+        : fields(descriptor.fields, descriptor.fields + descriptor.field_count) {}
 
     Sz Descriptor::size() const noexcept {
         return size_of(this->fields.data(), this->fields.size());

@@ -10,8 +10,7 @@ namespace hc {
     class Error {
     public:
         Error(HCError error)
-            : error(error) {
-        }
+            : error(error) {}
 
         /**
          * Convert a Vulkan error result into the `Error` type.
@@ -21,14 +20,12 @@ namespace hc {
          */
         Error(VkResult result);
 
-        operator HCError() const noexcept { return this->error; }
-
-        operator HCError&() noexcept { return this->error; }
+        [[nodiscard]] HCError value() const noexcept { return this->error; }
 
         template<typename T>
         operator std::expected<T, Error>() const noexcept { return std::unexpected(this->error); }
 
-        operator HCResult() const noexcept { return {.error = this->error, .success = false}; }
+        operator HCResult() const noexcept { return { .error = this->error, .success = false }; }
 
     private:
         HCError error;
