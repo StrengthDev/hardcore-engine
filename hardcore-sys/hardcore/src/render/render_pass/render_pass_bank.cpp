@@ -31,23 +31,27 @@ namespace hc::render {
                 return instance_result.error();
             }
 
-            this->instances.emplace(key, RenderPassInstance{*std::move(instance_result), 1});
+            this->instances.emplace(key, RenderPassInstance { *std::move(instance_result), 1 });
         }
 
         return this->bank.insert(std::move(render_pass));
     }
 
-    void RenderPassBank::destroy_render_pass(VolkDeviceTable const& fn_table, VkDevice device, u64 id) noexcept {
+    std::optional<vk::RenderPass> RenderPassBank::destroy_render_pass(u64 id) noexcept {
         RenderPass render_pass = this->bank.erase(id);
 
         RenderPassInstance& instance = this->instances[render_pass.instance_key()];
         instance.ref_count--;
 
         if (instance.ref_count == 0) {
-            instance.handle.destroy(fn_table, device);
+            vk::RenderPass handle = std::move(instance.handle);
 
             this->instances.erase(render_pass.instance_key());
+
+            return handle;
         }
+
+        return std::nullopt;
     }
 
     bool RenderPassBank::contains(u64 id) const {
@@ -57,7 +61,7 @@ namespace hc::render {
     std::pair<RenderPass&, VkRenderPass> RenderPassBank::operator[](u64 id) noexcept {
         RenderPass& render_pass = this->bank[id];
 
-        return {render_pass, this->instances[render_pass.instance_key()].handle};
+        return { render_pass, this->instances[render_pass.instance_key()].handle };
     }
 
     std::pair<RenderPass const&, VkRenderPass> RenderPassBank::operator[](
@@ -65,6 +69,6 @@ namespace hc::render {
     ) const noexcept {
         RenderPass const& render_pass = this->bank[id];
 
-        return {render_pass, this->instances.at(render_pass.instance_key()).handle};
+        return { render_pass, this->instances.at(render_pass.instance_key()).handle };
     }
 }

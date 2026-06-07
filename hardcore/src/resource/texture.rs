@@ -6,7 +6,6 @@ pub use hardcore_sys::{
     TextureSampleCount,
 };
 
-use crate::resource::Synchronization;
 use core::num::NonZeroU32;
 use core::ops::{
     Bound, Range, RangeBounds, RangeFrom, RangeFull, RangeInclusive, RangeTo, RangeToInclusive,
@@ -183,7 +182,7 @@ enum ViewRangeValue {
 }
 
 impl ViewRangeValue {
-    fn to_offset_and_count(&self, count: u32) -> Result<(u32, u32), Error> {
+    fn get_offset_and_count(&self, count: u32) -> Result<(u32, u32), Error> {
         let ret = match self {
             ViewRangeValue::Unbounded => Some((0, count)),
             ViewRangeValue::Bounded { from, to } => {
@@ -310,34 +309,56 @@ impl TextureView {
             cube,
         })
     }
+
+    fn as_view_params(
+        &self,
+        layer_count: NonZeroU32,
+        mip_level_count: NonZeroU32,
+    ) -> Result<TextureViewParams, Error> {
+        let (base_layer, layer_count) =
+            self.layer_range.0.get_offset_and_count(layer_count.get())?;
+        let (base_mip_level, mip_level_count) = self
+            .mip_level_range
+            .0
+            .get_offset_and_count(mip_level_count.get())?;
+
+        Ok(TextureViewParams {
+            base_layer,
+            layer_count,
+            base_mip_level,
+            mip_level_count,
+            cube: self.cube,
+        })
+    }
 }
 
-pub struct Texture<'s> {
+pub struct TextureBase<'s> {
     handle: Handle<'s, hardcore_sys::Texture>,
     layer_count: NonZeroU32,
     mip_level_count: NonZeroU32,
     cube_compatible: bool,
 }
 
-impl<'s> Texture<'s> {
-    pub fn new(
+impl<'s> TextureBase<'s> {
+    fn new(
         device: u32,
         dimensions: TextureDimensions,
         format: TextureFormat,
         mip_level_count: NonZeroU32,
         sample_count: TextureSampleCount,
         cube_compatible: bool,
-        synchronization: Synchronization, // TODO this is probably not the best way to do it, maybe it should be embedded in the type if a texture can be used as a target
-    ) -> Result<Texture<'s>, Error> {
+        render_target: bool,
+    ) -> Result<TextureBase<'s>, Error> {
         let mut handle = Default::default();
         unsafe {
-            hardcore_sys::create_texture(
+            hardcore_sys::new_texture(
                 &raw mut handle,
                 device,
                 dimensions.into(),
                 format.0.into(),
                 mip_level_count.get(),
                 sample_count,
+                render_target,
             )
             .into_std_result()?
         };
@@ -348,47 +369,96 @@ impl<'s> Texture<'s> {
             TextureDimensions::Texture3D { .. } => unsafe { NonZeroU32::new_unchecked(1) },
         };
 
-        Ok(Texture {
+        Ok(TextureBase {
             handle: handle.into(),
             layer_count,
             mip_level_count,
             cube_compatible,
         })
     }
-
-    fn c_view_params(&self, view: TextureView) -> Result<TextureViewParams, Error> {
-        let (base_layer, layer_count) = view
-            .layer_range
-            .0
-            .to_offset_and_count(self.layer_count.get())?;
-        let (base_mip_level, mip_level_count) = view
-            .mip_level_range
-            .0
-            .to_offset_and_count(self.mip_level_count.get())?;
-
-        Ok(TextureViewParams {
-            base_layer,
-            layer_count,
-            base_mip_level,
-            mip_level_count,
-            cube: view.cube,
-        })
-    }
 }
 
-impl BasicTexture for Texture<'_> {
+impl BasicTexture for TextureBase<'_> {
     fn handle(&self) -> hardcore_sys::Texture {
         self.handle.inner
     }
 
     fn c_view_params(&self, view: TextureView) -> Result<TextureViewParams, Error> {
-        self.c_view_params(view)
+        view.as_view_params(self.layer_count, self.mip_level_count)
     }
 }
 
-impl<'s> Drop for Texture<'s> {
+impl<'s> Drop for TextureBase<'s> {
     fn drop(&mut self) {
         unsafe { hardcore_sys::destroy_texture(self.handle.mut_ptr()) }
+    }
+}
+
+pub struct Texture<'s>(TextureBase<'s>);
+
+impl<'s> Texture<'s> {
+    pub(crate) fn new(
+        device: u32,
+        dimensions: TextureDimensions,
+        format: TextureFormat,
+        mip_level_count: NonZeroU32,
+        sample_count: TextureSampleCount,
+        cube_compatible: bool,
+    ) -> Result<Texture<'s>, Error> {
+        TextureBase::new(
+            device,
+            dimensions,
+            format,
+            mip_level_count,
+            sample_count,
+            cube_compatible,
+            false,
+        )
+        .map(Texture)
+    }
+}
+
+impl BasicTexture for Texture<'_> {
+    fn handle(&self) -> hardcore_sys::Texture {
+        self.0.handle()
+    }
+
+    fn c_view_params(&self, view: TextureView) -> Result<TextureViewParams, Error> {
+        self.0.c_view_params(view)
+    }
+}
+
+pub struct RenderTarget<'s>(TextureBase<'s>);
+
+impl<'s> RenderTarget<'s> {
+    pub(crate) fn new(
+        device: u32,
+        dimensions: TextureDimensions,
+        format: TextureFormat,
+        mip_level_count: NonZeroU32,
+        sample_count: TextureSampleCount,
+        cube_compatible: bool,
+    ) -> Result<RenderTarget<'s>, Error> {
+        TextureBase::new(
+            device,
+            dimensions,
+            format,
+            mip_level_count,
+            sample_count,
+            cube_compatible,
+            true,
+        )
+        .map(RenderTarget)
+    }
+}
+
+impl BasicTexture for RenderTarget<'_> {
+    fn handle(&self) -> hardcore_sys::Texture {
+        self.0.handle()
+    }
+
+    fn c_view_params(&self, view: TextureView) -> Result<TextureViewParams, Error> {
+        self.0.c_view_params(view)
     }
 }
 
@@ -400,10 +470,8 @@ pub(crate) trait BasicTexture {
 
 pub(crate) trait InputAttachmentTexture: BasicTexture {}
 
-pub(crate) trait OutputAttachmentTexture: BasicTexture {}
-
 pub struct DepthStencilTexture<'s> {
-    texture: Texture<'s>,
+    texture: TextureBase<'s>,
 }
 
 impl BasicTexture for DepthStencilTexture<'_> {

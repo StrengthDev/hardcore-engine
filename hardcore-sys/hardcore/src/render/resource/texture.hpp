@@ -63,6 +63,7 @@ namespace hc::render::texture {
 
     [[nodiscard]] std::expected<vk::Image, Error> create_image(
         VkPhysicalDevice physical_device,
+        VkPhysicalDeviceLimits const& limits,
         VolkDeviceTable const& fn_table,
         VkDevice device,
         VkImageCreateInfo const& image_info

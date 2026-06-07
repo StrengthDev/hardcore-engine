@@ -33,7 +33,7 @@ struct HCShader {
     void* inner;
 };
 
-struct HCResult hc_create_shader(struct HCShader* shader, const uint32_t* bytecode, size_t size, enum HCShaderStage stage);
+struct HCResult hc_new_shader(struct HCShader* shader, const uint32_t* bytecode, size_t size, enum HCShaderStage stage);
 
 void hc_destroy_shader(struct HCShader* shader);
 

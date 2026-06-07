@@ -1,7 +1,7 @@
 
 #include <pch.hpp>
 
-#include "raster_pipeline_params.hpp"
+#include "raster_pipeline_info.hpp"
 
 #include <core/color.hpp>
 
@@ -61,7 +61,7 @@ namespace hc::render::pipeline {
         { HCBlendOp_Max, VK_BLEND_OP_MAX },
     };
 
-    std::expected<RasterPipelineParams, Error> RasterPipelineParams::create(HCRasterPipelineParams const& params) {
+    std::expected<RasterPipelineInfo, Error> RasterPipelineInfo::create(HCRasterPipelineInfo const& params) {
         auto const topology = PRIMITIVE_TOPOLOGY_MAP[params.primitive_topology];
         if (!topology) {
             HC_ERROR("Unknown primitive topology value");
@@ -106,7 +106,7 @@ namespace hc::render::pipeline {
 
         auto const blend_constants = clamp_color(params.blend_constants);
 
-        return RasterPipelineParams {
+        return RasterPipelineInfo {
             .primitive_topology = *topology,
             .discard_primitives = params.discard_primitives,
             .polygon_mode = *polygon_mode,

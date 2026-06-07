@@ -6,6 +6,7 @@
 extern "C" {
 #endif // __cplusplus
 
+#include <stdbool.h>
 #include <stdint.h>
 
 enum HCTextureType {
@@ -252,13 +253,14 @@ struct HCTexture {
     uint32_t device; //!< The ID of the device which this texture belongs to.
 };
 
-struct HCResult hc_create_texture(
+struct HCResult hc_new_texture(
     struct HCTexture* texture,
     uint32_t device,
     struct HCTextureDimensions dims,
     struct HCTextureFormat format,
     uint32_t mip_levels,
-    enum HCTextureSampleCount sample_count
+    enum HCTextureSampleCount sample_count,
+    bool render_target
 );
 
 void hc_destroy_texture(struct HCTexture* texture);

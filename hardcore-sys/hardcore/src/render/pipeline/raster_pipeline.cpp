@@ -9,12 +9,14 @@ namespace hc::render::pipeline {
     std::expected<vk::PipelineLayout, Error> create_layout(
         VolkDeviceTable const& fn_table,
         VkDevice device,
-        std::vector<Shader> const& shaders
+        std::vector<std::reference_wrapper<Shader const>> const& shaders
     ) {
         std::vector<VkPushConstantRange> push_constant_ranges;
         push_constant_ranges.reserve(shaders.size());
 
-        for (auto const& shader : shaders) {
+        for (auto const& shader_ref : shaders) {
+            auto const& shader = shader_ref.get();
+
             if (auto const& push_constant = shader.push_constants(); push_constant) {
                 push_constant_ranges.push_back(
                     VkPushConstantRange {
@@ -44,13 +46,13 @@ namespace hc::render::pipeline {
     std::expected<RasterPipeline, Error> RasterPipeline::create(
         VolkDeviceTable const& fn_table,
         VkDevice device,
-        std::vector<Shader> const& shaders,
-        HCRasterPipelineParams const& params
+        std::vector<std::reference_wrapper<Shader const>> const& shaders,
+        HCRasterPipelineInfo const& info
     ) {
         RasterPipeline pipeline;
 
-        for (auto const& shader : shaders) {
-            if (shader.stage_flag() == VK_SHADER_STAGE_FRAGMENT_BIT) {
+        for (auto const& shader_ref : shaders) {
+            if (auto const& shader = shader_ref.get(); shader.stage_flag() == VK_SHADER_STAGE_FRAGMENT_BIT) {
                 pipeline.color_attachment_count = static_cast<u32>(shader.outputs().size());
                 break;
             }
@@ -61,11 +63,17 @@ namespace hc::render::pipeline {
             return Error(HCError_InvalidParams);
         }
 
-        auto params_result = RasterPipelineParams::create(params);
-        if (!params_result) {
-            return params_result.error();
+        auto info_result = RasterPipelineInfo::create(info);
+        if (!info_result) {
+            return info_result.error();
         }
-        pipeline.params = *std::move(params_result);
+        pipeline.info = *std::move(info_result);
+
+        auto processor_result = PushConstantsProcessor::create(shaders.front().get().push_constants());
+        if (!processor_result) {
+            return processor_result.error();
+        }
+        pipeline.push_constants_processor = *std::move(processor_result);
 
         auto layout_result = create_layout(fn_table, device, shaders);
         if (!layout_result) {
@@ -85,7 +93,7 @@ namespace hc::render::pipeline {
 
     void RasterPipeline::destroy(VolkDeviceTable const& fn_table, VkDevice device) {
         for (auto& [instance, _] : this->instances | std::views::values) {
-            instance.destroy(fn_table, device);
+            instance.extract_handle().destroy(fn_table, device);
         }
         this->instances.clear();
 
@@ -108,7 +116,7 @@ namespace hc::render::pipeline {
                 device,
                 cache,
                 this->shaders,
-                this->params,
+                this->info,
                 this->layout,
                 this->color_attachment_count,
                 render_pass,
@@ -118,6 +126,7 @@ namespace hc::render::pipeline {
                 return result.error();
             }
 
+            this->instance_keys.emplace(result.value().vk_handle(), std::pair(render_pass, subpass));
             this->instances.emplace(key, Instance { .instance = *std::move(result), .ref_count = 0 });
         }
 
@@ -128,16 +137,14 @@ namespace hc::render::pipeline {
         return instance.vk_handle();
     }
 
-    void RasterPipeline::free_instance(
-        VolkDeviceTable const& fn_table,
-        VkDevice device,
-        VkRenderPass render_pass,
-        u32 subpass
-    ) noexcept {
+    std::optional<vk::GraphicsPipeline> RasterPipeline::free_instance(VkPipeline vk_handle) noexcept {
+        auto [render_pass, subpass] = this->instance_keys[vk_handle];
         InstanceKey const key = { .render_pass = render_pass, .subpass = subpass };
 
+        std::optional<vk::GraphicsPipeline> handle;
+
         if (!this->instances.contains(key)) {
-            return;
+            return handle;
         }
 
         auto& [instance, ref_count] = this->instances[key];
@@ -145,10 +152,20 @@ namespace hc::render::pipeline {
         ref_count--;
 
         if (!ref_count) {
-            instance.destroy(fn_table, device);
+            handle = instance.extract_handle();
 
             this->instances.erase(key);
+            this->instance_keys.erase(vk_handle);
         }
+
+        return handle;
+    }
+
+    std::expected<void, Error> RasterPipeline::fill_push_constants_buffer(
+        std::vector<u8>& buffer,
+        std::span<void const*> const& constant_ptrs
+    ) const noexcept {
+        return this->push_constants_processor(buffer, constant_ptrs);
     }
 
     Sz RasterPipeline::InstanceKeyHash::operator()(InstanceKey const& key) const noexcept {

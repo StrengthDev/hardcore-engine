@@ -19,7 +19,7 @@ namespace hc::render::pipeline {
         static std::expected<ShaderStages, Error> create(
             VolkDeviceTable const& fn_table,
             VkDevice device,
-            std::vector<Shader> const& shaders
+            std::vector<std::reference_wrapper<Shader const>> const& shaders
         );
 
         void destroy(VolkDeviceTable const& fn_table, VkDevice device);

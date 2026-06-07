@@ -10,7 +10,7 @@
 #include <expected>
 
 namespace hc::render::pipeline {
-    struct RasterPipelineParams {
+    struct RasterPipelineInfo {
         // Rasterization
         VkPrimitiveTopology primitive_topology = VK_PRIMITIVE_TOPOLOGY_MAX_ENUM;
         VkBool32 discard_primitives = VK_TRUE;
@@ -27,6 +27,6 @@ namespace hc::render::pipeline {
         VkPipelineColorBlendAttachmentState blend_mode = {};
         float blend_constants[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
 
-        static std::expected<RasterPipelineParams, Error> create(HCRasterPipelineParams const& params);
+        static std::expected<RasterPipelineInfo, Error> create(HCRasterPipelineInfo const& params);
     };
 }

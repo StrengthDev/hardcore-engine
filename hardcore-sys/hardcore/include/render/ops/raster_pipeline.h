@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common.h"
+#include "../shader.h"
 
 #include "../../core/color.h"
 #include "../../core/result.h"
@@ -86,7 +86,11 @@ struct HCBlendMode {
     enum HCBlendOp alpha_blend_op;
 };
 
-struct HCRasterPipelineParams {
+extern struct HCBlendMode const HC_NONE_BLEND_MODE;
+extern struct HCBlendMode const HC_ALPHA_BLENDING_BLEND_MODE;
+extern struct HCBlendMode const HC_PREMULTIPLIED_ALPHA_BLENDING_BLEND_MODE;
+
+struct HCRasterPipelineInfo {
     enum HCPrimitiveTopology primitive_topology; //!< The primitive topology of the pipeline.
     bool discard_primitives; //!< Discard all primitives. Useful if your only interest are pipeline side effects.
     enum HCPolygonMode polygon_mode;
@@ -109,8 +113,9 @@ struct HCRasterPipeline {
 struct HCResult hc_new_raster_pipeline(
     struct HCRasterPipeline* raster_pipeline,
     uint32_t device,
-    HCOperationPredicate predicate,
-    void* user_data
+    struct HCShader const* shaders,
+    uint32_t shader_count,
+    struct HCRasterPipelineInfo info
 );
 
 void hc_destroy_raster_pipeline(struct HCRasterPipeline* raster_pipeline);

@@ -18,6 +18,7 @@ namespace hc::render {
 
         void destroy(VolkDeviceTable const& fn_table, VkDevice device) noexcept;
 
+        [[nodiscard]]
         std::expected<u64, Error> create_render_pass(
             VolkDeviceTable const& fn_table,
             VkDevice device,
@@ -25,7 +26,7 @@ namespace hc::render {
             Bank<texture::Texture> const& textures
         );
 
-        void destroy_render_pass(VolkDeviceTable const& fn_table, VkDevice device, u64 id) noexcept;
+        [[nodiscard]] std::optional<vk::RenderPass> destroy_render_pass(u64 id) noexcept;
 
         [[nodiscard]] bool contains(u64 id) const;
 

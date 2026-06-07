@@ -104,7 +104,7 @@ impl TryFrom<&Path> for ShaderStage {
 }
 
 pub struct Shader {
-    inner: hardcore_sys::Shader,
+    pub(crate) inner: hardcore_sys::Shader,
     stage: ShaderStage,
 }
 
@@ -115,7 +115,7 @@ impl Shader {
         let mut inner = Default::default();
 
         unsafe {
-            hardcore_sys::create_shader(
+            hardcore_sys::new_shader(
                 &raw mut inner,
                 bytecode.as_ptr(),
                 bytecode.len(),

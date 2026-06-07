@@ -3,6 +3,8 @@
 
 #include <render/ops/render_pass.h>
 
+#include "../../validation.hpp"
+
 #include <core/error.hpp>
 #include <core/log.hpp>
 #include <render/renderer.hpp>
@@ -19,15 +21,9 @@ HCResult hc_new_render_pass(
     void* user_data
 
 ) {
-    if (!render_pass) {
-        HC_ERROR("Null render pass pointer");
-        return hc::Error(HCError_InvalidParams);
-    }
-
-    if (!subpasses || !subpass_count) {
-        HC_ERROR("There must be at least 1 subpass");
-        return hc::Error(HCError_InvalidParams);
-    }
+    HC_VALIDATE_PTR_RE(render_pass, "render pass");
+    HC_VALIDATE_PTR_RE(subpasses, "subpasses");
+    HC_VALIDATE_RE(subpass_count > 0, "There must be at least 1 subpass");
 
     auto device_result = hc::render::device_at(device);
     if (!device_result) {
@@ -47,14 +43,12 @@ HCResult hc_new_render_pass(
         .device = device,
     };
 
-    return {.success = true};
+    return { .success = true };
 }
 
 void hc_destroy_render_pass(HCRenderPass* render_pass) {
-    if (!render_pass) {
-        HC_WARN("Null render pass pointer");
-        return;
-    }
+    HC_VALIDATE_PTR(render_pass, "render pass");
+
     const auto device_id = render_pass->device;
     auto device_result = hc::render::device_at(device_id);
     if (!device_result) {

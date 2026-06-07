@@ -8,16 +8,10 @@
 #include <window/context.hpp>
 
 #include <util/flow.hpp>
+#include <util/variant_visitor.hpp>
 
 namespace hc::render::device {
-    Cleaner::Cleaner() {
-        Sz const queue_count = max_frames_in_flight();
-
-        cleanup_queues.reserve(queue_count);
-        for (Sz i = 0; i < queue_count; ++i) {
-            cleanup_queues.emplace_back();
-        }
-    }
+    Cleaner::Cleaner() : cleanup_queues(max_frames_in_flight()) {}
 
     Cleaner::~Cleaner() {
         HC_ASSERT(this->cleanup_submissions.empty(), "There must be no items left for cleanup before destruction");
@@ -35,9 +29,9 @@ namespace hc::render::device {
 
     void Cleaner::tick(VolkDeviceTable const& fn_table, VkDevice device, memory::Memory& memory) {
         auto& cleanup_queue = this->cleanup_queues[this->frame_mod];
-        for (auto& mark : cleanup_queue) {
+        for (auto& item : cleanup_queue) {
             std::visit(
-                DestructionHandler{
+                VariantVisitor {
                     [&fn_table, &device](Window& window) {
                         window.swapchain.destroy(fn_table, device);
                         window::Context::instance().destroy_window(window.window);
@@ -55,8 +49,17 @@ namespace hc::render::device {
                         texture.destroy(fn_table, device);
                         memory.free_texture(texture.memory_ref());
                     },
+                    [&fn_table, &device](vk::RenderPass& render_pass) {
+                        render_pass.destroy(fn_table, device);
+                    },
+                    [&fn_table, &device](pipeline::RasterPipeline& pipeline) {
+                        pipeline.destroy(fn_table, device);
+                    },
+                    [&fn_table, &device](vk::GraphicsPipeline& pipeline) {
+                        pipeline.destroy(fn_table, device);
+                    },
                 },
-                mark
+                item
             );
         }
         cleanup_queue.clear();
@@ -66,7 +69,7 @@ namespace hc::render::device {
     }
 
     void Cleaner::yield_window(GLFWwindow* window, swapchain::Swapchain&& swapchain) {
-        this->cleanup_submissions.emplace_back(Window{.window = window, .swapchain = std::move(swapchain)});
+        this->cleanup_submissions.emplace_back(Window { .window = window, .swapchain = std::move(swapchain) });
     }
 
     void Cleaner::yield_swapchain(swapchain::SwapchainInstance&& instance) {
@@ -83,5 +86,17 @@ namespace hc::render::device {
 
     void Cleaner::yield_texture(texture::Texture&& texture) {
         this->cleanup_submissions.emplace_back(std::move(texture));
+    }
+
+    void Cleaner::yield_render_pass(vk::RenderPass&& render_pass) {
+        this->cleanup_submissions.emplace_back(std::move(render_pass));
+    }
+
+    void Cleaner::yield_raster_pipeline(pipeline::RasterPipeline&& pipeline) {
+        this->cleanup_submissions.emplace_back(std::move(pipeline));
+    }
+
+    void Cleaner::yield_graphics_pipeline_instance(vk::GraphicsPipeline&& pipeline) {
+        this->cleanup_submissions.emplace_back(std::move(pipeline));
     }
 }

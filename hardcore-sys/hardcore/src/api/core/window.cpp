@@ -5,6 +5,8 @@
 
 #include <core/window.h>
 
+#include "../validation.hpp"
+
 #include <window/context.hpp>
 #include <window/window.hpp>
 
@@ -13,17 +15,14 @@
 
 #include <util/function_signature.hpp>
 
-const HCVersion HC_GLFW_VERSION = {GLFW_VERSION_MAJOR, GLFW_VERSION_MINOR, GLFW_VERSION_REVISION};
+const HCVersion HC_GLFW_VERSION = { GLFW_VERSION_MAJOR, GLFW_VERSION_MINOR, GLFW_VERSION_REVISION };
 
 void hc_poll_events() {
     hc::window::Context::instance().poll_events();
 }
 
 HCResult hc_new_window(HCWindow* window, HCWindowParams params) {
-    if (!window) {
-        HC_ERROR("Null window pointer");
-        return hc::Error(HCError_InvalidParams);
-    }
+    HC_VALIDATE_PTR_RE(window, "window");
 
     auto window_result = hc::window::Context::instance().create_window(params);
     if (!window_result) {
@@ -32,16 +31,15 @@ HCResult hc_new_window(HCWindow* window, HCWindowParams params) {
 
     window->id = *window_result;
 
-    return {.success = true};
+    return { .success = true };
 }
 
 void hc_destroy_window(HCWindow* window) {
-    if (!window) {
-        HC_WARN("Null window pointer");
-        return;
-    }
+    HC_VALIDATE_PTR(window, "window");
 
     hc::window::Context::instance().yield_window(window->id);
+
+    *window = {};
 }
 
 template<typename S, typename A>
@@ -50,10 +48,7 @@ concept SimpleWindowSetter = requires(hc::window::Window window, S setter, A arg
 
 template<typename A, SimpleWindowSetter<A> S>
 static HCResult call_window_setter(HCWindow* window, S setter, A arg) {
-    if (!window) {
-        HC_WARN("Null window pointer");
-        return hc::Error(HCError_InvalidParams);
-    }
+    HC_VALIDATE_PTR_RE(window, "window");
 
     auto window_obj = hc::window::Context::instance().find_window(window->id);
     if (!window_obj) {
@@ -70,7 +65,7 @@ static HCResult call_window_setter(HCWindow* window, S setter, A arg) {
         }
     }
 
-    return {.success = true};
+    return { .success = true };
 }
 
 HCResult hc_set_window_cursor_mode(HCWindow* window, HCCursorMode cursor_mode) {

@@ -1,65 +1,32 @@
+
 #pragma once
 
-#include <render/device/memory/reference.hpp>
-#include "render/render_pass/render_pass_bank.hpp"
-#include "render/resource/buffer.hpp"
-#include "render/resource/texture.hpp"
+#include "node.hpp"
+
+#include "../cleaner.hpp"
+
+#include "../../device/memory/reference.hpp"
+#include "../../pipeline/raster_pipeline.hpp"
+#include "../../render_pass/render_pass_bank.hpp"
+#include "../../resource/buffer.hpp"
+#include "../../resource/texture.hpp"
+#include "../../shader/shader.hpp"
 
 #include <render/ops/common.h>
 #include <render/ops/render_pass.h>
 
-#include <util/number.hpp>
 #include <util/bank.hpp>
+#include <util/number.hpp>
 #include <util/user_predicate.hpp>
 
-#include <span>
+#include <expected>
 #include <ranges>
+#include <span>
 #include <unordered_map>
 #include <unordered_set>
+#include <variant>
 
-namespace hc::render::device {
-    class Graph;
-
-    class GraphCompilation {
-    public:
-        [[nodiscard]]
-        static std::expected<GraphCompilation, Error> create(Graph const& graph) noexcept;
-
-        void record_commands();
-
-    private:
-        GraphCompilation() = default;
-    };
-
-    struct Command {
-        u64 id;
-    };
-
-    struct RenderPass {};
-
-    enum class ResourceType: u8 {
-        Texture,
-    };
-
-    struct ResourceRef {
-        u64 id = std::numeric_limits<u64>::max();
-        ResourceType type;
-    };
-
-    enum class NodeType : u8 {
-        Compute,
-        Raster,
-        RayTracing,
-    };
-
-    struct Node {
-        NodeType type;
-        std::vector<ResourceRef> inputs;
-        std::vector<ResourceRef> outputs;
-        std::vector<u64> dependencies;
-        std::vector<u64> dependents;
-    };
-
+namespace hc::render::device::graph {
     /**
     * @brief A graph resource.
     */
@@ -95,33 +62,6 @@ namespace hc::render::device {
 
         Graph& operator=(const Graph&) = delete;
 
-        /**
-        * @brief Compile the graph into an optimized set of commands.
-        *
-        * No-op if no significant changes were made to the graph.
-        * This function MUST be called before `record`.
-        * If the logical flow of the graph is unsound, an error is returned.
-        *
-        * @return GraphResult::Success if the graph was successfully compiled, otherwise an appropriate error value.
-        */
-        [[nodiscard]] std::expected<void, Error> compile();
-
-        /**
-        * @brief Check if the graph has already been compiled.
-        *
-        * @return *true* if the is compiled, *false* otherwise.
-        */
-        [[nodiscard]] bool is_compiled() const noexcept;
-
-        /**
-        * @brief Clear the current command compilation.
-        *
-        * The graph must be re-compiled, using `compile`, after calling this function, before `record` is called.
-        */
-        void clear_commands() noexcept;
-
-        [[nodiscard]] std::expected<void, Error> record() const noexcept;
-
         [[nodiscard]] u64 add_resource(buffer::Buffer&& buffer);
         [[nodiscard]] u64 add_resource(buffer::DynamicBuffer&& buffer);
 
@@ -140,7 +80,34 @@ namespace hc::render::device {
             UserPredicate<Sz>&& predicate
         );
 
-        void destroy_render_pass(VolkDeviceTable const& fn_table, VkDevice device, u64 id);
+        void destroy_render_pass(Cleaner& cleaner, u64 id);
+
+        [[nodiscard]]
+        std::expected<u64, Error> create_raster_pipeline(
+            VolkDeviceTable const& fn_table,
+            VkDevice device,
+            std::vector<std::reference_wrapper<Shader const>> const& shaders,
+            HCRasterPipelineInfo const& params
+        );
+
+        void destroy_raster_pipeline(Cleaner& cleaner, u64 id);
+
+        [[nodiscard]]
+        std::expected<u64, Error> create_draw(
+            VolkDeviceTable const& fn_table,
+            VkDevice device,
+            VkPipelineCache cache,
+            u64 render_pass_id,
+            u32 subpass,
+            u64 pipeline_id,
+            u32 vertex_count,
+            u32 instance_count
+        );
+
+        void destroy_draw(Cleaner& cleaner, u64 id);
+
+        [[nodiscard]]
+        std::expected<void, Error> set_draw_push_constants(u64 id, std::span<void const*> const& constant_ptrs);
 
     private:
         Graph(u8 graphics_idx, u8 compute_idx, u8 transfer_idx, Sz command_queues);
@@ -149,7 +116,8 @@ namespace hc::render::device {
         std::expected<u64, Error> insert_node(
             std::vector<ResourceRef>&& inputs,
             std::vector<ResourceRef>&& outputs,
-            std::vector<u64>&& dependencies
+            std::vector<u64>&& dependencies,
+            NodeVariant&& variant
         );
 
         void remove_node(u64 id);
@@ -163,8 +131,14 @@ namespace hc::render::device {
 
         void prune_node(u64 prune_id);
 
-        [[nodiscard]]
-        u64 insert_resource(buffer::Buffer&& resource);
+        template<std::ranges::range R>
+        void prune_nodes(R&& ids) requires std::same_as<std::ranges::range_value_t<R>, u64> {
+            for (u64 const id : ids) {
+                this->prune_node(id);
+            }
+        }
+
+        [[nodiscard]] u64 insert_resource(buffer::Buffer&& resource);
 
         void remove_resource(u64 id);
 
@@ -173,6 +147,7 @@ namespace hc::render::device {
 
         Bank<Node> nodes;
         std::unordered_set<u64> pruned_node_ids;
+        u64 root_node;
         bool dirty = true;
 
         Bank<buffer::Buffer> resources;
@@ -187,10 +162,11 @@ namespace hc::render::device {
         RenderPassBank render_passes;
         std::unordered_map<u64, RenderPassGraphData> render_pass_datas;
 
-        u8 graphics_idx = std::numeric_limits<u8>::max(); //!< The index of the graphics command list in `commands`.
-        u8 compute_idx = std::numeric_limits<u8>::max(); //!< The index of the compute command list in `commands`.
-        u8 transfer_idx = std::numeric_limits<u8>::max(); //!< The index of the transfer command list in `commands`.
+        struct RasterPipeline {
+            pipeline::RasterPipeline pipeline;
+            std::vector<u64> dependents;
+        };
 
-        std::vector<std::vector<void*>> commands; //!< A compiled list of commands.
+        Bank<RasterPipeline> raster_pipelines;
     };
 }

@@ -157,12 +157,18 @@ namespace hc::render::device {
         }
 
         VkPhysicalDeviceFeatures features = {};
+        VkPhysicalDeviceVulkan12Features features12 = {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES,
+            .pNext = nullptr,
+            .descriptorIndexing = VK_TRUE,
+            .bufferDeviceAddress = VK_TRUE,
+        };
 
-        char const* extensions[] = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+        char const* extensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
         VkDeviceCreateInfo create_info = {
             .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-            .pNext = nullptr,
+            .pNext = &features12,
             .flags = 0,
             .queueCreateInfoCount = static_cast<u32>(queue_infos.size()),
             .pQueueCreateInfos = queue_infos.data(),
@@ -207,7 +213,7 @@ namespace hc::render::device {
         }
         device.pipeline_cache = *std::move(cache_result);
 
-        device.graph = Graph::create(
+        device.graph = graph::Graph::create(
             device.scheduler.graphics_queues()[0].get().family,
             device.scheduler.compute_queue().family,
             device.scheduler.transfer_queue().family
@@ -234,10 +240,10 @@ namespace hc::render::device {
             return memory_result.error();
         }
 
-        auto graph_result = this->graph.compile();
-        if (!graph_result) {
-            return graph_result.error();
-        }
+        // auto graph_result = this->graph.compile();
+        // if (!graph_result) {
+        //     return graph_result.error();
+        // }
 
         // this->graph.record();
 
@@ -353,7 +359,7 @@ namespace hc::render::device {
     }
 
     void Device::resize_framebuffer(GLFWwindow const* window, VkExtent2D extent) noexcept {
-        this->framebuffer_resizes.push({window, extent});
+        this->framebuffer_resizes.push({ window, extent });
     }
 
     std::expected<buffer::BufferData, Error> Device::new_buffer(
@@ -515,7 +521,13 @@ namespace hc::render::device {
     }
 
     std::expected<texture::TextureData, Error> Device::create_texture(VkImageCreateInfo const& image_info) {
-        auto texture_result = texture::create_image(this->physical_handle, this->fn_table, this->handle, image_info);
+        auto texture_result = texture::create_image(
+            this->physical_handle,
+            this->properties.limits,
+            this->fn_table,
+            this->handle,
+            image_info
+        );
         if (!texture_result) {
             return texture_result.error();
         }
@@ -547,7 +559,45 @@ namespace hc::render::device {
     }
 
     void Device::destroy_render_pass(u64 id) {
-        this->graph.destroy_render_pass(this->fn_table, this->handle, id);
+        this->graph.destroy_render_pass(this->cleaner, id);
+    }
+
+    std::expected<u64, Error> Device::create_raster_pipeline(
+        std::vector<std::reference_wrapper<Shader const>> const& shaders,
+        HCRasterPipelineInfo const& params
+    ) {
+        return this->graph.create_raster_pipeline(this->fn_table, this->handle, shaders, params);
+    }
+
+    void Device::destroy_raster_pipeline(u64 id) {
+        this->graph.destroy_raster_pipeline(this->cleaner, id);
+    }
+
+    std::expected<u64, Error> Device::create_draw(
+        u64 render_pass_id,
+        u32 subpass,
+        u64 pipeline_id,
+        u32 vertex_count,
+        u32 instance_count
+    ) {
+        return this->graph.create_draw(
+            this->fn_table,
+            this->handle,
+            this->pipeline_cache,
+            render_pass_id,
+            subpass,
+            pipeline_id,
+            vertex_count,
+            instance_count
+        );
+    }
+
+    void Device::destroy_draw(u64 id) {
+        this->graph.destroy_draw(this->cleaner, id);
+    }
+
+    std::expected<void, Error> Device::set_draw_push_constants(u64 id, std::span<void const*> const& constant_ptrs) {
+        return this->graph.set_draw_push_constants(id, constant_ptrs);
     }
 
     void Device::update_framebuffers() noexcept {

@@ -1,9 +1,9 @@
 #pragma once
 
 #include "cleaner.hpp"
-#include "graph.hpp"
 #include "scheduler.hpp"
 
+#include "graph/graph.hpp"
 #include "memory/memory.hpp"
 #include "swapchain/swapchain.hpp"
 
@@ -104,6 +104,28 @@ namespace hc::render::device {
 
         void destroy_render_pass(u64 id);
 
+        [[nodiscard]]
+        std::expected<u64, Error> create_raster_pipeline(
+            std::vector<std::reference_wrapper<Shader const>> const& shaders,
+            HCRasterPipelineInfo const& params
+        );
+
+        void destroy_raster_pipeline(u64 id);
+
+        [[nodiscard]]
+        std::expected<u64, Error> create_draw(
+            u64 render_pass_id,
+            u32 subpass,
+            u64 pipeline_id,
+            u32 vertex_count,
+            u32 instance_count
+        );
+
+        void destroy_draw(u64 id);
+
+        [[nodiscard]]
+        std::expected<void, Error> set_draw_push_constants(u64 id, std::span<void const*> const& constant_ptrs);
+
     private:
         Device() = default;
 
@@ -123,7 +145,7 @@ namespace hc::render::device {
         VkPhysicalDeviceFeatures2 features = {};
 
         Scheduler scheduler;
-        Graph graph;
+        graph::Graph graph;
         memory::Memory memory;
 
         struct FramebufferResize {

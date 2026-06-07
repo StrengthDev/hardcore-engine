@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "raster_pipeline_params.hpp"
+#include "raster_pipeline_info.hpp"
 #include "shader_stages.hpp"
 
 #include "../shader/shader.hpp"
@@ -19,14 +19,14 @@ namespace hc::render::pipeline {
             VkDevice device,
             VkPipelineCache cache,
             ShaderStages const& shaders,
-            RasterPipelineParams const& params,
+            RasterPipelineInfo const& info,
             VkPipelineLayout layout,
             u32 attachment_count,
             VkRenderPass render_pass,
             u32 subpass
         );
 
-        void destroy(VolkDeviceTable const& fn_table, VkDevice device);
+        [[nodiscard]] vk::GraphicsPipeline extract_handle() noexcept;
 
         [[nodiscard]] VkPipeline vk_handle() const noexcept;
 

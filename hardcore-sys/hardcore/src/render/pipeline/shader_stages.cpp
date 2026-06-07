@@ -7,14 +7,16 @@ namespace hc::render::pipeline {
     std::expected<ShaderStages, Error> ShaderStages::create(
         VolkDeviceTable const& fn_table,
         VkDevice device,
-        std::vector<Shader> const& shaders
+        std::vector<std::reference_wrapper<Shader const>> const& shaders
     ) {
         ShaderStages shader_stages;
 
         shader_stages.shader_stages.reserve(shaders.size());
         shader_stages.shader_modules.reserve(shaders.size());
 
-        for (auto const& shader : shaders) {
+        for (auto const& shader_ref : shaders) {
+            auto const& shader = shader_ref.get();
+
             VkShaderModuleCreateInfo module_create_info = {
                 .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
                 .pNext = nullptr,
@@ -23,7 +25,6 @@ namespace hc::render::pipeline {
                 .pCode = shader.bytecode_vec().data(),
             };
 
-            auto& module = shader_stages.shader_modules.back();
             auto result = vk::ShaderModule::create(fn_table, device, module_create_info);
             if (!result) {
                 return result.error();
@@ -36,7 +37,7 @@ namespace hc::render::pipeline {
                     .pNext = nullptr,
                     .flags = 0,
                     .stage = shader.stage_flag(),
-                    .module = module,
+                    .module = shader_stages.shader_modules.back(),
                     .pName = shader.entrypoint_str(),
                     // TODO specialization constants
                     .pSpecializationInfo = nullptr,
@@ -49,7 +50,6 @@ namespace hc::render::pipeline {
 
     void ShaderStages::destroy(VolkDeviceTable const& fn_table, VkDevice device) {
         for (auto& shader_module : this->shader_modules) {
-            fn_table.vkDestroyShaderModule(device, shader_module, nullptr);
             shader_module.destroy(fn_table, device);
         }
 

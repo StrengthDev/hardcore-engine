@@ -15,14 +15,14 @@ struct VersionBitfield {
     u32 variant : 3;
 };
 
-static constexpr HCVersion bitfield_to_version(u32 version_bitfield) {
+static HCVersion constexpr bitfield_to_version(u32 version_bitfield) {
     auto [patch, minor, major, variant] = std::bit_cast<VersionBitfield>(version_bitfield);
-    return {.major = major, .minor = minor, .patch = patch,};
+    return { .major = major, .minor = minor, .patch = patch, };
 }
 
-const HCVersion HC_VULKAN_API_VERSION = bitfield_to_version(hc::render::VULKAN_API_VERSION);
-const HCVersion HC_VULKAN_HEADERS_VERSION = bitfield_to_version(VK_HEADER_VERSION_COMPLETE);
-const u32 HC_VOLK_HEADER_VERSION = VOLK_HEADER_VERSION;
+HCVersion const HC_VULKAN_API_VERSION = bitfield_to_version(hc::render::VULKAN_API_VERSION);
+HCVersion const HC_VULKAN_HEADERS_VERSION = bitfield_to_version(VK_HEADER_VERSION_COMPLETE);
+u32 const HC_VOLK_HEADER_VERSION = VOLK_HEADER_VERSION;
 
 HCResult hc_render_tick() {
     auto result = hc::render::tick();
@@ -30,7 +30,7 @@ HCResult hc_render_tick() {
         return result.error();
     }
 
-    return {.success = true};
+    return { .success = true };
 }
 
 HCResult hc_render_finish() {
@@ -39,5 +39,5 @@ HCResult hc_render_finish() {
         return result.error();
     }
 
-    return {.success = true};
+    return { .success = true };
 }

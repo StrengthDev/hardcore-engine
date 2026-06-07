@@ -209,6 +209,31 @@ impl std::ops::MulAssign for Color {
     }
 }
 
+impl From<Color> for hardcore_sys::Color {
+    fn from(value: Color) -> Self {
+        hardcore_sys::Color {
+            r: value.r,
+            g: value.g,
+            b: value.b,
+            a: value.a,
+        }
+    }
+}
+
+pub static WHITE: Color = Color {
+    r: 1.0,
+    g: 1.0,
+    b: 1.0,
+    a: 1.0,
+};
+
+pub static BLACK: Color = Color {
+    r: 0.0,
+    g: 0.0,
+    b: 0.0,
+    a: 0.0,
+};
+
 mod tests {
     // TODO tests
 }

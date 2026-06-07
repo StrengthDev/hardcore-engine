@@ -1,7 +1,7 @@
 use crate::handle::Handle;
 use crate::ops::{as_dependency, seal, Dependency, Predicate, Schedule};
 use crate::resource::{
-    BasicTexture, DepthStencilTexture, InputAttachmentTexture, OutputAttachmentTexture, TextureView,
+    BasicTexture, DepthStencilTexture, InputAttachmentTexture, RenderTarget, TextureView,
 };
 use crate::Error;
 
@@ -13,8 +13,8 @@ pub struct InputAttachment<'t> {
     pub dependency: Option<&'t dyn Dependency>,
 }
 
-pub struct OutputAttachment<'t> {
-    pub attachment: &'t dyn OutputAttachmentTexture,
+pub struct OutputAttachment<'t, 's> {
+    pub attachment: &'t RenderTarget<'s>,
     pub view: TextureView,
     pub dependency: Option<&'t dyn Dependency>,
 }
@@ -25,7 +25,7 @@ pub struct DepthStencilAttachment<'t, 's> {
     pub dependency: Option<&'t dyn Dependency>,
 }
 
-pub struct Subpass {
+pub struct SubpassInfo {
     inputs: Vec<(
         hardcore_sys::Texture,
         hardcore_sys::TextureViewParams,
@@ -46,12 +46,12 @@ pub struct Subpass {
     device: u32,
 }
 
-impl Subpass {
+impl SubpassInfo {
     pub fn new(
         inputs: &HashMap<u32, InputAttachment>,
         outputs: &HashMap<u32, OutputAttachment>,
         depth_stencil: Option<DepthStencilAttachment>,
-    ) -> Result<Subpass, Error> {
+    ) -> Result<SubpassInfo, Error> {
         if outputs.is_empty() {
             return Err(Error::InvalidParams(
                 "Subpass must have at least one output".to_string(),
@@ -104,7 +104,7 @@ impl Subpass {
             }
         }
 
-        Ok(Subpass {
+        Ok(SubpassInfo {
             inputs: c_inputs,
             outputs: c_outputs,
             depth_stencil,
@@ -120,13 +120,13 @@ struct SubpassData {
 }
 
 pub struct RenderPass<'s> {
-    handle: Handle<'s, hardcore_sys::RenderPass>,
+    pub(super) handle: Handle<'s, hardcore_sys::RenderPass>,
     predicate: Option<Predicate>,
 }
 
 impl<'s> RenderPass<'s> {
     pub(crate) fn new(
-        subpasses: &[Subpass],
+        subpasses: &[SubpassInfo],
         schedule: Schedule<impl Fn(usize) -> bool + 'static>,
     ) -> Result<RenderPass<'s>, Error> {
         if subpasses.is_empty() {

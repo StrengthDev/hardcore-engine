@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::num::NonZeroU32;
 use tracing::{debug, trace};
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::EnvFilter;
@@ -8,11 +10,15 @@ use hardcore::io::input::{ButtonAction, MouseButton};
 use hardcore::io::window::{CursorMode, Window};
 use hardcore::layer::Layer;
 use hardcore::meta::{glfw_version, vulkan_api_version};
-use hardcore::resource::VertexBuffer;
+use hardcore::ops::raster_commands::Draw;
+use hardcore::ops::raster_pipeline::{RasterPipeline, RasterPipelineInfo};
+use hardcore::ops::render_pass::{OutputAttachment, RenderPass, SubpassInfo};
+use hardcore::resource::TextureDimensions::Texture2D;
+use hardcore::resource::{RenderTarget, TextureFormat, TextureView, VertexBuffer};
 use hardcore::shader::Shader;
 use hardcore::state::State;
 use hardcore::{ApplicationDescriptor, Device, Initializer, Instance, Version};
-use hardcore_sys::ShaderStage;
+use hardcore_sys::{ShaderStage, TextureComponentFormat, TextureNumericFormat, TextureSampleCount};
 
 struct SharedData<'s> {
     window: Window<'s>,
@@ -41,6 +47,10 @@ struct FractalLayer<'s> {
     action_signal: bool,
     vert_shader: Shader,
     frag_shader: Shader,
+    pipeline: RasterPipeline<'s>,
+    render_target: RenderTarget<'s>,
+    render_pass: RenderPass<'s>,
+    draw: Draw<'s>,
     cursor_mode: bool,
     cursor_mode_dirty: bool,
     should_exit: bool,
@@ -48,22 +58,75 @@ struct FractalLayer<'s> {
 
 impl<'s> FractalLayer<'s> {
     fn new(initializer: &'s Initializer, devices: &[Device]) -> Self {
+        let vert_shader = Shader::try_from_source(
+            include_str!("resources/shaders/shader.vert"),
+            ShaderStage::Vertex.into(),
+            Default::default(),
+        )
+        .expect("Failed to create vertex shader");
+        let frag_shader = Shader::try_from_source(
+            include_str!("resources/shaders/shader.frag"),
+            ShaderStage::Fragment.into(),
+            Default::default(),
+        )
+        .expect("Failed to create fragment shader");
+
+        let pipeline = initializer
+            .new_raster_pipeline(
+                &devices[0],
+                &[&vert_shader, &frag_shader],
+                RasterPipelineInfo::default(),
+            )
+            .expect("Failed to create raster pipeline");
+
+        let render_target = initializer
+            .new_render_target(
+                &devices[0],
+                Texture2D {
+                    width: unsafe { NonZeroU32::new_unchecked(1920) },
+                    height: unsafe { NonZeroU32::new_unchecked(1080) },
+                    layers: unsafe { NonZeroU32::new_unchecked(1) },
+                },
+                TextureFormat::standard(
+                    TextureComponentFormat::R16G16B16A16,
+                    TextureNumericFormat::UNorm,
+                )
+                .expect("Invalid texture format"),
+                unsafe { NonZeroU32::new_unchecked(1) },
+                TextureSampleCount::SC1,
+                false,
+            )
+            .expect("Failed to create render target");
+
+        let mut outputs = HashMap::new();
+        outputs.insert(
+            0,
+            OutputAttachment {
+                attachment: &render_target,
+                view: TextureView::full(false),
+                dependency: None,
+            },
+        );
+
+        let render_pass = initializer
+            .new_render_pass(&[SubpassInfo::new(&HashMap::new(), &outputs, None)
+                .expect("Failed to create subpass")])
+            .expect("Failed to create render pass");
+
+        let draw = initializer
+            .new_draw(&render_pass, 0, &pipeline, 6, 1)
+            .expect("Failed to create draw");
+
         Self {
             obj: None,
             print_signal: false,
             action_signal: false,
-            vert_shader: Shader::try_from_source(
-                include_str!("resources/shaders/shader.vert"),
-                ShaderStage::Vertex.into(),
-                Default::default(),
-            )
-            .expect("Failed to create shaders"),
-            frag_shader: Shader::try_from_source(
-                include_str!("resources/shaders/shader.frag"),
-                ShaderStage::Fragment.into(),
-                Default::default(),
-            )
-            .expect("Failed to create shader"),
+            vert_shader,
+            frag_shader,
+            pipeline,
+            render_target,
+            render_pass,
+            draw,
             cursor_mode: false,
             cursor_mode_dirty: false,
             should_exit: false,

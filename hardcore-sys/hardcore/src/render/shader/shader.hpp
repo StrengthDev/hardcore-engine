@@ -81,6 +81,6 @@ namespace hc::render {
 
         std::unordered_map<DescriptorLocation, DescriptorBinding> bindings_map;
 
-        friend HCResult (::hc_create_shader)(HCShader* shader, const u32* bytecode, size_t size, HCShaderStage stage);
+        friend HCResult (::hc_new_shader)(HCShader* shader, const u32* bytecode, size_t size, HCShaderStage stage);
     };
 }

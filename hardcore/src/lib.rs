@@ -69,7 +69,7 @@ pub mod meta;
 #[macro_use]
 mod native;
 pub mod color;
-mod ops;
+pub mod ops;
 pub mod resource;
 pub mod shader;
 pub mod state;

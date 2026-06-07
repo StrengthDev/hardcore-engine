@@ -7,6 +7,8 @@
 #include "swapchain/swapchain.hpp"
 #include "swapchain/swapchain_instance.hpp"
 
+#include "../pipeline/raster_pipeline.hpp"
+
 #include <core/glfw.hpp>
 
 #include <util/number.hpp>
@@ -32,6 +34,9 @@ namespace hc::render::device {
         void yield_buffer(buffer::Buffer&& buffer);
         void yield_dynamic_buffer(buffer::DynamicBuffer&& buffer);
         void yield_texture(texture::Texture&& texture);
+        void yield_render_pass(vk::RenderPass&& render_pass);
+        void yield_raster_pipeline(pipeline::RasterPipeline&& pipeline);
+        void yield_graphics_pipeline_instance(vk::GraphicsPipeline&& pipeline);
 
     private:
         struct Window {
@@ -44,13 +49,11 @@ namespace hc::render::device {
             swapchain::SwapchainInstance,
             buffer::Buffer,
             buffer::DynamicBuffer,
-            texture::Texture
+            texture::Texture,
+            vk::RenderPass,
+            pipeline::RasterPipeline,
+            vk::GraphicsPipeline
         > DestructionQueueItem;
-
-        template<class... Ts>
-        struct DestructionHandler : Ts... {
-            using Ts::operator()...;
-        };
 
         std::vector<std::vector<DestructionQueueItem>> cleanup_queues;
         std::vector<DestructionQueueItem> cleanup_submissions;

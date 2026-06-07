@@ -9,6 +9,7 @@
 #include "render/renderer.h"
 #include "render/shader.h"
 #include "render/ops/common.h"
+#include "render/ops/raster_commands.h"
 #include "render/ops/raster_pipeline.h"
 #include "render/ops/render_pass.h"
 #include "render/resource/buffer.h"

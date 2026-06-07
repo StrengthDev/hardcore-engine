@@ -1,5 +1,6 @@
 //! Device operations module.
 
+pub mod raster_commands;
 pub mod raster_pipeline;
 pub mod render_pass;
 

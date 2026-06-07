@@ -1,15 +1,14 @@
 
 #pragma once
 
+#include "push_constants_processor.hpp"
 #include "raster_pipeline_instance.hpp"
-#include "raster_pipeline_params.hpp"
+#include "raster_pipeline_info.hpp"
 #include "shader_stages.hpp"
 
 #include "../shader/shader.hpp"
 
 #include <core/error.hpp>
-
-#include <util/bank.hpp>
 
 #include <vulkan/vulkan.h>
 
@@ -22,8 +21,8 @@ namespace hc::render::pipeline {
         static std::expected<RasterPipeline, Error> create(
             VolkDeviceTable const& fn_table,
             VkDevice device,
-            std::vector<Shader> const& shaders,
-            HCRasterPipelineParams const& params
+            std::vector<std::reference_wrapper<Shader const>> const& shaders,
+            HCRasterPipelineInfo const& info
         );
 
         void destroy(VolkDeviceTable const& fn_table, VkDevice device);
@@ -37,12 +36,12 @@ namespace hc::render::pipeline {
             u32 subpass
         ) noexcept;
 
-        void free_instance(
-            VolkDeviceTable const& fn_table,
-            VkDevice device,
-            VkRenderPass render_pass,
-            u32 subpass
-        ) noexcept;
+        [[nodiscard]] std::optional<vk::GraphicsPipeline> free_instance(VkPipeline vk_handle) noexcept;
+
+        [[nodiscard]] std::expected<void, Error> fill_push_constants_buffer(
+            std::vector<u8>& buffer,
+            std::span<void const*> const& constant_ptrs
+        ) const noexcept;
 
     private:
         RasterPipeline() = default;
@@ -64,10 +63,13 @@ namespace hc::render::pipeline {
         };
 
         ShaderStages shaders;
-        RasterPipelineParams params;
+        RasterPipelineInfo info;
         vk::PipelineLayout layout;
+        PushConstantsProcessor push_constants_processor;
+
         u32 color_attachment_count = 0;
 
         std::unordered_map<InstanceKey, Instance, InstanceKeyHash> instances;
+        std::unordered_map<VkPipeline, std::pair<VkRenderPass, u32>> instance_keys;
     };
 }
